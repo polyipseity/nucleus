@@ -34,6 +34,7 @@ function Assert-Fail {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $stepFile = Join-Path $repoRoot 'src/scripts/checks/check-steps/13-repo-policy-data.ps1'
+$driftLibFile = Join-Path $repoRoot 'src/scripts/lib/provisioned-tools-drift.ps1'
 
 # WHY: check-lib.ps1 sources step-runner.ps1 and defines the Write-* helpers the
 # drift helper calls; it needs both variables set before it is dot-sourced.
@@ -43,10 +44,10 @@ $FrameworkDir = Join-Path $repoRoot 'src/scripts/lib'
 # see a read that happens through dot-sourcing, so reference the variable here.
 $null = $FrameworkDir  # check-suppress:suppression_doc: cross-scope read by dot-sourced check-lib.ps1; PSSA cannot track it
 . (Join-Path $repoRoot 'src/scripts/checks/check-lib.ps1')
-. $stepFile
+. $driftLibFile
 
 if (-not (Get-Command Invoke-ProvisionedToolsInstructionDriftCheck -ErrorAction SilentlyContinue)) {
-  Write-Output 'FAIL helper exists : Invoke-ProvisionedToolsInstructionDriftCheck not found after dot-sourcing'
+  Write-Output 'FAIL helper exists : Invoke-ProvisionedToolsInstructionDriftCheck not found after dot-sourcing the lib'
   Write-Output "TOTAL $script:passCount passed, 1 failed"
   exit 1
 }
@@ -187,12 +188,15 @@ try {
   Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# 5. Step action wires the extracted helper (parity/registration evidence).
+# 5. Step action wires the extracted helper via the lib.
 $stepSource = Get-Content -LiteralPath $stepFile -Raw
-if ($stepSource -match 'Invoke-ProvisionedToolsInstructionDriftCheck\s+-RepoRoot' -and $stepSource -match '-Passed\s+\(\[ref\]' -and $stepSource -match 'function Invoke-ProvisionedToolsInstructionDriftCheck') {
-  Assert-Pass 'the step action calls the extracted drift helper'
+if ($stepSource -match "provisioned-tools-drift\.ps1" -and
+    $stepSource -match 'Invoke-ProvisionedToolsInstructionDriftCheck\s+-RepoRoot' -and
+    $stepSource -match '-Passed\s+\(\[ref\]' -and
+    $stepSource -notmatch '(?m)^function\s+Invoke-ProvisionedToolsInstructionDriftCheck\b') {
+  Assert-Pass 'the step action dot-sources the drift lib and calls the extracted helper'
 } else {
-  Assert-Fail 'the step action calls the extracted drift helper' 'helper definition or call not found in step file'
+  Assert-Fail 'the step action dot-sources the drift lib and calls the extracted helper' 'expected lib dot-source and helper call in step file without a local helper definition'
 }
 
 Write-Output ''
