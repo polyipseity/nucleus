@@ -14,6 +14,9 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+  $bashProbeLibPath = Join-Path $r 'src/scripts/lib/completions-bash-probe.ps1'
+  . $bashProbeLibPath
+
   $fmtDur = {
     param([datetime]$Start)
     '{0:N3} s' -f (([datetime]::UtcNow - $Start).TotalSeconds)
@@ -76,7 +79,26 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   Write-Message "--- --list-* help/introspection contract ---"
   $t0 = [datetime]::UtcNow
   $zshDir = Join-Path $r 'src/modules/completions/zsh'
-  $bashExe = (Get-Command bash -ErrorAction SilentlyContinue).Source # check-suppress:suppression_doc: optional probe; absence fails below
+  $bashCommand = Get-Command bash -ErrorAction SilentlyContinue # check-suppress:suppression_doc: bash absence handled explicitly below
+  if (-not $bashCommand -or -not $bashCommand.Source) {
+    Write-ErrorMessage "bash is required for completion introspection/probes but was not found on PATH"
+    return $false
+  }
+  $bashExe = $bashCommand.Source
+  $bashVersionOut = & $bashExe --version 2>&1
+  $bashVersionExit = $LASTEXITCODE
+  $bashVersionText = (($bashVersionOut | ForEach-Object { "$_" }) -join "`n")
+  if ($bashVersionExit -ne 0) {
+    $detail = if ($bashVersionText) { "; output: $bashVersionText" } else { '' }
+    Write-ErrorMessage "bash --version failed for '$bashExe' (exit $bashVersionExit)$detail"
+    return $false
+  }
+  $bashVersionError = Get-NucleusBashVersionRequirementError -VersionOutput $bashVersionText -BashPath $bashExe
+  if ($bashVersionError) {
+    Write-ErrorMessage $bashVersionError
+    return $false
+  }
+
   foreach ($command in $commands) {
     $zshFile = Join-Path $zshDir "_nucleus-$command"
     if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
@@ -85,13 +107,18 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     $scriptName = "scripts/$command.sh"
     if ($command -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
     $scriptPath = Join-Path $r $scriptName
-    if (-not $bashExe -or -not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
-    $helpOut = & $bashExe $scriptPath --help 2>$null # check-suppress:suppression_doc: help is stdout-only per contract; --help failure handled below
-    if ($LASTEXITCODE -ne 0) {
-      Write-ErrorMessage "nucleus-${command}: --help failed during introspection"
+    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
+    $bashScriptPath = ConvertTo-NucleusGitBashPath -Path $scriptPath
+    $helpOut = & $bashExe $bashScriptPath --help 2>&1
+    $helpExit = $LASTEXITCODE
+    $stderrLines = @($helpOut | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().TrimEnd() } | Where-Object { $_ -ne '' })
+    $stdoutLines = @($helpOut | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString() })
+    if ($helpExit -ne 0) {
+      $detail = if ($stderrLines.Count -gt 0) { "; stderr: $($stderrLines -join ' | ')" } elseif ($helpOut) { "; output: $(($helpOut | ForEach-Object { "$_" }) -join ' | ')" } else { '' }
+      Write-ErrorMessage "nucleus-${command}: --help failed during introspection (exit $helpExit)$detail"
       return $false
     }
-    $helpText = ($helpOut | Out-String)
+    $helpText = ($stdoutLines -join "`n")
     $listFlags = @([regex]::Matches($zshText, '--list-[a-z0-9-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
     foreach ($flag in $listFlags) {
       if ($helpText -notmatch [regex]::Escape($flag)) {
@@ -109,10 +136,12 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   $t0 = [datetime]::UtcNow
   if ($bashExe) {
     $endpointSvc = $null
+    $svcScriptPath = Join-Path $r 'scripts/svc.sh'
+    $bashSvcScriptPath = ConvertTo-NucleusGitBashPath -Path $svcScriptPath
     try {
-      $svcList = @(& $bashExe (Join-Path $r 'scripts/svc.sh') --list-services 2>$null) # check-suppress:suppression_doc: probe for endpoint-capable service; empty is handled
+      $svcList = @(& $bashExe $bashSvcScriptPath --list-services 2>$null) # check-suppress:suppression_doc: probe for endpoint-capable service; empty is handled
       foreach ($svc in ($svcList | ForEach-Object { ($_ | Out-String).Trim() } | Where-Object { $_ })) {
-        & $bashExe (Join-Path $r 'scripts/svc.sh') endpoint --list-endpoints $svc > $null 2>&1 # check-suppress:suppression_doc: probe exit code selects a service with endpoints
+        & $bashExe $bashSvcScriptPath endpoint --list-endpoints $svc > $null 2>&1 # check-suppress:suppression_doc: probe exit code selects a service with endpoints
         if ($LASTEXITCODE -eq 0) { $endpointSvc = $svc; break }
       }
     } catch { $endpointSvc = $null } # check-suppress:suppression_doc: probe failure means no endpoint provider context to test
@@ -130,7 +159,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
           if ($name -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
           $scriptPath = Join-Path $r $scriptName
           if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
-            $quotedScriptPath = $scriptPath -replace "'", "'\\''"
+            $bashMappedScriptPath = ConvertTo-NucleusGitBashPath -Path $scriptPath
+            $quotedScriptPath = $bashMappedScriptPath -replace "'", "'\\''"
             $testCmd = "bash '$quotedScriptPath'" + $testCmd.Substring(("nucleus-$name").Length)
           }
         }
@@ -141,9 +171,12 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
             continue
           }
         }
-        & $bashExe -c $testCmd > $null 2>&1 # check-suppress:suppression_doc: provider output not user-facing; exit code is the signal
-        if ($LASTEXITCODE -ne 0) {
-          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero: $testCmd"
+        $provOut = & $bashExe -c $testCmd 2>&1
+        $provExit = $LASTEXITCODE
+        if ($provExit -ne 0) {
+          $provStderr = @($provOut | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().TrimEnd() } | Where-Object { $_ -ne '' })
+          $detail = if ($provStderr.Count -gt 0) { "; stderr: $($provStderr -join ' | ')" } elseif ($provOut) { "; output: $(($provOut | ForEach-Object { "$_" }) -join ' | ')" } else { '' }
+          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero (exit $provExit): $testCmd$detail"
           return $false
         }
       }
