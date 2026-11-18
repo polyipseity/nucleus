@@ -534,21 +534,35 @@ export async function copyTextToClipboard(text, deps = {}) {
   return false;
 }
 
-export async function defaultWriteToClipboardCommand(command, args, text) {
+export async function defaultWriteToClipboardCommand(command, args, text, timeoutMs = 5000) {
   return new Promise((resolve) => {
     let settled = false;
     const child = spawn(command, args, { stdio: ["pipe", "ignore", "ignore"] });
     const finish = (ok) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       resolve(ok);
     };
+    const timer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        // process may have already exited
+      }
+      finish(false);
+    }, timeoutMs);
     child.on("error", () => finish(false));
     child.on("close", (code) => finish(code === 0));
     try {
       child.stdin?.write(text);
       child.stdin?.end();
     } catch {
+      try {
+        child.kill();
+      } catch {
+        // process may have already exited
+      }
       finish(false);
     }
   });
