@@ -354,6 +354,31 @@ export async function pickPromptChoice(
 	second: PromptChoice | string | ExtensionCommandContext["ui"] | null,
 	third?: ExtensionCommandContext["ui"],
 ): Promise<PromptChoice | null | "cancelled"> {
+	// New signature: (choices, filter, ui)
+	if (third && isPickerUi(third) && typeof second === "string") {
+		const choices = (first ?? []) as readonly PromptChoice[];
+		const filter = second;
+		const ui = third;
+		const filtered = filterPromptChoices(choices, filter);
+		if (filtered.length === 0) {
+			return null;
+		}
+		const options = filtered.map(promptOptionLabel);
+		const selected = await ui.select("Select prompt", options);
+		if (selected === undefined) {
+			return "cancelled";
+		}
+		let index = options.indexOf(selected);
+		if (index < 0) {
+			if (selected.startsWith("Sent:")) {
+				index = filtered.findIndex((choice) => choice.source === "sent");
+			} else if (selected.startsWith("Queued:")) {
+				index = filtered.findIndex((choice) => choice.source === "queued");
+			}
+		}
+		return index < 0 ? "cancelled" : filtered[index] ?? "cancelled";
+	}
+
 	// Legacy signature: (sent, queued, ui) — preserves existing labels/behavior.
 	if (third || isPickerUi(second)) {
 		const sent = first as PromptChoice | null;
@@ -385,10 +410,13 @@ export async function pickPromptChoice(
 		return index < 0 ? "cancelled" : choices[index] ?? "cancelled";
 	}
 
-	// New signature: (choices, filter, ui)
+	// Back-compat: treat missing ui/filter as no choices when called oddly.
 	const choices = (first ?? []) as readonly PromptChoice[];
 	const filter = typeof second === "string" ? second : "";
-	const ui = third as ExtensionCommandContext["ui"];
+	const ui = third as ExtensionCommandContext["ui"] | undefined;
+	if (!ui || !isPickerUi(ui)) {
+		return null;
+	}
 	const filtered = filterPromptChoices(choices, filter);
 	if (filtered.length === 0) {
 		return null;
