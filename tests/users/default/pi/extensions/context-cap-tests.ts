@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import contextCap, {
   agentPaths,
   applyToFiles,
+  DEFAULT_GLOBAL_CAP,
   effectiveWindow,
   formatFullStatus,
   formatScopeStatus,
@@ -19,6 +20,7 @@ import contextCap, {
   parseCommand,
   providerWindow,
   readCap,
+  readGlobalCap,
   refreshActiveModel,
   resetWrittenCap,
   resolveWindow,
@@ -256,6 +258,28 @@ describe("readCap", () => {
       expect(readCap({ contextWindowCap: value })).toBeNull();
     }
     expect(readCap(null)).toBeNull();
+  });
+});
+
+describe("readGlobalCap", () => {
+  test("absent settings file returns the exported default-cap constant", () => {
+    expect(DEFAULT_GLOBAL_CAP).toBeNull();
+    expect(readGlobalCap(null)).toBe(DEFAULT_GLOBAL_CAP);
+    expect(readGlobalCap(undefined)).toBe(DEFAULT_GLOBAL_CAP);
+    expect(readGlobalCap({})).toBe(DEFAULT_GLOBAL_CAP);
+  });
+
+  test("an explicit window at a scope wins over the global cap", () => {
+    const settings = { contextWindowCap: 256000 };
+    expect(readGlobalCap(settings)).toBe(256000);
+    expect(resolveWindow({ baseline: 1000000, session: 300000, explicit: null, cap: readGlobalCap(settings) })).toEqual({
+      window: 300000,
+      source: "session",
+    });
+    expect(resolveWindow({ baseline: 1000000, session: null, explicit: 900000, cap: readGlobalCap(settings) })).toEqual({
+      window: 900000,
+      source: "model",
+    });
   });
 });
 

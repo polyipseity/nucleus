@@ -290,6 +290,12 @@ export function readCap(settings: unknown): number | null {
   return typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : null;
 }
 
+export const DEFAULT_GLOBAL_CAP: number | null = null;
+
+export function readGlobalCap(settings: unknown): number | null {
+  return readCap(settings);
+}
+
 export function setGlobalCap(settings: Json, value: number | null): void {
   if (value === null) {
     delete settings.contextWindowCap;
