@@ -7,10 +7,13 @@ import promptTools, {
 	NOTHING_TO_CONTINUE_MESSAGE,
 	NOTHING_TO_COPY_QUEUED_MESSAGE,
 	NOTHING_TO_REPEAT_QUEUED_MESSAGE,
+	buildPromptChoices,
 	copyTextToClipboard,
 	createPromptToolsExtension,
 	extractUserMessageText,
+	filterPromptChoices,
 	findLastSentUserPrompt,
+	findSentUserPrompts,
 	handleContinue,
 	handleCopyUserPrompt,
 	handleRepeatUserPrompt,
@@ -20,6 +23,7 @@ import promptTools, {
 	pickPromptChoice,
 	promptPreview,
 	readQueuedPrompt,
+	readQueuedPromptList,
 	resolvePromptChoice,
 	type PromptToolsDeps,
 } from "../../../../../src/users/default/pi/extensions/prompt-tools.ts";
@@ -283,6 +287,30 @@ describe("pickPromptChoice", () => {
 			(ctx as { ui: { select: (title: string, options: string[]) => Promise<string | undefined> } }).ui as never,
 		);
 		expect(result).toBe("cancelled");
+	});
+});
+
+describe("prompt choice list and filter", () => {
+	test("candidate list holds every sent message and every queued prompt", () => {
+		const sent = [
+			{ text: "first", timestamp: "2026-11-18T10:00:00Z" },
+			{ text: "second", timestamp: "2026-11-18T10:05:00Z" },
+		];
+		const queued = [{ text: "queued one", mtimeMs: Date.parse("2026-11-18T10:03:00Z") }];
+		const choices = buildPromptChoices(sent, queued);
+		expect(choices.map((c) => c.text)).toEqual(["second", "queued one", "first"]);
+	});
+
+	test("queued entries lead when sent messages carry no timestamp", () => {
+		const sent = [{ text: "older" }, { text: "newer" }];
+		const queued = [{ text: "queued", mtimeMs: 1 }];
+		expect(buildPromptChoices(sent, queued).map((c) => c.text)).toEqual(["queued", "newer", "older"]);
+	});
+
+	test("filter narrows by case-insensitive substring and empty keeps all", () => {
+		const choices = buildPromptChoices([{ text: "Alpha" }, { text: "beta" }], []);
+		expect(filterPromptChoices(choices, "ALP").map((c) => c.text)).toEqual(["Alpha"]);
+		expect(filterPromptChoices(choices, "").length).toBe(2);
 	});
 });
 
