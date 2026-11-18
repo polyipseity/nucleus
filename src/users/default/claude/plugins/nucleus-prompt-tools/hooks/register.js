@@ -398,14 +398,6 @@ export function resolvePromptChoice(mode, $, deps = {}) {
   return null;
 }
 
-function unavailableSourceMessage(mode, command, choice) {
-  if (choice !== null) return null;
-  if (mode === "queued") {
-    return command === "copy" ? NOTHING_TO_COPY_QUEUED_MESSAGE : NOTHING_TO_REPEAT_QUEUED_MESSAGE;
-  }
-  return EMPTY_SESSION_MESSAGE;
-}
-
 function harnessClipboardCommands() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const scriptDir = path.join(here, "..", "..", "..", "..", "..", "src", "scripts", "notify");
