@@ -30,9 +30,12 @@ function importSpecifiers(source: string): string[] {
 
 describe("opencode v2 plugins", () => {
   for (const plugin of plugins) {
-    test(`${plugin.name} imports, exports a default function, and uses only node: specifiers`, async () => {
+    test(`${plugin.name} imports, exports a default plugin, and uses only node: specifiers`, async () => {
       const mod = await import(plugin.path);
-      expect(typeof mod.default).toBe("function");
+      expect(mod.default).toBeDefined();
+      const isFunction = typeof mod.default === "function";
+      const isPluginObject = typeof mod.default === "object" && mod.default !== null && typeof mod.default.setup === "function";
+      expect(isFunction || isPluginObject).toBe(true);
 
       const source = readFileSync(plugin.path, "utf8");
       const specifiers = importSpecifiers(source);
