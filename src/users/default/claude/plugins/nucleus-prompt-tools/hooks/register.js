@@ -3,17 +3,15 @@
  * /repeat-user-prompt.
  *
  * Semantics mirror src/users/default/pi/extensions/prompt-tools.ts:
- * - `sent` is the last user-role message sent to the model.
- * - `queued` is the newest queued harness-bridge prompt for Claude, read
- *   without consuming it from
- *   <nucleus user root>/state/harness-bridge/commands/claude/*.json.
- * - `pick` selects between sent and queued. A general mod dialog picker API is
- *   not verified from authoritative docs available in this environment, so
- *   `pick` resolves deterministically (queued if present, otherwise sent) and
- *   the task report records that limitation and evidence. No dialog API is
- *   called.
- * - copy copies to the platform clipboard as a side effect with a visible
- *   fallback when no clipboard command works.
+ * - `sent`/`queued` shortcuts return the newest prompt of that kind.
+ * - `queued` prompts are read from
+ *   <nucleus user root>/state/harness-bridge/commands/claude/*.json without
+ *   consuming them.
+ * - `pick` prints a numbered reverse-chronological list of every retained sent
+ *   and queued prompt; `pick <index>` selects that 1-based candidate. No dialog
+ *   picker API is assumed.
+ * - copy goes through the shared harness-clipboard command (stdin) with a
+ *   visible fallback when no clipboard command works.
  * - repeat returns the selected prompt as `{ text }` so command.run injects it
  *   as a new user turn.
  * - continue returns `{ text: " " }` to continue/retry the turn when a sent
@@ -23,9 +21,10 @@
  */
 
 import { execFile } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const runFile = promisify(execFile);
@@ -56,6 +55,35 @@ export function claudeQueuedCommandsDir(root) {
   return path.join(root, "state", "harness-bridge", "commands", "claude");
 }
 
+function queuedFilePromptText(value) {
+  if (!isRecord(value) || typeof value.text !== "string") return null;
+  const text = value.text.trim();
+  return text === "" ? null : text;
+}
+
+/** Read all queued harness-bridge prompts for Claude without consuming them. */
+export function readQueuedPromptList(commandsDir) {
+  let names;
+  try {
+    names = readdirSync(commandsDir).filter((name) => name.endsWith(".json"));
+  } catch {
+    return [];
+  }
+  const prompts = [];
+  for (const name of names) {
+    const filePath = path.join(commandsDir, name);
+    try {
+      const text = queuedFilePromptText(JSON.parse(readFileSync(filePath, "utf8")));
+      if (text === null) continue;
+      const mtimeMs = statSync(filePath).mtimeMs;
+      prompts.push({ text, mtimeMs });
+    } catch {
+      // unreadable/invalid queued entries are ignored
+    }
+  }
+  return prompts;
+}
+
 /** Read the newest queued harness-bridge prompt for Claude without consuming it. */
 export function readQueuedPromptFile(commandsDir) {
   let names;
@@ -70,12 +98,7 @@ export function readQueuedPromptFile(commandsDir) {
   }
   if (newest === "") return null;
   try {
-    const queued = JSON.parse(readFileSync(path.join(commandsDir, newest), "utf8"));
-    if (typeof queued.text === "string") {
-      const text = queued.text.trim();
-      return text === "" ? null : text;
-    }
-    return null;
+    return queuedFilePromptText(JSON.parse(readFileSync(path.join(commandsDir, newest), "utf8")));
   } catch {
     return null;
   }
@@ -118,16 +141,32 @@ export function extractUserPromptText(message) {
   return extractTextContent(messageContent(message));
 }
 
-export function findLastSentUserPrompt(messages) {
-  if (!Array.isArray(messages)) return null;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
+function messageTimestamp(message) {
+  if (!isRecord(message)) return undefined;
+  const candidates = [message.timestamp, isRecord(message.info) ? message.info.timestamp : undefined];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return undefined;
+}
+
+export function findSentUserPrompts(messages) {
+  if (!Array.isArray(messages)) return [];
+  const prompts = [];
+  for (const message of messages) {
     if (messageRole(message) !== "user") continue;
     const text = extractUserPromptText(message);
     if (text === null) continue;
-    return { source: "sent", text };
+    const timestamp = messageTimestamp(message);
+    prompts.push(timestamp === undefined ? { text } : { text, timestamp });
   }
-  return null;
+  return prompts;
+}
+
+export function findLastSentUserPrompt(messages) {
+  const prompts = findSentUserPrompts(messages);
+  const last = prompts[prompts.length - 1];
+  return last ? { source: "sent", text: last.text, timestamp: last.timestamp } : null;
 }
 
 export function parsePromptSourceArg(args) {
@@ -135,6 +174,10 @@ export function parsePromptSourceArg(args) {
   if (trimmed === "") return "sent";
   const lower = trimmed.toLowerCase();
   if (lower === "sent" || lower === "queued" || lower === "pick") return lower;
+  const pickMatch = /^pick\s+(.+)$/i.exec(trimmed);
+  if (pickMatch) {
+    return { pickIndex: pickMatch[1].trim() };
+  }
   return { error: `Unknown prompt source "${trimmed}". Use sent, queued, or pick.` };
 }
 
@@ -142,6 +185,90 @@ export function promptPreview(text, maxLength = 60) {
   const oneLine = String(text).replace(/\s+/g, " ").trim();
   if (oneLine.length <= maxLength) return oneLine;
   return `${oneLine.slice(0, Math.max(0, maxLength - 1))}\u2026`;
+}
+
+function formatRelativeAge(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+function choiceLabel(choice, nowMs) {
+  const kind = choice.source === "sent" ? "sent" : "queued";
+  let when = "now";
+  if (choice.source === "queued" && typeof choice.mtimeMs === "number") {
+    when = formatRelativeAge(nowMs - choice.mtimeMs);
+  } else if (choice.source === "sent" && typeof choice.timestamp === "string") {
+    const ts = Date.parse(choice.timestamp);
+    if (!Number.isNaN(ts)) when = formatRelativeAge(nowMs - ts);
+  }
+  return `${kind} · ${when} · ${promptPreview(choice.text)}`;
+}
+
+function parseSentTimestamp(timestamp) {
+  if (typeof timestamp !== "string") return null;
+  const ms = Date.parse(timestamp);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+export function buildPromptChoices(sent, queued) {
+  const sentChoices = sent.map((prompt, index) => ({
+    source: "sent",
+    text: prompt.text,
+    timestamp: prompt.timestamp,
+    index,
+    ts: parseSentTimestamp(prompt.timestamp),
+  }));
+  const queuedChoices = [...queued]
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .map((prompt) => ({ source: "queued", text: prompt.text, mtimeMs: prompt.mtimeMs, ts: prompt.mtimeMs }));
+
+  const anySentTimestamp = sentChoices.some((choice) => choice.ts !== null);
+  if (!anySentTimestamp) {
+    if (sentChoices.length === 1 && queuedChoices.length === 1) {
+      return [sentChoices[0], queuedChoices[0]].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+    }
+    const sentNewestFirst = [...sentChoices].sort((a, b) => b.index - a.index);
+    return [...queuedChoices, ...sentNewestFirst].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+  }
+
+  const mixed = [
+    ...queuedChoices.map((choice) => ({ ...choice, sentIndex: -1 })),
+    ...sentChoices.filter((choice) => choice.ts !== null).map((choice) => ({ ...choice, sentIndex: choice.index })),
+  ];
+  mixed.sort((a, b) => {
+    if (b.ts !== a.ts) return b.ts - a.ts;
+    if (a.source !== b.source) return a.source === "queued" ? -1 : 1;
+    return b.sentIndex - a.sentIndex;
+  });
+  const untimedSent = sentChoices.filter((choice) => choice.ts === null).sort((a, b) => b.index - a.index);
+  return [...mixed, ...untimedSent].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+}
+
+export function filterPromptChoices(choices, filter) {
+  if (filter === "") return choices;
+  const needle = String(filter).toLowerCase();
+  return choices.filter((choice) => String(choice.text).toLowerCase().includes(needle));
+}
+
+export function formatPromptChoiceList(choices, nowMs = Date.now()) {
+  return choices.map((choice, index) => `${index + 1}. ${choiceLabel(choice, nowMs)}`).join("\n");
+}
+
+export function selectPromptChoice(choices, index) {
+  const raw = typeof index === "string" ? index.trim() : String(index);
+  if (!/^\d+$/.test(raw)) {
+    return { error: `Invalid index "${raw}". Enter a number from 1 to ${choices.length || 1}.` };
+  }
+  const n = Number.parseInt(raw, 10);
+  if (n < 1 || n > choices.length) {
+    return { error: `Index ${n} out of range. Enter a number from 1 to ${choices.length || 1}.` };
+  }
+  return choices[n - 1];
 }
 
 function readArrayValue(source, keys) {
@@ -159,6 +286,26 @@ function readArrayValue(source, keys) {
     }
   }
   return null;
+}
+
+function readAllSentPromptsFromContext($, deps = {}) {
+  if (typeof deps.readAllSentPrompts === "function") return deps.readAllSentPrompts($);
+  if (typeof deps.readSentPrompt === "function") {
+    const one = deps.readSentPrompt($);
+    return one ? [{ text: one.text, timestamp: one.timestamp }] : [];
+  }
+  const ctx = isRecord($) ? $ : {};
+  const candidates = [
+    readArrayValue(ctx, ["messages", "history", "turns"]),
+    readArrayValue(ctx.session, ["messages", "history", "turns", "getBranch"]),
+    readArrayValue(ctx.sessionManager, ["messages", "history", "turns", "getBranch"]),
+    readArrayValue(ctx.data?.session?.message, ["list", "get", "sync"]),
+    readArrayValue(ctx.conversation, ["messages", "history"]),
+  ];
+  for (const messages of candidates) {
+    if (Array.isArray(messages)) return findSentUserPrompts(messages);
+  }
+  return [];
 }
 
 /**
@@ -183,27 +330,71 @@ export function readSentPromptFromContext($, deps = {}) {
   return null;
 }
 
+function readQueuedPromptsFromRoot(root, deps = {}) {
+  if (typeof deps.readQueuedPromptList === "function") {
+    return deps.readQueuedPromptList(claudeQueuedCommandsDir(root));
+  }
+  if (typeof deps.readQueuedPromptFile === "function") {
+    // Back-compat: custom single-read override (tests) -> synthesize newest.
+    const text = deps.readQueuedPromptFile(claudeQueuedCommandsDir(root));
+    return text === null ? [] : [{ text, mtimeMs: Date.now() }];
+  }
+  return readQueuedPromptList(claudeQueuedCommandsDir(root));
+}
+
 export function readQueuedPromptFromRoot(root, deps = {}) {
-  const queuedText = (deps.readQueuedPromptFile ?? readQueuedPromptFile)(claudeQueuedCommandsDir(root));
-  if (queuedText === null) return null;
-  return { source: "queued", text: queuedText };
+  if (typeof deps.readQueuedPromptFile === "function") {
+    const text = deps.readQueuedPromptFile(claudeQueuedCommandsDir(root));
+    if (text === null) return null;
+    return { source: "queued", text };
+  }
+  const prompts = readQueuedPromptList(claudeQueuedCommandsDir(root));
+  if (prompts.length === 0) return null;
+  const newest = [...prompts].sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+  return newest ? { source: "queued", text: newest.text } : null;
+}
+
+export function resolvePromptSource(parsed, $, deps = {}) {
+  const env = deps.env ?? process.env;
+  const root = nucleusUserRoot(deps.platform ?? process.platform, env, deps.homeDir ?? homedir);
+  const sentList = readAllSentPromptsFromContext($, deps);
+  const queuedList = readQueuedPromptsFromRoot(root, deps);
+  const lastSent = sentList[sentList.length - 1]
+    ? { source: "sent", text: sentList[sentList.length - 1].text, timestamp: sentList[sentList.length - 1].timestamp }
+    : null;
+  const newestQueued = [...queuedList].sort((a, b) => b.mtimeMs - a.mtimeMs)[0] ?? null;
+  const lastQueued = newestQueued ? { source: "queued", text: newestQueued.text } : null;
+
+  if (parsed === "sent") {
+    return lastSent ? { choice: lastSent } : { empty: EMPTY_SESSION_MESSAGE };
+  }
+  if (parsed === "queued") {
+    return lastQueued ? { choice: lastQueued } : { emptyQueued: true };
+  }
+
+  const choices = buildPromptChoices(sentList, queuedList);
+  if (choices.length === 0) {
+    return { empty: EMPTY_SESSION_MESSAGE };
+  }
+  if (parsed === "pick") {
+    const nowMs = typeof deps.now === "function" ? deps.now() : Date.now();
+    return { list: formatPromptChoiceList(choices, nowMs), choices };
+  }
+  if (isRecord(parsed) && typeof parsed.pickIndex === "string") {
+    const selected = selectPromptChoice(choices, parsed.pickIndex);
+    if (isRecord(selected) && typeof selected.error === "string") {
+      return { error: selected.error };
+    }
+    return { choice: selected };
+  }
+  return { error: `Unknown prompt source "${String(parsed)}". Use sent, queued, or pick.` };
 }
 
 export function resolvePromptChoice(mode, $, deps = {}) {
-  const sent = readSentPromptFromContext($, deps);
-  const env = deps.env ?? process.env;
-  const root = nucleusUserRoot(deps.platform ?? process.platform, env, deps.homeDir ?? homedir);
-  const queued = readQueuedPromptFromRoot(root, deps);
-
-  if (mode === "sent") return sent;
-  if (mode === "queued") return queued;
-
-  // Deterministic `pick`: no verified mod dialog picker API is available in
-  // this environment (plan states dialog.select not clearly documented and no
-  // authoritative dialog API was found in-repo), so prefer queued when
-  // present, otherwise sent. Limitation documented in the task report.
-  if (queued) return queued;
-  if (sent) return sent;
+  const parsed = mode;
+  const resolved = resolvePromptSource(parsed, $, deps);
+  if (resolved.choice) return resolved.choice;
+  if (resolved.empty || resolved.emptyQueued || resolved.list || resolved.error) return null;
   return null;
 }
 
@@ -213,6 +404,16 @@ function unavailableSourceMessage(mode, command, choice) {
     return command === "copy" ? NOTHING_TO_COPY_QUEUED_MESSAGE : NOTHING_TO_REPEAT_QUEUED_MESSAGE;
   }
   return EMPTY_SESSION_MESSAGE;
+}
+
+function harnessClipboardCommands() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const scriptDir = path.join(here, "..", "..", "..", "..", "..", "src", "scripts", "notify");
+  return [
+    { command: "harness-clipboard", args: [] },
+    { command: "bash", args: [path.join(scriptDir, "harness-clipboard.sh")] },
+    { command: "pwsh", args: ["-NoProfile", "-File", path.join(scriptDir, "harness-clipboard.ps1")] },
+  ];
 }
 
 export function clipboardCommands(platform = process.platform) {
@@ -238,6 +439,12 @@ export async function copyTextToClipboard(text, deps = {}) {
     return deps.copyToClipboard(text);
   }
   const writer = deps.writeToClipboardCommand ?? defaultWriteToClipboardCommand;
+  if (!deps.writeToClipboardCommand) {
+    for (const candidate of harnessClipboardCommands()) {
+      const ok = await writer(candidate.command, candidate.args, text);
+      if (ok) return true;
+    }
+  }
   for (const candidate of clipboardCommands(deps.platform ?? process.platform)) {
     const ok = await writer(candidate.command, candidate.args, text);
     if (ok) return true;
@@ -267,43 +474,39 @@ export function isRuntimeBusy($, deps = {}) {
 }
 
 export async function handleCopyUserPrompt(args, $, deps = {}) {
-  const mode = parsePromptSourceArg(args);
-  if (typeof mode === "object") {
-    return { text: mode.error };
+  const parsed = parsePromptSourceArg(args);
+  if (isRecord(parsed) && typeof parsed.error === "string") {
+    return { text: parsed.error };
   }
-  const choice = resolvePromptChoice(mode, $, deps);
-  const message = unavailableSourceMessage(mode, "copy", choice);
-  if (message) {
-    return { text: message };
-  }
-  if (!choice) {
-    return { text: EMPTY_SESSION_MESSAGE };
-  }
+  const resolved = resolvePromptSource(parsed, $, deps);
+  if (resolved.error) return { text: resolved.error };
+  if (resolved.list) return { text: resolved.list };
+  if (resolved.emptyQueued) return { text: NOTHING_TO_COPY_QUEUED_MESSAGE };
+  if (resolved.empty) return { text: parsed === "queued" ? NOTHING_TO_COPY_QUEUED_MESSAGE : EMPTY_SESSION_MESSAGE };
+  if (!resolved.choice) return { text: EMPTY_SESSION_MESSAGE };
 
-  const copied = await copyTextToClipboard(choice.text, deps);
+  const copied = await copyTextToClipboard(resolved.choice.text, deps);
   if (copied) {
-    return { text: `Copied ${choice.source} prompt to clipboard.` };
+    return { text: `Copied ${resolved.choice.source} prompt to clipboard.` };
   }
-  return { text: `Clipboard unavailable. Prompt:\n${choice.text}` };
+  return { text: `Clipboard unavailable. Prompt:\n${resolved.choice.text}` };
 }
 
 export async function handleRepeatUserPrompt(args, $, deps = {}) {
-  const mode = parsePromptSourceArg(args);
-  if (typeof mode === "object") {
-    return { text: mode.error };
+  const parsed = parsePromptSourceArg(args);
+  if (isRecord(parsed) && typeof parsed.error === "string") {
+    return { text: parsed.error };
   }
-  const choice = resolvePromptChoice(mode, $, deps);
-  const message = unavailableSourceMessage(mode, "repeat", choice);
-  if (message) {
-    return { text: message };
-  }
-  if (!choice) {
-    return { text: EMPTY_SESSION_MESSAGE };
-  }
+  const resolved = resolvePromptSource(parsed, $, deps);
+  if (resolved.error) return { text: resolved.error };
+  if (resolved.list) return { text: resolved.list };
+  if (resolved.emptyQueued) return { text: NOTHING_TO_REPEAT_QUEUED_MESSAGE };
+  if (resolved.empty) return { text: parsed === "queued" ? NOTHING_TO_REPEAT_QUEUED_MESSAGE : EMPTY_SESSION_MESSAGE };
+  if (!resolved.choice) return { text: EMPTY_SESSION_MESSAGE };
 
   // `command.run` returns `{ text }` to inject the selected prompt as a new
   // user turn. Confirmation during streaming is not verified in mod APIs here.
-  return { text: choice.text };
+  return { text: resolved.choice.text };
 }
 
 export async function handleContinue(_args, $, deps = {}) {
@@ -323,12 +526,12 @@ function defineCommands($) {
     $.command.register({
       name: "copy-user-prompt",
       description: "Copy a sent or queued prompt (default: sent)",
-      argumentHint: "[sent|queued|pick]",
+      argumentHint: "[sent|queued|pick [index]]",
     });
     $.command.register({
       name: "repeat-user-prompt",
       description: "Resubmit a sent or queued prompt as a new user turn (default: sent)",
-      argumentHint: "[sent|queued|pick]",
+      argumentHint: "[sent|queued|pick [index]]",
     });
   }
 }

@@ -7,10 +7,14 @@ import registerDefault, {
 	NOTHING_TO_CONTINUE_MESSAGE,
 	NOTHING_TO_COPY_QUEUED_MESSAGE,
 	NOTHING_TO_REPEAT_QUEUED_MESSAGE,
+	buildPromptChoices,
 	claudeQueuedCommandsDir,
 	copyTextToClipboard,
 	extractUserPromptText,
+	filterPromptChoices,
 	findLastSentUserPrompt,
+	findSentUserPrompts,
+	formatPromptChoiceList,
 	handleContinue,
 	handleCopyUserPrompt,
 	handleRepeatUserPrompt,
@@ -18,8 +22,11 @@ import registerDefault, {
 	parsePromptSourceArg,
 	promptPreview,
 	readQueuedPromptFile,
+	readQueuedPromptList,
 	register,
 	resolvePromptChoice,
+	resolvePromptSource,
+	selectPromptChoice,
 } from "../../../../../src/users/default/claude/plugins/nucleus-prompt-tools/hooks/register.js";
 
 type CommandRunHandler = (ctx: unknown, event: unknown) => unknown | Promise<unknown>;
@@ -197,8 +204,8 @@ describe("command registration", () => {
 			"repeat-user-prompt",
 		]);
 		expect(harness.registeredCommands[0]?.description).toBe("Retry or continue the current turn");
-		expect(harness.registeredCommands[1]?.argumentHint).toBe("[sent|queued|pick]");
-		expect(harness.registeredCommands[2]?.argumentHint).toBe("[sent|queued|pick]");
+		expect(harness.registeredCommands[1]?.argumentHint).toBe("[sent|queued|pick [index]]");
+		expect(harness.registeredCommands[2]?.argumentHint).toBe("[sent|queued|pick [index]]");
 		expect(typeof harness.handlers.get("continue")).toBe("function");
 		expect(typeof harness.handlers.get("copy-user-prompt")).toBe("function");
 		expect(typeof harness.handlers.get("repeat-user-prompt")).toBe("function");
@@ -230,28 +237,22 @@ describe("resolvePromptChoice and pick behavior", () => {
 		}
 	});
 
-	test("pick resolves deterministically: queued preferred, else sent (no dialog API)", () => {
-		const root = makeQueueRoot({ "300-c.json": { text: "queued pick" } });
-		try {
-			const deps = {
-				homeDir: () => "/unused",
-				env: {},
-				platform: "linux",
-				readQueuedPromptFile: () => readQueuedPromptFile(claudeQueuedCommandsDir(root)),
-			};
-			expect(resolvePromptChoice("pick", { messages: [{ role: "user", content: "sent pick" }] }, deps)).toEqual({
-				source: "queued",
-				text: "queued pick",
-			});
-		} finally {
-			cleanup(root);
-		}
-		const depsSentOnly = { readQueuedPromptFile: () => null };
-		expect(resolvePromptChoice("pick", { messages: [{ role: "user", content: "sent only" }] }, depsSentOnly)).toEqual({
-			source: "sent",
-			text: "sent only",
-		});
-		expect(resolvePromptChoice("pick", { messages: [] }, depsSentOnly)).toBeNull();
+	test("a bare pick prints the numbered list instead of choosing", () => {
+		const choices = buildPromptChoices([{ text: "a" }, { text: "b" }], []);
+		const out = formatPromptChoiceList(choices);
+		expect(out).toContain("1.");
+		expect(out).toContain("2.");
+		expect(typeof out).toBe("string");
+	});
+
+	test("pick with an index selects that candidate and is 1-based", () => {
+		const choices = buildPromptChoices([{ text: "a" }, { text: "b" }], []);
+		expect(selectPromptChoice(choices, "1").text).toBe("b");
+	});
+
+	test("an out-of-range index reports the range instead of choosing", () => {
+		const choices = buildPromptChoices([{ text: "a" }], []);
+		expect(selectPromptChoice(choices, "9")).toMatchObject({ error: expect.any(String) });
 	});
 });
 
@@ -299,13 +300,13 @@ describe("copy-user-prompt", () => {
 		});
 	});
 
-	test("pick copies deterministically selected prompt (queued preferred)", async () => {
-		await expect(
-			handleCopyUserPrompt("pick", { messages: [{ role: "user", content: "sent prompt" }] }, {
-				copyToClipboard: async () => true,
-				readQueuedPromptFile: () => "queued prompt",
-			}),
-		).resolves.toEqual({ text: "Copied queued prompt to clipboard." });
+	test("pick prints a numbered list and pick with index copies selected prompt", async () => {
+		const deps = { copyToClipboard: async () => true, readQueuedPromptFile: () => "queued prompt" };
+		const ctx = { messages: [{ role: "user", content: "sent prompt" }] };
+		const list = await handleCopyUserPrompt("pick", ctx, deps);
+		expect(list.text).toContain("1.");
+		expect(list.text).toContain("2.");
+		await expect(handleCopyUserPrompt("pick 2", ctx, deps)).resolves.toEqual({ text: "Copied queued prompt to clipboard." });
 	});
 });
 
@@ -327,13 +328,14 @@ describe("repeat-user-prompt", () => {
 		await expect(handleRepeatUserPrompt("queued", { messages: [] }, { readQueuedPromptFile: () => null })).resolves.toEqual({ text: NOTHING_TO_REPEAT_QUEUED_MESSAGE });
 	});
 
-	test("pick returns deterministically selected prompt (queued preferred)", async () => {
-		await expect(
-			handleRepeatUserPrompt("pick", { messages: [{ role: "user", content: "sent prompt" }] }, { readQueuedPromptFile: () => "queued prompt" }),
-		).resolves.toEqual({ text: "queued prompt" });
-		await expect(
-			handleRepeatUserPrompt("pick", { messages: [{ role: "user", content: "sent prompt" }] }, { readQueuedPromptFile: () => null }),
-		).resolves.toEqual({ text: "sent prompt" });
+	test("pick prints a numbered list and pick with index returns selected prompt", async () => {
+		const ctx = { messages: [{ role: "user", content: "sent prompt" }] };
+		const depsQueued = { readQueuedPromptFile: () => "queued prompt" };
+		const list = await handleRepeatUserPrompt("pick", ctx, depsQueued);
+		expect(list.text).toContain("1.");
+		expect(list.text).toContain("2.");
+		await expect(handleRepeatUserPrompt("pick 2", ctx, depsQueued)).resolves.toEqual({ text: "queued prompt" });
+		await expect(handleRepeatUserPrompt("pick 1", ctx, { readQueuedPromptFile: () => null })).resolves.toEqual({ text: "sent prompt" });
 	});
 });
 
