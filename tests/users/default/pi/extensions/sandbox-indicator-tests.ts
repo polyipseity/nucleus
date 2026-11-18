@@ -202,13 +202,16 @@ describe("sandbox status tone", () => {
 		resetSandboxWarningForTests();
 	});
 
-	test("unsandboxed label is warning yellow when color is allowed", () => {
+	test("unsandboxed label is warning yellow with tone token in both footer variants", () => {
 		const { events } = registerExtension({});
-		const { ctx, statuses } = makeContext({ hasUI: false, mode: "interactive" });
+		const start = makeContext({ hasUI: false, mode: "interactive" });
+		const compact = makeContext({ hasUI: false, mode: "interactive" });
 
-		events.session_start?.({}, ctx);
+		events.session_start?.({}, start.ctx);
+		events.session_compact?.({}, compact.ctx);
 
-		expect(statuses).toEqual([[STATUS_KEY, `${ESC}[33msandbox: none${ESC}[0m`]]);
+		expect(start.statuses).toEqual([[STATUS_KEY, `${ESC}[33msandbox: none${ESC}[0m`]]);
+		expect(compact.statuses).toEqual([[STATUS_KEY, `${ESC}[33msandbox: none${ESC}[0m`]]);
 	});
 
 	test("TERM=dumb keeps the unsandboxed label plain", () => {
@@ -220,13 +223,16 @@ describe("sandbox status tone", () => {
 		expect(statuses).toEqual([[STATUS_KEY, "sandbox: none"]]);
 	});
 
-	test("sandboxed label stays plain when color is allowed", () => {
+	test("sandboxed label is sandbox: srt in both footer variants", () => {
 		const { events } = registerExtension({ SANDBOX_RUNTIME: "1" });
-		const { ctx, statuses } = makeContext({ hasUI: false, mode: "interactive" });
+		const start = makeContext({ hasUI: false, mode: "interactive" });
+		const compact = makeContext({ hasUI: false, mode: "interactive" });
 
-		events.session_start?.({}, ctx);
+		events.session_start?.({}, start.ctx);
+		events.session_compact?.({}, compact.ctx);
 
-		expect(statuses).toEqual([[STATUS_KEY, "sandbox: srt"]]);
+		expect(start.statuses).toEqual([[STATUS_KEY, "sandbox: srt"]]);
+		expect(compact.statuses).toEqual([[STATUS_KEY, "sandbox: srt"]]);
 	});
 });
 
