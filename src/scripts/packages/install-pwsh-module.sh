@@ -11,7 +11,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
 # shellcheck source=../lib/bash-guard.sh
 . "$SCRIPT_DIR/../lib/bash-guard.sh"
-bash_guard_require 5 1 install-pwsh-module
+# WHY: bootstrap.sh runs this before Nix is installed and must stay
+#   bash-3.2-compatible on macOS.
+bash_guard_require 3 2 install-pwsh-module
 
 _ipm_pwsh="$1"
 _ipm_module="$2"
