@@ -366,6 +366,22 @@ let
     assert' (builtins.length nixosDesktopPackageNames > 0 && duplicates == [ ])
       "src/hosts/NixOS/desktop.nix must not install what managedPackages already provides; drop the line for: ${lib.strings.concatStringsSep ", " duplicates}";
 
+  # The darwin and linux package filters must agree on availability, or a
+  # package drops out of one list with no declaration explaining it.
+  test_availability_predicate_symmetry =
+    let
+      afterBranchMarker = builtins.head (
+        lib.lists.tail (
+          lib.strings.splitString "  managedNixPackages = map managedNixPackageDerivation (\n    if pkgs.stdenv.hostPlatform.isDarwin then" coreModuleText
+        )
+      );
+      darwinFilter = builtins.head (lib.strings.splitString "\n    else" afterBranchMarker);
+    in
+    assert' (
+      lib.strings.hasInfix "nixPackageAttrPresent" darwinFilter
+      && lib.strings.hasInfix "nixPackageAttrAvailable" darwinFilter
+    ) "the darwin package filter applies the availability predicate";
+
   allTests = [
     test_entry_names_valid
     test_registry_names_sorted
@@ -380,6 +396,7 @@ let
     test_homebrew_kind_has_name
     test_no_undocumented_homebrew_kind
     test_nixos_desktop_has_no_registry_duplicates
+    test_availability_predicate_symmetry
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
