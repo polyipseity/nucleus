@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -46,12 +47,13 @@ COMMAND_NAME = "harness"
 
 _HELP_TEXT = """Harness bridge
 
-/harness status              pending approval requests
-/harness approve <id>        allow a pending request
-/harness deny <id>           deny a pending request
-/harness send <harness> <text>  queue a prompt for a harness session
-/harness sessions            per-harness activity summary
-/harness help                this text"""
+/harness status                pending approval requests
+/harness approve <id>          allow a pending request
+/harness deny <id>             deny a pending request
+/harness send <harness> <text> queue a prompt for a harness session
+/harness prompts [index]       list queued prompts, or copy prompt <index>
+/harness sessions              per-harness activity summary
+/harness help                  this text"""
 
 
 def _nucleus_user_root() -> Path:
@@ -195,6 +197,74 @@ def _cmd_send(args: List[str]) -> str:
     return f"Queued for {harness} ({command_id}): {text}"
 
 
+def _queued_prompts(harness: str = "hermes") -> List[Dict[str, Any]]:
+    """Queued bridge prompts for a harness, newest first. Never consumes files."""
+    directory = _commands_dir() / harness
+    if not directory.is_dir():
+        return []
+    prompts: List[Dict[str, Any]] = []
+    for path in directory.glob("*.json"):
+        payload = _read_json(path)
+        if payload is None:
+            continue
+        text = payload.get("text")
+        if not isinstance(text, str):
+            continue
+        text = text.strip()
+        if text == "":
+            continue
+        created = payload.get("created_at")
+        if not isinstance(created, (int, float)):
+            try:
+                created = path.stat().st_mtime
+            except OSError:
+                created = 0.0
+        prompts.append({"text": text, "created_at": float(created), "name": path.name})
+    prompts.sort(key=lambda item: (item["created_at"], item["name"]), reverse=True)
+    return prompts
+
+
+def _format_prompts(prompts: List[Dict[str, Any]]) -> str:
+    lines = [f"{index}. queued · {item['text']}" for index, item in enumerate(prompts, start=1)]
+    if not lines:
+        lines.append("No queued prompts.")
+    lines.append("Sent history unavailable: Hermes plugin cannot read message history.")
+    return "\n".join(lines)
+
+
+def _copy_with_harness_clipboard(text: str) -> bool:
+    command = os.environ.get("NUCLEUS_HARNESS_CLIPBOARD") or "harness-clipboard"
+    try:
+        subprocess.run(
+            [command],
+            input=text,
+            text=True,
+            check=True,
+            timeout=5,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _cmd_prompts(args: List[str]) -> str:
+    prompts = _queued_prompts("hermes")
+    if not args:
+        return _format_prompts(prompts)
+    raw = args[0].strip()
+    if not raw.isdigit():
+        return f'Invalid index "{raw}". Enter a number from 1 to {len(prompts) or 1}.'
+    index = int(raw)
+    if index < 1 or index > len(prompts):
+        return f"Index {index} out of range. Enter a number from 1 to {len(prompts) or 1}."
+    choice = prompts[index - 1]
+    if _copy_with_harness_clipboard(choice["text"]):
+        return f"Copied queued prompt to clipboard. ({choice['text']})"
+    return f"Clipboard unavailable. Prompt:\n{choice['text']}"
+
+
 def _handle_command(raw_args: str) -> str:
     """Dispatch one /harness invocation. Never raises: the gateway shows the text."""
     args = (raw_args or "").split()
@@ -208,6 +278,8 @@ def _handle_command(raw_args: str) -> str:
         return _cmd_status()
     if subcommand == "sessions":
         return _cmd_sessions()
+    if subcommand == "prompts":
+        return _cmd_prompts(rest)
     if subcommand == "approve":
         return _cmd_decide(rest, "allow")
     if subcommand == "deny":
@@ -223,5 +295,5 @@ def register(ctx) -> None:
         COMMAND_NAME,
         handler=_handle_command,
         description="Approve, deny, or redirect coding-harness sessions running on this machine.",
-        args_hint="status|approve|deny|send|sessions",
+        args_hint="status|approve|deny|send|prompts|sessions",
     )
