@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -497,6 +497,31 @@ describe("clipboard helpers", () => {
   test("copyTextToClipboard uses injected copier and falls back", async () => {
     expect(await copyTextToClipboard("hello", { copyToClipboard: async () => true })).toBe(true);
     expect(await copyTextToClipboard("hello", { copyToClipboard: async () => false, writeToClipboardCommand: async () => false })).toBe(false);
+  });
+
+  test("uses harness-clipboard on PATH when no custom writer is injected", async () => {
+    const root = mkdtempSync(join(tmpdir(), "opencode-harness-clip-"));
+    try {
+      const bin = join(root, "bin");
+      mkdirSync(bin, { recursive: true });
+      const capture = join(root, "captured.txt");
+      writeFileSync(
+        join(bin, "harness-clipboard"),
+        `#!/bin/sh\ncat > "${capture}"\n`,
+        { encoding: "utf8", mode: 0o755 },
+      );
+      const prevPath = process.env.PATH ?? "";
+      process.env.PATH = `${bin}:${prevPath}`;
+      try {
+        const ok = await copyTextToClipboard("copy me", { platform: "linux" });
+        expect(ok).toBe(true);
+        expect(readFileSync(capture, "utf8")).toBe("copy me");
+      } finally {
+        process.env.PATH = prevPath;
+      }
+    } finally {
+      cleanup(root);
+    }
   });
 
   test("tries platform clipboard commands until one succeeds", async () => {

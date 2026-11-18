@@ -15,14 +15,11 @@
  * - empty state prints one line and does nothing else.
  */
 
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
-
-const runFile = promisify(execFile);
 
 export const EMPTY_SESSION_MESSAGE = "Nothing to repeat yet \u2014 this session has no user message.";
 export const NOTHING_TO_COPY_QUEUED_MESSAGE = "Nothing to copy yet \u2014 no queued prompt.";
@@ -538,12 +535,23 @@ export async function copyTextToClipboard(text, deps = {}) {
 }
 
 export async function defaultWriteToClipboardCommand(command, args, text) {
-  try {
-    await runFile(command, args, { input: text, timeout: 5000 });
-    return true;
-  } catch {
-    return false;
-  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const child = spawn(command, args, { stdio: ["pipe", "ignore", "ignore"] });
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    child.on("error", () => finish(false));
+    child.on("close", (code) => finish(code === 0));
+    try {
+      child.stdin?.write(text);
+      child.stdin?.end();
+    } catch {
+      finish(false);
+    }
+  });
 }
 
 async function isSessionRunning(context, deps = {}) {
