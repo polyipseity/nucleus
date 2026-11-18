@@ -31,7 +31,17 @@ Describe 'Sync-OpenCodeConfig opencode config and bridges' {
         $null = New-Item -ItemType Directory -Path $script:agentsConfigDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path $script:homeRoot '.agents\agents') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path $script:homeRoot '.agents\prompts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        $null = Set-Content -Path (Join-Path $script:agentsConfigDir 'opencode.jsonc') -Value '{"$schema":"https://opencode.ai/config.json"}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        $script:configContent = @'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "instructions": ["../../.agents/instructions/**/*.md"],
+  "skills": ["../../.agents/skills"],
+  "plugins": ["./plugins/harness-notify", "./plugins/prompt-tools"],
+  "permissions": { "bash": { "*": "allow" } }
+}
+'@
+        $null = Set-Content -Path (Join-Path $script:agentsConfigDir 'opencode.jsonc') -Value $script:configContent -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
         $script:openCodeDir = Join-Path $script:homeRoot '.config\opencode'
         $script:configLink = Join-Path $script:openCodeDir 'opencode.jsonc'
@@ -58,6 +68,15 @@ Describe 'Sync-OpenCodeConfig opencode config and bridges' {
         (Get-Item -LiteralPath $script:configLink -Force).Target | Should -Be $script:configTarget
         (Get-Item -LiteralPath $script:agentsLink -Force).Target | Should -Be $script:agentsTarget
         (Get-Item -LiteralPath $script:commandsLink -Force).Target | Should -Be $script:commandsTarget
+
+        $seededConfig = Get-Content -LiteralPath $script:configLink -Raw | ConvertFrom-Json
+        $seededConfig.'$schema' | Should -Be 'https://opencode.ai/config.json'
+        $seededConfig.autoupdate | Should -BeFalse
+        $seededConfig.instructions | Should -Contain '../../.agents/instructions/**/*.md'
+        $seededConfig.skills | Should -Contain '../../.agents/skills'
+        $seededConfig.plugins | Should -Contain './plugins/harness-notify'
+        $seededConfig.plugins | Should -Contain './plugins/prompt-tools'
+        $seededConfig.permissions.bash.'*' | Should -Be 'allow'
     }
 
     It 'is idempotent across repeated runs' {
