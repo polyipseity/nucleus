@@ -29,6 +29,10 @@ init_test_state
 
 WRAPPER="$REPO_ROOT/src/scripts/services/rclone-mount.sh"
 
+# Faster stale-mount cleanup polls in tests (5 attempts preserved).
+NUCLEUS_TEST_POLL_INTERVAL="${NUCLEUS_TEST_POLL_INTERVAL:-0}"
+export NUCLEUS_TEST_POLL_INTERVAL
+
 # Every temp dir created by setup_fakes lands here so the suite leaves nothing
 # behind in TMPDIR.
 _TEMP_DIRS=()

@@ -39,9 +39,10 @@ clean_mount_point() {
   if mount | grep -qF " on $mount_point ("; then
     # check-suppress:suppression_doc: best-effort stale unmount, re-checked by the poll below
     umount -f "$mount_point" 2>/dev/null || true
+    local _clean_poll_interval="${NUCLEUS_TEST_POLL_INTERVAL:-1}"
     for _clean_i in 1 2 3 4 5; do
       mount | grep -qF " on $mount_point (" || break
-      sleep 1
+      sleep "$_clean_poll_interval"
     done
   fi
   # WHY rmdir before mkdir: a mount torn down uncleanly can leave an inode the

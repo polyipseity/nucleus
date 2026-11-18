@@ -1929,36 +1929,33 @@ vm_android_fastboot_list_state() {
   printf 'offline\n'
 }
 
-# Sleep min(poll, timeout - elapsed) and echo the new elapsed value. All four
-# inputs are integer seconds; a poll of 0 or less never advances. Fractions are
-# rejected because $((0 + 0.1)) is a shell arithmetic syntax error that would
-# abort the wait loop, and `[ -lt ]` would instead report false and sleep out the
-# whole timeout silently.
+# Sleep min(poll, timeout - elapsed) and echo the new elapsed value.
+# Timeout/elapsed may be integer or fractional seconds; poll must be a positive
+# number (test overrides may be fractional).
 vm_android_wait_tick() {
   _awt_timeout="$1"
   _awt_elapsed="$2"
   _awt_default_poll="$3"
   _awt_poll="${NUCLEUS_VM_ANDROID_POLL_INTERVAL:-$_awt_default_poll}"
-  _awt_poll_bad=''
-  case "$_awt_poll" in
-  '' | *[!0-9]*) _awt_poll_bad=1 ;;
-  *) [ "$_awt_poll" -ge 1 ] || _awt_poll_bad=1 ;;
-  esac
-  if [ -n "$_awt_poll_bad" ]; then
-    error "NUCLEUS_VM_ANDROID_POLL_INTERVAL must be a positive integer number of seconds: $_awt_poll"
+  if ! awk -v p="$_awt_poll" 'BEGIN { exit !(p ~ /^[0-9]+([.][0-9]+)?$/ && (p + 0) > 0) }'; then
+    error "NUCLEUS_VM_ANDROID_POLL_INTERVAL must be a positive number of seconds: $_awt_poll"
     return 1
   fi
-  _awt_remain=$((_awt_timeout - _awt_elapsed))
-  if [ "$_awt_remain" -le 0 ]; then
+  _awt_sleep="$(awk -v t="$_awt_timeout" -v e="$_awt_elapsed" -v p="$_awt_poll" 'BEGIN {
+    r = t - e
+    if (r <= 0) { print "0"; exit }
+    s = p
+    if (s > r) s = r
+    printf "%.6f", s
+  }')"
+  case "$_awt_sleep" in
+  0 | 0.000000)
     printf '%s' "$_awt_elapsed"
     return
-  fi
-  _awt_sleep="$_awt_remain"
-  if [ "$_awt_poll" -lt "$_awt_sleep" ]; then
-    _awt_sleep="$_awt_poll"
-  fi
+    ;;
+  esac
   sleep "$_awt_sleep"
-  printf '%s' "$((_awt_elapsed + _awt_sleep))"
+  awk -v e="$_awt_elapsed" -v s="$_awt_sleep" 'BEGIN { printf "%.6f", (e + s) }'
 }
 
 vm_android_fastboot_wait() {
@@ -1975,11 +1972,11 @@ vm_android_fastboot_wait() {
 
   say "waiting for fastboot on $_afw_serial (timeout ${_afw_timeout}s)..."
 
-  while [ "$_afw_elapsed" -lt "$_afw_timeout" ]; do
+  while awk -v e="$_afw_elapsed" -v t="$_afw_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     if [ "$(vm_android_fastboot_list_state "$_afw_vm_index")" = "fastboot" ]; then
       return 0
     fi
-    if [ "$_afw_elapsed" -ge "$((_afw_last_hint + 30))" ]; then
+    if awk -v e="$_afw_elapsed" -v h="$_afw_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
       say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot"
       _afw_last_hint="$_afw_elapsed"
     fi
@@ -2036,18 +2033,18 @@ vm_android_adb_wait_authorized() {
 
   say "waiting for authorized ADB on $_awa_serial (timeout ${_awa_timeout}s)..."
 
-  while [ "$_awa_elapsed" -lt "$_awa_timeout" ]; do
+  while awk -v e="$_awa_elapsed" -v t="$_awa_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     _awa_state="$(vm_android_adb_poll_state "$_awa_vm_index")"
     case "$_awa_state" in
     device) return 0 ;;
     unauthorized)
-      if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+      if awk -v e="$_awa_elapsed" -v h="$_awa_last_unauth_msg" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
         _awa_last_unauth_msg="$_awa_elapsed"
       fi
       ;;
     recovery | sideload)
-      if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+      if awk -v e="$_awa_elapsed" -v h="$_awa_last_unauth_msg" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "guest is in $_awa_state; boot LineageOS system for this step (Reboot system now from recovery)"
         _awa_last_unauth_msg="$_awa_elapsed"
       fi
@@ -2085,26 +2082,26 @@ vm_android_adb_wait_boot_completed() {
 
   say "waiting for booted guest on $_awbc_serial (timeout ${_awbc_timeout}s)..."
 
-  while [ "$_awbc_elapsed" -lt "$_awbc_timeout" ]; do
+  while awk -v e="$_awbc_elapsed" -v t="$_awbc_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     _awbc_state="$(vm_android_adb_poll_state "$_awbc_vm_index")"
     case "$_awbc_state" in
     device)
       if vm_android_guest_boot_completed "$_awbc_vm_index"; then
         return 0
       fi
-      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+      if awk -v e="$_awbc_elapsed" -v h="$_awbc_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "guest ADB is up but still booting (waiting for sys.boot_completed=1)..."
         _awbc_last_hint="$_awbc_elapsed"
       fi
       ;;
     unauthorized)
-      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+      if awk -v e="$_awbc_elapsed" -v h="$_awbc_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
         _awbc_last_hint="$_awbc_elapsed"
       fi
       ;;
     recovery | sideload)
-      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+      if awk -v e="$_awbc_elapsed" -v h="$_awbc_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "guest is in $_awbc_state; boot LineageOS system for this step (Reboot system now from recovery)"
         _awbc_last_hint="$_awbc_elapsed"
       fi
@@ -2133,18 +2130,18 @@ vm_android_adb_wait_sideload() {
 
   say "waiting for sideload ADB on $_aws_serial (timeout ${_aws_timeout}s)..."
 
-  while [ "$_aws_elapsed" -lt "$_aws_timeout" ]; do
+  while awk -v e="$_aws_elapsed" -v t="$_aws_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     _aws_state="$(vm_android_adb_poll_state "$_aws_vm_index")"
     case "$_aws_state" in
     sideload) return 0 ;;
     recovery)
-      if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+      if awk -v e="$_aws_elapsed" -v h="$_aws_last_hint" 'BEGIN { exit !((e + 0) >= (h + 15)) }'; then
         say "manual step: in recovery, select Apply update from ADB to enter sideload mode"
         _aws_last_hint="$_aws_elapsed"
       fi
       ;;
     unauthorized)
-      if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+      if awk -v e="$_aws_elapsed" -v h="$_aws_last_hint" 'BEGIN { exit !((e + 0) >= (h + 15)) }'; then
         say "ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)"
         _aws_last_hint="$_aws_elapsed"
       fi
@@ -2166,7 +2163,7 @@ vm_android_adb_connect() {
 
   say "waiting for ADB on $_aac_serial (timeout ${_aac_timeout}s)..."
 
-  while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
+  while awk -v e="$_aac_elapsed" -v t="$_aac_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     _aac_state="$(vm_android_adb_poll_state "$_aac_vm_index")"
     case "$_aac_state" in
     device | recovery | sideload) return 0 ;;
@@ -2371,18 +2368,18 @@ vm_android_adb_wait_recovery() {
 
   say "waiting for recovery ADB on $_awr_serial (timeout ${_awr_timeout}s)..."
 
-  while [ "$_awr_elapsed" -lt "$_awr_timeout" ]; do
+  while awk -v e="$_awr_elapsed" -v t="$_awr_timeout" 'BEGIN { exit !((e + 0) < (t + 0)) }'; do
     _awr_state="$(vm_android_adb_poll_state "$_awr_vm_index")"
     case "$_awr_state" in
     recovery | sideload) return 0 ;;
     unauthorized)
-      if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+      if awk -v e="$_awr_elapsed" -v h="$_awr_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)"
         _awr_last_hint="$_awr_elapsed"
       fi
       ;;
     device)
-      if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+      if awk -v e="$_awr_elapsed" -v h="$_awr_last_hint" 'BEGIN { exit !((e + 0) >= (h + 30)) }'; then
         say "guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)"
         _awr_last_hint="$_awr_elapsed"
       fi
