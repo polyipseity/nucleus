@@ -158,10 +158,11 @@ launchctl_bootout_wait() {
     # check-suppress:suppression_doc: the poll below is the check; an absent job already satisfies it.
     $sudo_prefix launchctl bootout "$target" >/dev/null 2>&1 || true
   fi
-  local _i=0
-  while [ "$_i" -lt 10 ]; do
+  local _i=0 _poll_interval="${NUCLEUS_TEST_POLL_INTERVAL:-0.5}" _max_i
+  _max_i="$(awk -v b=5 -v i="$_poll_interval" 'BEGIN { if (i <= 0) i = 0.5; print int((b / i) + 0.999999) }')"
+  while [ "$_i" -lt "$_max_i" ]; do
     launchctl_job_loaded "$target" "$sudo_prefix" || return 0
-    sleep 0.5
+    sleep "$_poll_interval"
     _i=$((_i + 1))
   done
   return 1

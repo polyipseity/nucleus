@@ -1278,6 +1278,7 @@ section 23 "A repair call is bounded by the watchdog repair constant"
 # these checks pin that the constant is ENFORCED and that the production value
 # stays positive and single-sourced.
 _repair_marker="$_tmp/repair-invoked.txt"
+_repair_work_seconds="${NUCLEUS_TEST_REPAIR_WORK_SECONDS:-3}"
 _orig_repair="$(declare -f supervisor_repair)"
 # shellcheck disable=SC2329 # reason: invoked by eval'd watchdog code through svc_run_bounded in a subshell
 supervisor_repair() {
@@ -1286,7 +1287,7 @@ supervisor_repair() {
   #   below, and a background process still holding the captured stdout pipe
   #   would keep the command substitution open until it exited, making the
   #   elapsed-time check below measure the sleep instead of the bound.
-  sleep 5 >/dev/null 2>&1
+  sleep "${NUCLEUS_TEST_REPAIR_WORK_SECONDS:-3}" >/dev/null 2>&1
   printf 'completed\n' >>"$_repair_marker"
 }
 
@@ -1335,11 +1336,11 @@ if repair_completed; then
 else
   assert_pass "a repair outliving the bound never completes"
 fi
-if [ "$_elapsed" -lt 5 ]; then
+if [ "$_elapsed" -lt "$_repair_work_seconds" ]; then
   assert_pass "the bound returns before the repair would have finished"
 else
   assert_fail "the bound returns before the repair would have finished" \
-    "took ${_elapsed}s; the repair sleeps 5s, so the call was not bounded"
+    "took ${_elapsed}s; the repair sleeps ${_repair_work_seconds}s, so the call was not bounded"
 fi
 
 # (2) The production constant stays positive and declared exactly once: a zero
