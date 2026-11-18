@@ -313,17 +313,7 @@ case "$action" in
   exit 0
   ;;
 --list-steps)
-  REPO_ROOT="$(derive_repo_root)"
-  /run/current-system/sw/bin/bash -c '
-    set -euo pipefail
-    REPO_ROOT="$1"
-    cd "$REPO_ROOT"
-    # shellcheck source=../src/scripts/checks/check-lib.sh
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" 2>/dev/null
-    # shellcheck source=../src/scripts/checks/check-steps.sh
-    . "$REPO_ROOT/src/scripts/checks/check-steps.sh" 2>/dev/null
-    printf "%s\n" "${_STEP_IDS[@]}"
-  ' -- "$REPO_ROOT"
+  printf '%s\n' "${_STEP_IDS[@]}"
   exit 0
   ;;
 packer | pwsh | sh)
