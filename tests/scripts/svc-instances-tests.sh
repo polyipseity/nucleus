@@ -25,6 +25,10 @@ init_test_state
 
 require_command jq "svc-instances tests parse registry JSON with jq"
 
+# Faster poll/release waits in tests; wall-clock budgets remain unchanged (R4/G2).
+NUCLEUS_TEST_POLL_INTERVAL="${NUCLEUS_TEST_POLL_INTERVAL:-0.05}"
+export NUCLEUS_TEST_POLL_INTERVAL
+
 _tmp="$(mktemp -d)"
 trap 'rm -rf "$_tmp"' EXIT
 mkdir -p "$_tmp/bin"

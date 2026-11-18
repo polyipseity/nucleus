@@ -133,15 +133,16 @@ svc_cloud_mount_point() {
 # WHY: a reload must not start while the previous volume is still attached, or the new mount is destroyed as a duplicate and the drive stays missing until a reboot. Callers report the timeout.
 svc_wait_mount_released() {
   local mount_point="$1" timeout="${2:-30}" ticks=0 max_ticks
+  local _poll_interval="${NUCLEUS_TEST_POLL_INTERVAL:-0.5}"
 
   [ -n "$mount_point" ] || return 0
-  max_ticks=$((timeout * 2))
+  max_ticks="$(awk -v t="$timeout" -v i="$_poll_interval" 'BEGIN { if (i <= 0) i = 0.5; print int((t / i) + 0.999999) }')"
 
   while svc_mount_table_contains "$mount_point"; do
     if [ "$ticks" -ge "$max_ticks" ]; then
       return 1
     fi
-    sleep 0.5
+    sleep "$_poll_interval"
     ticks=$((ticks + 1))
   done
 
@@ -245,8 +246,9 @@ svc_mount_table_contains() {
 svc_run_bounded() {
   local bound="$1"
   shift
-  local pid ticks=0 max_ticks _sleep
-  max_ticks=$((bound * 5))
+  local pid ticks=0 max_ticks _sleep _tick_interval
+  _tick_interval="${NUCLEUS_TEST_POLL_INTERVAL:-0.2}"
+  max_ticks="$(awk -v b="$bound" -v i="$_tick_interval" 'BEGIN { if (i <= 0) i = 0.2; print int((b / i) + 0.999999) }')"
   _sleep="${REAL_SLEEP:-sleep}"
 
   # Run in its own process group so timeout kills can reap children that keep
@@ -271,7 +273,7 @@ svc_run_bounded() {
       wait "$pid" 2>/dev/null || true
       return 124
     fi
-    "$_sleep" 0.2
+    "$_sleep" "$_tick_interval"
     ticks=$((ticks + 1))
   done
 
