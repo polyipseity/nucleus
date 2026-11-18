@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Compare every registered argument hint with the sources the matrix records."""
+import json
+import re
+import sys
+
+matrix = json.load(open(sys.argv[1], encoding="utf-8"))
+root = sys.argv[2]
+failures = []
+
+for harness, value in matrix["harnesses"].items():
+    for command in value["commands"]:
+        try:
+            text = open(f"{root}/{command['path']}", encoding="utf-8").read()
+        except OSError:
+            continue
+        name_pattern = re.compile(r'name:\s*"' + re.escape(command["name"]) + r'"')
+        # Capture the full bracketed hint body; use greedy content so nested "]"
+        # (e.g. "pick [index]") is preserved, but do not span past the closing
+        # quote of this hint string.
+        hint_pattern = re.compile(r'argument-?[Hh]int:\s*"\[([^\n"]+)\]"')
+        for name_match in name_pattern.finditer(text):
+            region = text[name_match.end() : name_match.end() + 300]
+            hint_match = hint_pattern.search(region)
+            if not hint_match:
+                continue
+            between = region[: hint_match.start()]
+            if re.search(r'name:\s*"', between):
+                continue
+            for token in (part.strip() for part in hint_match.group(1).split("|")):
+                if not token:
+                    continue
+                base = token.split()[0]
+                if token not in command["sources"] and base not in command["sources"]:
+                    failures.append(
+                        f"{harness}/{command['name']}: hint '{token}' is not in {command['sources']}"
+                    )
+
+if failures:
+    print("\n".join(failures))
+    sys.exit(1)

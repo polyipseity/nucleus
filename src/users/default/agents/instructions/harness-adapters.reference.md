@@ -38,6 +38,9 @@ opencode, Cursor, Claude Code, Hermes, and CLI agents have no verified mapping f
 
 ## Prompt tools capability (continue / copy user prompt / repeat user prompt)
 
+The machine-checked capability matrix is `src/modules/configs/harness-capabilities.json` (schema `harness-capabilities.schema.json`); truthfulness rules are enforced by `tests/scripts/harness-capability-truth-tests.sh`.
+
+
 Commands and modes, where implemented: `/continue`, `/copy-user-prompt [sent|queued|pick]`, `/repeat-user-prompt [sent|queued|pick]` (default `sent`). `pick` resolves by the harness-specific implementation described below; cancel/empty states are one-line/no-op as implemented.
 
 | Harness | Status | Implementation / evidence | Notes |

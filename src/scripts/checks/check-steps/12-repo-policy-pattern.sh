@@ -81,7 +81,7 @@ run_config_method_compliance() {
     esac
     _rel="${_cfg#"$_cfg_dir"/}"
     case "$_rel" in
-    agents/* | hermes-agent/SOUL.md | ollama/models.json) continue ;;
+    agents/* | harness-capabilities.json | hermes-agent/SOUL.md | ollama/models.json) continue ;;
     esac
     _cfgs+=("$_rel")
     _bases+=("$_base")

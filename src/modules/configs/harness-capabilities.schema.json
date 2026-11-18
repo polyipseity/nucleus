@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Harness prompt capability matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "harnesses"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "harnesses": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/harness" }
+    }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "capability", "surface", "picker", "sources", "path"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "capability": {
+          "type": "string",
+          "enum": ["continue", "copy-prompt", "repeat-prompt"]
+        },
+        "surface": {
+          "type": "string",
+          "enum": ["extension", "mod", "tui-plugin", "plugin"]
+        },
+        "picker": {
+          "type": "string",
+          "enum": ["filterable", "numbered", "none"]
+        },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["sent", "queued", "pick"] },
+          "uniqueItems": true
+        },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commands"],
+      "properties": {
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/command" }
+        },
+        "verdict": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "commands": { "maxItems": 0 }
+            }
+          },
+          "then": { "required": ["verdict"] },
+          "else": { "not": { "required": ["verdict"] } }
+        }
+      ]
+    }
+  }
+}
