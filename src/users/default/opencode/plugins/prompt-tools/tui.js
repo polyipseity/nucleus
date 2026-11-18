@@ -1,22 +1,25 @@
 /**
  * OpenCode v2 TUI plugin providing prompt tools: /continue, /copy-user-prompt,
  * /repeat-user-prompt. Client-only: it reads TUI session data, shows dialogs,
- * copies to the platform clipboard, and re-submits prompts through the client.
+ * copies to the clipboard, and re-submits prompts through the client.
  *
  * Semantics mirror src/users/default/pi/extensions/prompt-tools.ts:
- * - `sent` is the last user-role message sent to the model.
- * - `queued` is the last queued prompt (TUI pending list / harness bridge queue).
- * - `pick` selects between them and always opens dialog.select, even for a
- *   single candidate; cancel is a silent no-op.
- * - copy uses platform clipboard commands with a visible fallback when none works.
+ * - `sent`/`queued` shortcuts return the newest prompt of that kind.
+ * - `pick` lists every retained sent and queued prompt in reverse chronological
+ *   order behind a text filter and always opens dialog.select (even for a
+ *   single candidate); cancel is a silent no-op. Queued prompts are never
+ *   consumed/deleted.
+ * - copy prefers the shared harness-clipboard command (stdin) with platform
+ *   fallback and a visible fallback when none works.
  * - repeat resubmits as a new user turn and confirms while running.
  * - empty state prints one line and does nothing else.
  */
 
 import { execFile } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const runFile = promisify(execFile);
@@ -47,6 +50,35 @@ export function opencodeQueuedCommandsDir(root) {
   return path.join(root, "state", "harness-bridge", "commands", "opencode");
 }
 
+function queuedFilePromptText(value) {
+  if (!isRecord(value) || typeof value.text !== "string") return null;
+  const text = value.text.trim();
+  return text === "" ? null : text;
+}
+
+/** Read all queued harness-bridge prompts without consuming them. */
+export function readQueuedPromptList(commandsDir) {
+  let names;
+  try {
+    names = readdirSync(commandsDir).filter((name) => name.endsWith(".json"));
+  } catch {
+    return [];
+  }
+  const prompts = [];
+  for (const name of names) {
+    const filePath = path.join(commandsDir, name);
+    try {
+      const text = queuedFilePromptText(JSON.parse(readFileSync(filePath, "utf8")));
+      if (text === null) continue;
+      const mtimeMs = statSync(filePath).mtimeMs;
+      prompts.push({ text, mtimeMs });
+    } catch {
+      // unreadable/invalid queued entries are ignored
+    }
+  }
+  return prompts;
+}
+
 /** Read the newest queued harness-bridge prompt without consuming it. */
 export function readQueuedPromptFile(commandsDir) {
   let names;
@@ -61,12 +93,7 @@ export function readQueuedPromptFile(commandsDir) {
   }
   if (newest === "") return null;
   try {
-    const queued = JSON.parse(readFileSync(path.join(commandsDir, newest), "utf8"));
-    if (typeof queued.text === "string") {
-      const text = queued.text.trim();
-      return text === "" ? null : text;
-    }
-    return null;
+    return queuedFilePromptText(JSON.parse(readFileSync(path.join(commandsDir, newest), "utf8")));
   } catch {
     return null;
   }
@@ -109,16 +136,32 @@ export function extractUserPromptText(message) {
   return extractTextContent(messageContent(message));
 }
 
-export function findLastSentUserPrompt(messages) {
-  if (!Array.isArray(messages)) return null;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
+function messageTimestamp(message) {
+  if (!isRecord(message)) return undefined;
+  const candidates = [message.timestamp, isRecord(message.info) ? message.info.timestamp : undefined];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim() !== "") return value;
+  }
+  return undefined;
+}
+
+export function findSentUserPrompts(messages) {
+  if (!Array.isArray(messages)) return [];
+  const prompts = [];
+  for (const message of messages) {
     if (messageRole(message) !== "user") continue;
     const text = extractUserPromptText(message);
     if (text === null) continue;
-    return { source: "sent", text };
+    const timestamp = messageTimestamp(message);
+    prompts.push(timestamp === undefined ? { text } : { text, timestamp });
   }
-  return null;
+  return prompts;
+}
+
+export function findLastSentUserPrompt(messages) {
+  const prompts = findSentUserPrompts(messages);
+  const last = prompts[prompts.length - 1];
+  return last ? { source: "sent", text: last.text, timestamp: last.timestamp } : null;
 }
 
 export function extractPendingPromptText(item) {
@@ -148,6 +191,18 @@ export function findLastQueuedPrompt(pending) {
   return null;
 }
 
+export function findQueuedPrompts(pending, baseMtimeMs = Date.now()) {
+  if (!Array.isArray(pending)) return [];
+  const prompts = [];
+  for (let index = 0; index < pending.length; index += 1) {
+    const text = extractPendingPromptText(pending[index]);
+    if (text === null) continue;
+    // Preserve pending order (later = newer) via synthetic increasing mtimes.
+    prompts.push({ text, mtimeMs: baseMtimeMs + index });
+  }
+  return prompts;
+}
+
 export function parsePromptSourceArg(args) {
   const trimmed = typeof args === "string" ? args.trim() : "";
   if (trimmed === "") return "sent";
@@ -165,6 +220,74 @@ export function promptPreview(text, maxLength = 60) {
 function promptOptionLabel(choice) {
   const label = choice.source === "sent" ? "Sent" : "Queued";
   return `${label}: ${promptPreview(choice.text)}`;
+}
+
+function formatRelativeAge(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+function pickLabel(choice, nowMs) {
+  const kind = choice.source === "sent" ? "sent" : "queued";
+  let when = "now";
+  if (choice.source === "queued" && typeof choice.mtimeMs === "number") {
+    when = formatRelativeAge(nowMs - choice.mtimeMs);
+  } else if (choice.source === "sent" && typeof choice.timestamp === "string") {
+    const ts = Date.parse(choice.timestamp);
+    if (!Number.isNaN(ts)) when = formatRelativeAge(nowMs - ts);
+  }
+  return `${kind} · ${when} · ${promptPreview(choice.text)}`;
+}
+
+function parseSentTimestamp(timestamp) {
+  if (typeof timestamp !== "string") return null;
+  const ms = Date.parse(timestamp);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+export function buildPromptChoices(sent, queued) {
+  const sentChoices = sent.map((prompt, index) => ({
+    source: "sent",
+    text: prompt.text,
+    timestamp: prompt.timestamp,
+    index,
+    ts: parseSentTimestamp(prompt.timestamp),
+  }));
+  const queuedChoices = [...queued]
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .map((prompt) => ({ source: "queued", text: prompt.text, mtimeMs: prompt.mtimeMs, ts: prompt.mtimeMs }));
+
+  const anySentTimestamp = sentChoices.some((choice) => choice.ts !== null);
+  if (!anySentTimestamp) {
+    if (sentChoices.length === 1 && queuedChoices.length === 1) {
+      return [sentChoices[0], queuedChoices[0]].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+    }
+    const sentNewestFirst = [...sentChoices].sort((a, b) => b.index - a.index);
+    return [...queuedChoices, ...sentNewestFirst].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+  }
+
+  const mixed = [
+    ...queuedChoices.map((choice) => ({ ...choice, sentIndex: -1 })),
+    ...sentChoices.filter((choice) => choice.ts !== null).map((choice) => ({ ...choice, sentIndex: choice.index })),
+  ];
+  mixed.sort((a, b) => {
+    if (b.ts !== a.ts) return b.ts - a.ts;
+    if (a.source !== b.source) return a.source === "queued" ? -1 : 1;
+    return b.sentIndex - a.sentIndex;
+  });
+  const untimedSent = sentChoices.filter((choice) => choice.ts === null).sort((a, b) => b.index - a.index);
+  return [...mixed, ...untimedSent].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
+}
+
+export function filterPromptChoices(choices, filter) {
+  if (filter === "") return choices;
+  const needle = String(filter).toLowerCase();
+  return choices.filter((choice) => String(choice.text).toLowerCase().includes(needle));
 }
 
 async function listData(data, methodNames, args = []) {
@@ -198,23 +321,81 @@ export async function readSentPrompt(context, deps = {}) {
   return findLastSentUserPrompt(messages ?? []);
 }
 
-export async function readQueuedPrompt(context, deps = {}) {
-  if (typeof deps.readQueuedPrompt === "function") return deps.readQueuedPrompt(context);
+async function readAllSentPrompts(context, deps = {}) {
+  if (typeof deps.readAllSentPrompts === "function") return deps.readAllSentPrompts(context);
+  const sessionID = deps.sessionID ?? context?.sessionID ?? null;
+  const messages = await listData(
+    context?.data?.session?.message,
+    ["list", "get", "sync"],
+    sessionID === null ? [] : [sessionID],
+  );
+  return findSentUserPrompts(messages ?? []);
+}
+
+function newestQueuedChoice(prompts) {
+  if (!Array.isArray(prompts) || prompts.length === 0) return null;
+  const newest = [...prompts].sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+  return newest ? { source: "queued", text: newest.text, mtimeMs: newest.mtimeMs } : null;
+}
+
+async function readAllQueuedPrompts(context, deps = {}) {
+  if (typeof deps.readAllQueuedPrompts === "function") return deps.readAllQueuedPrompts(context);
   const sessionID = deps.sessionID ?? context?.sessionID ?? null;
   const pending = await listData(
     context?.data?.session?.pending,
     ["list", "get", "sync"],
     sessionID === null ? [] : [sessionID],
   );
-  const fromPending = findLastQueuedPrompt(pending ?? []);
-  if (fromPending !== null) return fromPending;
+  const root = nucleusUserRoot(deps.platform ?? process.platform, deps.env ?? process.env, deps.homeDir ?? homedir);
+  const filePrompts = (deps.readQueuedPromptList ?? readQueuedPromptList)(opencodeQueuedCommandsDir(root));
+  const pendingPrompts = findQueuedPrompts(pending ?? [], Date.now());
+  return [...pendingPrompts, ...filePrompts];
+}
+
+export async function readQueuedPrompt(context, deps = {}) {
+  if (typeof deps.readQueuedPrompt === "function") return deps.readQueuedPrompt(context);
+  const all = await readAllQueuedPrompts(context, deps);
+  const newest = newestQueuedChoice(all);
+  if (newest) return { source: "queued", text: newest.text };
+  // Back-compat: honor custom file reader returning text only.
   const root = nucleusUserRoot(deps.platform ?? process.platform, deps.env ?? process.env, deps.homeDir ?? homedir);
   const queuedText = (deps.readQueuedPromptFile ?? readQueuedPromptFile)(opencodeQueuedCommandsDir(root));
   if (queuedText === null) return null;
   return { source: "queued", text: queuedText };
 }
 
-export async function pickPromptChoice(sent, queued, ui) {
+function selectIndex(selected, length) {
+  if (selected === undefined || selected === null) return -1;
+  const index = typeof selected === "number" ? selected : Number(selected?.value ?? selected?.index ?? NaN);
+  if (!Number.isInteger(index) || index < 0 || index >= length) return -1;
+  return index;
+}
+
+export async function pickPromptChoice(first, second, third) {
+  const isUi = third !== undefined && typeof first !== "function";
+  // New signature: (choices, filter, ui)
+  if (isUi && (Array.isArray(first) || first === null)) {
+    const choices = Array.isArray(first) ? first : [];
+    const filter = typeof second === "string" ? second : "";
+    const ui = third;
+    const filtered = filterPromptChoices(choices, filter);
+    if (filtered.length === 0) return null;
+    const select = ui?.dialog?.select;
+    if (typeof select !== "function") return "cancelled";
+    const options = filtered.map((choice) => promptOptionLabel(choice));
+    const selected = await select({
+      title: "Select prompt",
+      options: options.map((label, index) => ({ label, value: index })),
+      current: 0,
+    });
+    const index = selectIndex(selected, filtered.length);
+    return index < 0 ? "cancelled" : filtered[index] ?? "cancelled";
+  }
+
+  // Legacy signature: (sent, queued, ui)
+  const sent = first;
+  const queued = second;
+  const ui = third;
   const choices = [];
   if (sent) choices.push(sent);
   if (queued) choices.push(queued);
@@ -232,9 +413,8 @@ export async function pickPromptChoice(sent, queued, ui) {
     current: 0,
   });
   if (selected === undefined || selected === null) return "cancelled";
-  const index = typeof selected === "number" ? selected : Number(selected?.value ?? selected?.index ?? NaN);
-  if (!Number.isInteger(index) || index < 0 || index >= choices.length) return "cancelled";
-  return choices[index] ?? "cancelled";
+  const index = selectIndex(selected, choices.length);
+  return index < 0 ? "cancelled" : choices[index] ?? "cancelled";
 }
 
 export async function resolvePromptChoice(mode, context, deps = {}) {
@@ -242,7 +422,43 @@ export async function resolvePromptChoice(mode, context, deps = {}) {
   const queued = await readQueuedPrompt(context, deps);
   if (mode === "sent") return sent;
   if (mode === "queued") return queued;
-  return pickPromptChoice(sent, queued, context?.ui);
+
+  const allSent = await readAllSentPrompts(context, deps);
+  const allQueued = await readAllQueuedPrompts(context, deps);
+  const choices = buildPromptChoices(allSent, allQueued);
+  if (choices.length === 0) return null;
+
+  const ui = context?.ui;
+  const select = ui?.dialog?.select;
+  if (typeof select !== "function") return "cancelled";
+
+  // Legacy-compatible presentation for the simple 1+1 untimestamped case.
+  const legacyTwo = allSent.length <= 1 && allQueued.length <= 1 && !allSent.some((p) => typeof p.timestamp === "string" && p.timestamp.trim() !== "");
+  if (legacyTwo) {
+    return pickPromptChoice(sent, queued, ui);
+  }
+
+  let filter = "";
+  const input = ui?.dialog?.input;
+  if (typeof input === "function") {
+    const value = await input({ title: "Filter prompts", placeholder: "text filter (empty for all)" });
+    if (value === undefined || value === null) return "cancelled";
+    if (typeof value === "string") filter = value;
+    else if (isRecord(value) && typeof value.value === "string") filter = value.value;
+    else filter = "";
+  }
+
+  const filtered = filterPromptChoices(choices, filter);
+  if (filtered.length === 0) return null;
+
+  const nowMs = typeof deps.now === "function" ? deps.now() : Date.now();
+  const selected = await select({
+    title: "Select prompt",
+    options: filtered.map((choice, index) => ({ label: pickLabel(choice, nowMs), value: index })),
+    current: 0,
+  });
+  const index = selectIndex(selected, filtered.length);
+  return index < 0 ? "cancelled" : filtered[index] ?? "cancelled";
 }
 
 function printLine(context, text) {
@@ -284,6 +500,16 @@ function unavailableSourceMessage(mode, command, choice) {
   return EMPTY_SESSION_MESSAGE;
 }
 
+function harnessClipboardCommands() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const scriptDir = path.join(here, "..", "..", "..", "..", "..", "src", "scripts", "notify");
+  return [
+    { command: "harness-clipboard", args: [] },
+    { command: "bash", args: [path.join(scriptDir, "harness-clipboard.sh")] },
+    { command: "pwsh", args: ["-NoProfile", "-File", path.join(scriptDir, "harness-clipboard.ps1")] },
+  ];
+}
+
 export function clipboardCommands(platform = process.platform) {
   if (platform === "darwin") return [{ command: "pbcopy", args: [] }];
   if (platform === "win32") return [{ command: "clip.exe", args: [] }];
@@ -298,6 +524,12 @@ export async function copyTextToClipboard(text, deps = {}) {
     return deps.copyToClipboard(text);
   }
   const writer = deps.writeToClipboardCommand ?? defaultWriteToClipboardCommand;
+  if (!deps.writeToClipboardCommand) {
+    for (const candidate of harnessClipboardCommands()) {
+      const ok = await writer(candidate.command, candidate.args, text);
+      if (ok) return true;
+    }
+  }
   for (const candidate of clipboardCommands(deps.platform ?? process.platform)) {
     const ok = await writer(candidate.command, candidate.args, text);
     if (ok) return true;
