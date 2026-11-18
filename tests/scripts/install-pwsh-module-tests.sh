@@ -319,7 +319,7 @@ run_shadowed_program() {
 section 1 "install-pwsh-module program contract"
 
 test_records_pinned_module_and_version() {
-  run_installer Pester 6.2.0
+  # Shared standard recording prepared once for contract assertions below.
   if [ "$RUN_STATUS" -ne 0 ]; then
     assert_fail "installer: hands pwsh the pinned module and version" "installer exited $RUN_STATUS"
     return
@@ -333,7 +333,6 @@ test_records_pinned_module_and_version() {
 }
 
 test_unloads_module_before_uninstalling() {
-  run_installer Pester 6.2.0
   local unload_line uninstall_line
   unload_line="$(first_line_of "$PS_UNLOAD")"
   uninstall_line="$(first_line_of "$PS_UNINSTALL")"
@@ -349,7 +348,6 @@ test_unloads_module_before_uninstalling() {
 }
 
 test_unload_only_runs_when_module_is_loaded() {
-  run_installer Pester 6.2.0
   local guard_line unload_line
   unload_line="$(first_line_of "$PS_UNLOAD")"
   guard_line="$(first_line_of "$PS_LOADED_GUARD")"
@@ -364,7 +362,6 @@ test_unload_only_runs_when_module_is_loaded() {
 }
 
 test_uninstall_stops_on_error() {
-  run_installer Pester 6.2.0
   if grep -F "$PS_UNINSTALL" "$IPM_STUB_LOG" | grep -qF -- '-ErrorAction Stop'; then
     assert_pass "installer: uninstalls with -ErrorAction Stop so a refusal is a failure"
   else
@@ -381,10 +378,11 @@ test_pwsh_failure_reaches_the_caller() {
   else
     assert_fail "installer: propagates a pwsh failure as a non-zero exit" "installer exited 0 after pwsh exited 1"
   fi
+  # Restore the shared standard recording for later contract assertions.
+  run_installer Pester 6.2.0
 }
 
 test_verifies_the_pin_is_the_only_copy_after_installing() {
-  run_installer Pester 6.2.0
   local install_line listing_count verify_line message_line throw_line
   install_line="$(first_line_of "$PS_INSTALL")"
   listing_count="$(count_of "$PS_LIST")"
@@ -405,7 +403,6 @@ test_verifies_the_pin_is_the_only_copy_after_installing() {
 }
 
 test_names_the_leftover_copy_in_the_failure() {
-  run_installer Pester 6.2.0
   # The message has to carry the copy's version and path, otherwise the failure
   # says a copy survived without saying which one.
   if grep -qF "${PS}_.Version" "$IPM_STUB_LOG" &&
@@ -417,7 +414,6 @@ test_names_the_leftover_copy_in_the_failure() {
 }
 
 test_keeps_the_early_exit_when_the_pin_is_already_converged() {
-  run_installer Pester 6.2.0
   local exit_line install_line
   exit_line="$(first_line_of 'is already converged')"
   install_line="$(first_line_of "$PS_INSTALL")"
@@ -432,7 +428,6 @@ test_keeps_the_early_exit_when_the_pin_is_already_converged() {
 # two facts. A single predicate over "no copy can shadow the pin" is also true on
 # a host that has no pin at all, and that host would then never get one.
 test_early_exit_names_the_pin_and_the_shadowing_separately() {
-  run_installer Pester 6.2.0
   if grep -qF "if (${PS}converged.Count -gt 0 -and ${PS}shadowing.Count -eq 0)" "$IPM_STUB_LOG"; then
     assert_pass "installer: the early exit requires both the pin and the absence of anything shadowing it"
   else
@@ -489,7 +484,6 @@ test_skips_with_a_line_when_the_lockfile_pins_no_version() {
 # command, and the comment arrived with the word gone. Nothing else in this suite
 # would notice, because a mangled comment changes no behaviour.
 test_emits_the_program_without_shell_interpretation() {
-  run_installer Pester 6.2.0
   if [ -n "$RUN_STUB_STDERR" ]; then
     assert_fail "installer: hands pwsh the program with nothing the shell interpreted" "the shell wrote to stderr while building the program: $RUN_STUB_STDERR"
     return
@@ -500,6 +494,10 @@ test_emits_the_program_without_shell_interpretation() {
   fi
   assert_pass "installer: hands pwsh the program with nothing the shell interpreted"
 }
+
+# One stub recording shared by contract assertions that inspect the same
+# default Pester 6.2.0 program (R4: batch assertions sharing one invocation).
+run_installer Pester 6.2.0
 
 test_records_pinned_module_and_version
 test_unloads_module_before_uninstalling
@@ -735,7 +733,6 @@ test_post_install_check_passes_when_a_lower_copy_survives
 test_post_install_check_throws_when_the_pin_is_missing
 
 test_elevates_the_removal_and_keeps_the_install_unprivileged() {
-  run_installer Pester 6.2.0
   if grep -qF "${PS}privilegeCommand ${PS}pwshBinary" "$IPM_STUB_LOG" &&
     grep -qF "${PS}removalProgram" "$IPM_STUB_LOG" &&
     grep -qF "Install-Module -Name ${PS}moduleName" "$IPM_STUB_LOG"; then
@@ -746,7 +743,6 @@ test_elevates_the_removal_and_keeps_the_install_unprivileged() {
 }
 
 test_removal_is_narrowed_to_the_versions_that_shadow() {
-  run_installer Pester 6.2.0
   if grep -qF "Uninstall-Module -Name ${PS}moduleName -RequiredVersion" "$IPM_STUB_LOG"; then
     assert_pass "installer: the elevated removal targets one version at a time"
   else
@@ -760,7 +756,6 @@ test_removal_is_narrowed_to_the_versions_that_shadow() {
 }
 
 test_elevated_removal_never_carries_the_converged_pin() {
-  run_installer Pester 6.2.0
   if grep -qF "${PS}shadowTargets = @(${PS}shadowing" "$IPM_STUB_LOG" &&
     grep -qF "+ '|' + ${PS}_.ModuleBase" "$IPM_STUB_LOG"; then
     assert_pass "installer: the targets handed to the removal are the shadowing copies with their paths"
@@ -770,7 +765,6 @@ test_elevated_removal_never_carries_the_converged_pin() {
 }
 
 test_requires_a_privilege_command_only_when_a_copy_shadows() {
-  run_installer Pester 6.2.0
   if grep -qF "if (-not ${PS}privilegeCommand)" "$IPM_STUB_LOG" &&
     grep -qF 'no privilege command was supplied' "$IPM_STUB_LOG"; then
     assert_pass "installer: a shadowing copy with no privilege command fails by name"
