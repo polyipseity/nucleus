@@ -1084,7 +1084,6 @@ $nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata')
 $nucleusCloudCommands = @('setup', 'reset', 'sync', 'status', 'restart')
 $nucleusUpdateCommands = @('update', 'lockfile')
 $nucleusCheckCommands = @('packer', 'pwsh', 'sh')
-$nucleusTestCommands = @()
 
 function Get-NucleusCompletionItemList {
   param(
