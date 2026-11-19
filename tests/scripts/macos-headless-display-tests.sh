@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-# Tests for the BetterDisplay headless virtual-screen specification:
-#   macos-configure-headless-display.sh: the create path
-#   macos-heartbeat-betterdisplay.sh: the 60 s reconcile/recreate path
-#   macos-display-resolutions.sh: the exclusion that keeps the virtual
-#                                          screen out of external-monitor matching
-#
-# The two create sites MUST agree on the virtual-screen parameters: the
-# heartbeat recreates the screen with its own copy, so a stale value there
-# silently undoes the create path on the next poll.
-#
-# WHY: parsing instead of execution: none of the three scripts can prove these
-# values in the check environment. The create path soft-fails every BetterDisplay
-# CLI call and no-ops without the app, the heartbeat is a 60 s daemon loop that
-# never exits, and macos-display-resolutions.sh needs a WindowServer context a
-# headless session does not have, as its own header states. Parsing the source is
-# the only way to pin the shared parameters.
+# Behavioral tests for BetterDisplay headless-screen reconcile logic in
+# src/scripts/lib/betterdisplay.sh. A fake BetterDisplay CLI fixture drives
+# canned responses and records every invocation so tests assert real
+# behavior/call counts, not source text.
 
 set -euo pipefail
 
@@ -22,127 +10,327 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-PLATFORM_DIR="$SCRIPT_DIR/../../src/platforms/macOS/scripts"
-CONFIGURE_SH="$PLATFORM_DIR/macos-configure-headless-display.sh"
-HEARTBEAT_SH="$PLATFORM_DIR/macos-heartbeat-betterdisplay.sh"
-RESOLUTIONS_SH="$PLATFORM_DIR/macos-display-resolutions.sh"
+BETTERDISPLAY_LIB="$SCRIPT_DIR/../../src/scripts/lib/betterdisplay.sh"
+# shellcheck source=../../src/scripts/lib/betterdisplay.sh
+. "$BETTERDISPLAY_LIB"
 
-# multiplierStep x aspect is the logical size; -virtualScreenHiDPI doubles it
-# into the framebuffer, so 80 x 16:10 = 1280x800 logical / 2560x1600 framebuffer.
-EXPECTED_MULTIPLIER_STEP="80"
+TMPDIR_TEST="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
-# Print every -multiplierStep value in a file, one per line, in source order.
-_multiplier_steps_in() {
-  local file="$1"
-  grep -o -- '-multiplierStep=[0-9]*' "$file" | sed 's/.*=//'
+# Write the fake BetterDisplay CLI into $BD_BIN and configure harmless process
+# controls. Each test resets scenario state via environment variables/files.
+setup_fake_bd() {
+  local dir="$TMPDIR_TEST/fake-$BASHPID-$$-$RANDOM"
+  mkdir -p "$dir/state"
+  BD_BIN="$dir/BetterDisplay"
+  BD_APP="$dir/BetterDisplay.app"
+  BD_FAKE_LOG="$dir/calls.log"
+  BD_FAKE_STATE_DIR="$dir/state"
+  # Defaults: app present, running, no-op side effects, fast sleeps.
+  : >"$BD_FAKE_LOG"
+  rm -f "$BD_FAKE_STATE_DIR/created"
+  export BD_BIN BD_APP BD_FAKE_LOG BD_FAKE_STATE_DIR
+  export BD_PGREP="$dir/pgrep" BD_OPEN="$dir/open" BD_SLEEP="$dir/sleep"
+  export BD_DISPLAY_NAME="HeadlessDisplay"
+
+  cat >"$BD_PGREP" <<'EOF'
+#!/usr/bin/env bash
+# Reports BetterDisplay running by default; BD_FAKE_PGREP_RUNNING=0 means not running.
+if [ "${BD_FAKE_PGREP_RUNNING:-1}" = "0" ]; then
+  exit 1
+fi
+exit 0
+EOF
+  cat >"$BD_OPEN" <<'EOF'
+#!/usr/bin/env bash
+printf 'open %s\n' "$*" >>"${BD_FAKE_LOG:?}"
+exit 0
+EOF
+  cat >"$BD_SLEEP" <<'EOF'
+#!/usr/bin/env bash
+printf 'sleep %s\n' "$*" >>"${BD_FAKE_LOG:?}"
+exit 0
+EOF
+  cat >"$BD_BIN" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"${BD_FAKE_LOG:?}"
+
+# State flips after a successful create so verify/re-read can observe the new screen.
+created() { [ -f "${BD_FAKE_STATE_DIR:?}/created" ]; }
+
+case "$1" in
+  get)
+    case "${2:-}" in
+      -identifiers)
+        if created && [ -n "${BD_FAKE_TAG_IDS_AFTER_CREATE+x}" ]; then
+          ids="${BD_FAKE_TAG_IDS_AFTER_CREATE}"
+        else
+          ids="${BD_FAKE_TAG_IDS-}"
+        fi
+        for id in $ids; do
+          printf '{"tagID":"%s"}\n' "$id"
+        done
+        exit "${BD_FAKE_IDENTIFIERS_RC:-0}"
+        ;;
+      -name=*|-tagID=*)
+        # connected query: get -name=... -connected or get -tagID=... -connected
+        if [ "${3:-}" = "-connected" ] || [ "${2:-}" = "-connected" ] || [[ "${2:-}" == *-connected* ]] || [[ "${3:-}" == *-connected* ]]; then
+          :
+        fi
+        if created && [ -n "${BD_FAKE_CONNECTED_AFTER_CREATE+x}" ]; then
+          state="${BD_FAKE_CONNECTED_AFTER_CREATE}"
+          rc="${BD_FAKE_CONNECTED_AFTER_CREATE_RC:-0}"
+        else
+          state="${BD_FAKE_CONNECTED-}"
+          rc="${BD_FAKE_CONNECTED_RC:-0}"
+        fi
+        if [ -n "$state" ]; then
+          printf '%s\n' "$state"
+        fi
+        exit "$rc"
+        ;;
+      *)
+        exit 0
+        ;;
+    esac
+    ;;
+  create)
+    rc="${BD_FAKE_CREATE_RC:-0}"
+    if [ "$rc" -eq 0 ]; then
+      : >"${BD_FAKE_STATE_DIR:?}/created"
+    fi
+    exit "$rc"
+    ;;
+  discard)
+    exit "${BD_FAKE_DISCARD_RC:-0}"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+EOF
+  chmod +x "$BD_BIN" "$BD_PGREP" "$BD_OPEN" "$BD_SLEEP"
 }
 
-# Count the -multiplierStep values in a file. More than one means a stale
-# leftover value is still present and could be picked up by a future edit.
-_multiplier_step_count() {
-  _multiplier_steps_in "$1" | wc -l | tr -d ' '
+# Count recorded invocations whose logged argument string starts with $1.
+count_calls() {
+  local prefix="$1" n
+  if [ ! -f "$BD_FAKE_LOG" ]; then
+    printf '0\n'
+    return
+  fi
+  n="$(grep -c "^${prefix}" "$BD_FAKE_LOG" 2>/dev/null)" || n=0
+  printf '%s\n' "${n//$'\n'/}"
 }
 
-# --- Tests ---
-
-test_multiplier_step_value() {
-  section 1 "multiplierStep value"
-
-  local value
-  value="$(_multiplier_steps_in "$CONFIGURE_SH")"
-  if [ "$value" = "$EXPECTED_MULTIPLIER_STEP" ]; then
-    assert_pass "headless-display create uses multiplierStep=$EXPECTED_MULTIPLIER_STEP"
-  else
-    assert_fail "headless-display create multiplierStep" \
-      "expected '$EXPECTED_MULTIPLIER_STEP', got '$value'"
+# Assert that the last (or only) create call contains every expected token.
+assert_create_spec() {
+  local line
+  line="$(grep '^create ' "$BD_FAKE_LOG" | tail -n 1 || true)"
+  if [ -z "$line" ]; then
+    assert_fail "create spec recorded" "no create call logged"
+    return
   fi
-
-  value="$(_multiplier_steps_in "$HEARTBEAT_SH")"
-  if [ "$value" = "$EXPECTED_MULTIPLIER_STEP" ]; then
-    assert_pass "betterdisplay heartbeat uses multiplierStep=$EXPECTED_MULTIPLIER_STEP"
-  else
-    assert_fail "betterdisplay heartbeat multiplierStep" \
-      "expected '$EXPECTED_MULTIPLIER_STEP', got '$value'"
-  fi
-}
-
-test_create_sites_agree() {
-  section 2 "create sites agree"
-
-  local configure_count heartbeat_count
-  configure_count="$(_multiplier_step_count "$CONFIGURE_SH")"
-  heartbeat_count="$(_multiplier_step_count "$HEARTBEAT_SH")"
-
-  if [ "$configure_count" = "1" ] && [ "$heartbeat_count" = "1" ]; then
-    assert_pass "each create site declares exactly one multiplierStep"
-  else
-    assert_fail "multiplierStep declaration count" \
-      "configure=$configure_count heartbeat=$heartbeat_count (expected 1 each)"
-  fi
-
-  local configure_steps heartbeat_steps
-  configure_steps="$(_multiplier_steps_in "$CONFIGURE_SH" | sort -u)"
-  heartbeat_steps="$(_multiplier_steps_in "$HEARTBEAT_SH" | sort -u)"
-  if [ -n "$configure_steps" ] && [ "$configure_steps" = "$heartbeat_steps" ]; then
-    assert_pass "both create sites use the identical multiplierStep ($configure_steps)"
-  else
-    assert_fail "create-site drift" \
-      "configure='$configure_steps' heartbeat='$heartbeat_steps'"
+  local ok=1 token
+  for token in \
+    "-type=VirtualScreen" \
+    "-virtualScreenName=HeadlessDisplay" \
+    "-aspectWidth=16" \
+    "-aspectHeight=10" \
+    "-multiplierStep=80" \
+    "-virtualScreenHiDPI=on" \
+    "-connected=on"; do
+    case "$line" in
+    *"$token"*) ;;
+    *)
+      assert_fail "create spec contains $token" "got: $line"
+      ok=0
+      ;;
+    esac
+  done
+  if [ "$ok" -eq 1 ]; then
+    assert_pass "create spec includes type/name/aspect/multiplier/HiDPI/connected"
   fi
 }
 
-test_hidpi_and_aspect_retained() {
-  section 3 "HiDPI and aspect retained"
+test_bd_connected_predicate() {
+  section 1 "bd_connected predicate"
 
-  if grep -q -- '-virtualScreenHiDPI=on' "$CONFIGURE_SH" &&
-    grep -q -- '-virtualScreenHiDPI=on' "$HEARTBEAT_SH"; then
-    assert_pass "both create sites keep -virtualScreenHiDPI=on"
+  if bd_connected "on"; then
+    assert_pass "bd_connected accepts 'on'"
   else
-    assert_fail "HiDPI flag" "expected -virtualScreenHiDPI=on in both create sites"
+    assert_fail "bd_connected accepts 'on'" "returned non-zero"
+  fi
+  if bd_connected "on,on"; then
+    assert_pass "bd_connected accepts 'on,on'"
+  else
+    assert_fail "bd_connected accepts 'on,on'" "returned non-zero"
   fi
 
-  if grep -q -- '-aspectWidth=16' "$CONFIGURE_SH" &&
-    grep -q -- '-aspectHeight=10' "$CONFIGURE_SH"; then
-    assert_pass "create site keeps the 16:10 aspect"
+  local bad
+  for bad in "" "Failed." "off" "off,off" "on,off"; do
+    if bd_connected "$bad"; then
+      assert_fail "bd_connected rejects '${bad}'" "returned zero (should be unhealthy)"
+    else
+      assert_pass "bd_connected rejects '${bad}'"
+    fi
+  done
+}
+
+test_reconcile_healthy_single_screen() {
+  section 2 "healthy single screen converges"
+
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS="11"
+  export BD_FAKE_CONNECTED="on,on" BD_FAKE_CONNECTED_RC=0
+
+  local rc=0
+  bd_reconcile || rc=$?
+
+  if [ "$rc" -eq 0 ]; then
+    assert_pass "healthy single screen: exit 0"
   else
-    assert_fail "aspect flags" "expected -aspectWidth=16 and -aspectHeight=10"
+    assert_fail "healthy single screen: exit 0" "rc=$rc status=${BD_RECONCILE_STATUS-}"
+  fi
+  if [ "${BD_RECONCILE_STATUS-}" = "converged" ]; then
+    assert_pass "healthy single screen: status converged"
+  else
+    assert_fail "healthy single screen: status converged" "got '${BD_RECONCILE_STATUS-}'"
+  fi
+  if [ "$(count_calls 'create')" -eq 0 ] && [ "$(count_calls 'discard')" -eq 0 ]; then
+    assert_pass "healthy single screen: zero create and zero discard calls"
+  else
+    assert_fail "healthy single screen: zero create/discard" \
+      "create=$(count_calls 'create') discard=$(count_calls 'discard')"
   fi
 }
 
-test_resolutions_skips_virtual_display() {
-  section 4 "display-resolutions exclusion"
+test_reconcile_duplicate_tags() {
+  section 3 "duplicate tags discard and recreate"
 
-  if grep -q 'VIRTUAL_DISPLAY_SERIAL_ID="s2865085837"' "$RESOLUTIONS_SH"; then
-    assert_pass "virtual-display serial id is pinned"
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS="11 12"
+  export BD_FAKE_CONNECTED="on,on" BD_FAKE_CONNECTED_RC=0
+  # After create the screen is healthy with a single tag.
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="13"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+
+  local rc=0
+  bd_reconcile || rc=$?
+
+  if [ "$rc" -eq 0 ] && [ "${BD_RECONCILE_STATUS-}" = "recreated" ]; then
+    assert_pass "duplicate tags: recreated successfully"
   else
-    assert_fail "virtual-display serial id" \
-      "expected VIRTUAL_DISPLAY_SERIAL_ID=s2865085837 in $RESOLUTIONS_SH"
+    assert_fail "duplicate tags: recreated successfully" \
+      "rc=$rc status=${BD_RECONCILE_STATUS-} observed=${BD_RECONCILE_OBSERVED-}"
+  fi
+  if [ "$(count_calls 'discard')" -eq 2 ]; then
+    assert_pass "duplicate tags: both tags discarded"
+  else
+    assert_fail "duplicate tags: both tags discarded" "discard calls=$(count_calls 'discard') log=$(cat "$BD_FAKE_LOG")"
+  fi
+  if [ "$(count_calls 'create')" -eq 1 ]; then
+    assert_pass "duplicate tags: exactly one create call"
+  else
+    assert_fail "duplicate tags: exactly one create call" "create calls=$(count_calls 'create')"
+  fi
+  assert_create_spec
+}
+
+test_reconcile_disconnected_missing() {
+  section 4 "disconnected/missing creates once"
+
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS=""
+  export BD_FAKE_CONNECTED="Failed." BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="21"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+
+  local rc=0
+  bd_reconcile || rc=$?
+
+  if [ "$rc" -eq 0 ] && [ "${BD_RECONCILE_STATUS-}" = "recreated" ]; then
+    assert_pass "missing screen: creates and verifies (recreated)"
+  else
+    assert_fail "missing screen: creates and verifies" \
+      "rc=$rc status=${BD_RECONCILE_STATUS-} observed=${BD_RECONCILE_OBSERVED-}"
+  fi
+  if [ "$(count_calls 'create')" -eq 1 ]; then
+    assert_pass "missing screen: exactly one create call"
+  else
+    assert_fail "missing screen: exactly one create call" "create calls=$(count_calls 'create')"
   fi
 
-  # The skip must live inside the external-display loop, otherwise a virtual
-  # display is still matched and re-inflated.
-  local loop_body
-  loop_body="$(sed -n '/for ID in /,/^  done$/p' "$RESOLUTIONS_SH")"
-  if printf '%s\n' "$loop_body" | grep -q 'VIRTUAL_DISPLAY_PERSISTENT_ID'; then
-    assert_pass "external-display loop skips the virtual display"
-  else
-    assert_fail "virtual-display skip" \
-      "no VIRTUAL_DISPLAY_PERSISTENT_ID check inside the external-display loop"
-  fi
+  # Verify-after-create still unhealthy -> failed.
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS=""
+  export BD_FAKE_CONNECTED="" BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="22"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="off,off" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
 
-  if printf '%s\n' "$loop_body" | grep -q 'VIRTUAL_DISPLAY_SERIAL_ID'; then
-    assert_pass "external-display loop also skips by serial id"
+  rc=0
+  bd_reconcile || rc=$?
+  if [ "$rc" -ne 0 ] && [ "${BD_RECONCILE_STATUS-}" = "failed" ]; then
+    assert_pass "unhealthy after create: status failed, exit non-zero"
   else
-    assert_fail "virtual-display serial skip" \
-      "no VIRTUAL_DISPLAY_SERIAL_ID check inside the external-display loop"
+    assert_fail "unhealthy after create: status failed, exit non-zero" \
+      "rc=$rc status=${BD_RECONCILE_STATUS-} observed=${BD_RECONCILE_OBSERVED-}"
   fi
+  if [ "$(count_calls 'create')" -eq 1 ]; then
+    assert_pass "unhealthy after create: still attempted one create"
+  else
+    assert_fail "unhealthy after create: still attempted one create" "create calls=$(count_calls 'create')"
+  fi
+}
+
+test_reconcile_get_failure_empty_unhealthy() {
+  section 5 "get failure/empty treated as unhealthy"
+
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS="31"
+  # One tag present but connected state empty/failure -> must discard+create, not success.
+  export BD_FAKE_CONNECTED="" BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="32"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+
+  local rc=0
+  bd_reconcile || rc=$?
+
+  if [ "$rc" -eq 0 ] && [ "${BD_RECONCILE_STATUS-}" = "recreated" ]; then
+    assert_pass "empty connected with one tag: discard+create (not silent success)"
+  else
+    assert_fail "empty connected with one tag: discard+create (not silent success)" \
+      "rc=$rc status=${BD_RECONCILE_STATUS-}"
+  fi
+  if [ "$(count_calls 'discard')" -ge 1 ] && [ "$(count_calls 'create')" -eq 1 ]; then
+    assert_pass "empty connected with one tag: discarded existing tag and created once"
+  else
+    assert_fail "empty connected with one tag: discarded existing tag and created once" \
+      "discard=$(count_calls 'discard') create=$(count_calls 'create')"
+  fi
+}
+
+test_create_spec_pinned() {
+  section 6 "create spec pinned"
+
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS=""
+  export BD_FAKE_CONNECTED="Failed." BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="41"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+
+  bd_reconcile || true
+  assert_create_spec
 }
 
 # --- Run all tests ---
 
-test_multiplier_step_value
-test_create_sites_agree
-test_hidpi_and_aspect_retained
-test_resolutions_skips_virtual_display
+test_bd_connected_predicate
+test_reconcile_healthy_single_screen
+test_reconcile_duplicate_tags
+test_reconcile_disconnected_missing
+test_reconcile_get_failure_empty_unhealthy
+test_create_spec_pinned
 
 finish_tests
