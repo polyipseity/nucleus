@@ -40,7 +40,7 @@ let
   flatGuardWindowsWiring = flatten (read guardWindowsWiring);
 
   copilotHooks =
-    (builtins.fromJSON (read "/src/users/default/agents/hooks/harness-notify" + ".json")).hooks;
+    (builtins.fromJSON (read "/src/users/default/agents/hooks/harness-notify.json")).hooks;
   cursorHooks = (builtins.fromJSON (read "/src/users/default/cursor/hooks.json")).hooks;
   cursorVersion = (builtins.fromJSON (read "/src/users/default/cursor/hooks.json")).version;
 
