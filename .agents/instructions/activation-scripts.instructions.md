@@ -83,7 +83,7 @@ _arg1="$1"
 - Always define `SCRIPT_DIR`. Never reference `$REPO_ROOT`, `${repoRoot}`, or a hardcoded path at runtime.
 - Prefix script variables per script (`_mqi_` for merge-qtpass-ini).
 - No `main()` function. Scripts run top to bottom.
-- No shebang in a bundle script; the bundle derivation supplies the interpreter.
+- Bundle derivation rewrites a `#!/usr/bin/env bash` first line to the pinned bash so bundled scripts always run on 5.x regardless of caller PATH; repo copies keep `#!/usr/bin/env bash` for direct invocation.
 
 ## Prohibited patterns
 

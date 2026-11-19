@@ -1,11 +1,3 @@
-# src/modules/lib/script-tree.nix - one derivation bundling src/scripts/,
-# src/platforms/, and each host's scripts/ under $out/src/, so bundled paths stay
-# repo-root-relative. Shellcheck runs in nucleus-check sh / CI, not at build time.
-#
-# WHY: each directory is interpolated on its own and no parent tree is
-# referenced. A glob over `${../../../src}/hosts/*/scripts` interpolates all of
-# src/, which re-keys this derivation and every nucleus-*-app wrapper on any
-# edit under src/.
 { pkgs }:
 
 let
@@ -24,6 +16,8 @@ let
           builtins.attrNames (builtins.readDir ../../hosts)
         )
       );
+
+  bashShebang = import ./bash-shebang.nix { inherit pkgs; };
 in
 pkgs.runCommand "nucleus-script-tree"
   {
@@ -37,5 +31,8 @@ pkgs.runCommand "nucleus-script-tree"
       mkdir -p "$out/src/hosts/${entry.host}"
       cp -r "${entry.scripts}" "$out/src/hosts/${entry.host}/scripts"
     '') hostScriptTrees}
+    chmod -R +x "$out"
+    chmod -R u+w "$out"
+    ${bashShebang.rewriteBashShebang "$out/src"}
     chmod -R +x "$out"
   ''

@@ -197,5 +197,65 @@ test_script_tree_inputs() {
 
 test_script_tree_inputs
 
+section 3 "Bundled bash shebang pinning (nucleus-gc)"
+test_bundled_bash_shebang_pinning() {
+  local pkg out script first
+  pkg=nucleus-gc
+  out=$(pkg_path "$pkg") || return 1
+
+  # No bundled *.sh may keep the unpinned env shebang. Executable bash scripts
+  # that used #!/usr/bin/env bash are rewritten to the store bash by the bundle
+  # derivation; sourced lib .sh files are left untouched when they have no
+  # shebang.
+  local bad_env=0
+  local shfile
+  while IFS= read -r -d '' shfile; do
+    first=$(sed -n '1p' "$shfile")
+    if [ "$first" = '#!/usr/bin/env bash' ]; then
+      bad_env=1
+      echo "still env-bash: $shfile" >&2
+    fi
+  done < <(find -L "$out/scripts" "$out/src" -type f -name '*.sh' -print0 2>/dev/null)
+
+  if [ "$bad_env" -eq 0 ]; then
+    assert_pass "no bundled *.sh starts with #!/usr/bin/env bash"
+  else
+    assert_fail "no bundled *.sh starts with #!/usr/bin/env bash" "found at least one"
+  fi
+
+  # Named samples from each bundle (executable entry scripts).
+  script="$out/src/scripts/services/log-dirs-init.sh"
+  if [ -f "$script" ]; then
+    first=$(sed -n '1p' "$script")
+    case "$first" in
+    '#!'"/nix/store/"*"-bash-"*"/bin/bash")
+      assert_pass "sample $script uses store bash"
+      ;;
+    *)
+      assert_fail "sample $script uses store bash" "got: $first"
+      ;;
+    esac
+  else
+    assert_fail "sample $script uses store bash" "missing"
+  fi
+
+  script="$out/scripts/check.sh"
+  if [ -f "$script" ]; then
+    first=$(sed -n '1p' "$script")
+    case "$first" in
+    '#!'"/nix/store/"*"-bash-"*"/bin/bash")
+      assert_pass "sample $script uses store bash"
+      ;;
+    *)
+      assert_fail "sample $script uses store bash" "got: $first"
+      ;;
+    esac
+  else
+    assert_fail "sample $script uses store bash" "missing"
+  fi
+}
+
+test_bundled_bash_shebang_pinning
+
 # --- Summary -----------------------------------------------------------------
 finish_tests

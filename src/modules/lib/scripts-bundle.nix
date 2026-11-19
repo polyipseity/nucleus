@@ -8,6 +8,9 @@
 # (physical path through the scripts/ symlink).
 { pkgs, scriptTree }:
 
+let
+  bashShebang = import ./bash-shebang.nix { inherit pkgs; };
+in
 pkgs.runCommand "nucleus-scripts-bundle"
   {
     preferLocalBuild = true;
@@ -15,6 +18,9 @@ pkgs.runCommand "nucleus-scripts-bundle"
   ''
     mkdir -p "$out"
     cp -r "${../../../scripts}" "$out/scripts"
+    chmod -R +x "$out/scripts"
+    chmod -R u+w "$out/scripts"
+    ${bashShebang.rewriteBashShebang "$out/scripts"}
     chmod -R +x "$out/scripts"
     ln -s ${scriptTree}/src "$out/src"
   ''
