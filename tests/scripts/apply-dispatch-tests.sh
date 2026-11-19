@@ -44,8 +44,9 @@ test_scripts_apply_delegates_to_src() {
   # src/scripts/apply.sh that sits beside it and hand over argv and exit status.
   local _tmp _rc=0 _argv=""
   _tmp="$(mktemp -d)"
-  mkdir -p "$_tmp/bin" "$_tmp/src/scripts"
+  mkdir -p "$_tmp/bin" "$_tmp/src/scripts" "$_tmp/src/scripts/lib"
   cp "$SCRIPTS_APPLY" "$_tmp/bin/apply.sh"
+  cp "$REPO_ROOT/src/scripts/lib/bash-guard.sh" "$_tmp/src/scripts/lib/bash-guard.sh"
   cat >"$_tmp/src/scripts/apply.sh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$APPLY_STUB_LOG"

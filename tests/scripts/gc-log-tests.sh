@@ -235,6 +235,7 @@ test_log_gc_dies_without_root() {
   mkdir -p "$tree/services" "$tree/lib"
   cp "$LOG_GC_SH" "$tree/services/log-gc.sh"
   cp "$LIB_SH" "$tree/lib/lib.sh"
+  cp "$SCRIPT_DIR/../../src/scripts/lib/bash-guard.sh" "$tree/lib/bash-guard.sh"
 
   # The copy sits outside the checkout and git is kept below it, so every source
   # derive_repo_root consults is absent or rejected.
