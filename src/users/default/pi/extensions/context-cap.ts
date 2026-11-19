@@ -3,14 +3,16 @@
 // four scopes, and re-select the model when the effective window changes so the
 // user's footer recomputes it. Model and provider windows are models.json
 // entries that pi applies itself, so this file reads them only to report and
-// writes them only on request. Precedence: session > explicit model window >
-// global ceiling > native, so an explicit window always wins over the ceiling.
-// Each `as` below narrows a value this file already checked with asObject or a
-// string guard. This extension installs no footer of its own: the footer belongs
-// to the user's pi-powerline-footer package, whose component is single-owner.
+// writes them only on request. Client precedence: session > explicit model
+// window > global ceiling > native. The server context limit is read-only
+// (live probe, then models-store.json, else unset) and clamps the effective
+// window to min(client, server). Each `as` below narrows a value this file
+// already checked with asObject or a string guard. This extension installs no
+// footer of its own: the footer belongs to the user's pi-powerline-footer
+// package, whose component is single-owner.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -27,7 +29,13 @@ try {
 
 export type Scope = "session" | "model" | "provider" | "global";
 export type StatusScope = "all" | Scope;
-export type Source = "session" | "model" | "global" | "native";
+export type Source = "session" | "model" | "global" | "native" | "server";
+export type ServerSource = "live" | "store" | "unset";
+export interface ServerWindow {
+  value: number | null;
+  source: ServerSource;
+  reason?: string;
+}
 export type Json = Record<string, unknown>;
 
 export interface ActiveModel {
@@ -75,8 +83,11 @@ export interface FullStatusInput {
   model: number | null;
   provider: ProviderStatus;
   global: number | null;
+  server: ServerWindow;
   effective: number;
   source: Source;
+  clientWindow: number;
+  clientSource: Exclude<Source, "server">;
   native: number;
 }
 
@@ -133,6 +144,7 @@ export interface WindowInput {
   session: number | null;
   models: Json | null;
   settings: unknown;
+  server?: number | null;
 }
 
 const SCOPES = new Set<Scope>(["session", "model", "provider", "global"]);
@@ -276,11 +288,27 @@ export function parseCommand(input: string, active: ActiveModel): Command {
   return { kind: "status", scope: "model", ...target };
 }
 
-export function resolveWindow(layers: Layers): { window: number; source: Source } {
+export interface ResolvedWindow {
+  window: number;
+  source: Source;
+  clientWindow: number;
+  clientSource: Exclude<Source, "server">;
+}
+
+function resolveClientWindow(layers: Layers): { window: number; source: Exclude<Source, "server"> } {
   if (layers.session !== null) return { window: layers.session, source: "session" };
   if (layers.explicit !== null) return { window: layers.explicit, source: "model" };
   if (layers.cap !== null && layers.baseline > layers.cap) return { window: layers.cap, source: "global" };
   return { window: layers.baseline, source: "native" };
+}
+
+export function resolveWindow(layers: Layers & { server?: number | null }): ResolvedWindow {
+  const client = resolveClientWindow(layers);
+  const server = layers.server ?? null;
+  if (server !== null && server < client.window) {
+    return { window: server, source: "server", clientWindow: client.window, clientSource: client.source };
+  }
+  return { window: client.window, source: client.source, clientWindow: client.window, clientSource: client.source };
 }
 
 export function readCap(settings: unknown): number | null {
@@ -348,19 +376,377 @@ function formatProviderStatus(provider: ProviderStatus): string {
   return `${provider.value} (${provider.count} models)`;
 }
 
+export function formatServerStatus(server: ServerWindow): string {
+  if (server.value !== null) return `server ${server.value} (${server.source})`;
+  if (server.reason) return `server unavailable (${server.reason})`;
+  return "server unset";
+}
+
+function formatEffectiveStatus(input: FullStatusInput): string {
+  if (input.source === "server") {
+    return `effective ${input.effective} (server clamp, client ${input.clientSource} ${input.clientWindow}) of ${input.native} native`;
+  }
+  return `effective ${input.effective} (${input.source}) of ${input.native} native`;
+}
+
 export function formatFullStatus(input: FullStatusInput): string[] {
   return [
     `session ${formatValue(input.session)}`,
     `model ${formatValue(input.model)}`,
     `provider ${formatProviderStatus(input.provider)}`,
     `global ${formatValue(input.global)}`,
-    `effective ${input.effective} (${input.source}) of ${input.native} native`,
+    formatServerStatus(input.server),
+    formatEffectiveStatus(input),
   ];
 }
 
 export function formatScopeStatus(scope: Exclude<StatusScope, "all">, value: number | ProviderStatus | null): string {
   if (scope === "provider") return `provider ${formatProviderStatus(value as ProviderStatus)}`;
   return `${scope} ${formatValue(value as number | null)}`;
+}
+
+
+export const SERVER_PROBE_TIMEOUT_MS = 3000;
+export const SERVER_VALUE_TTL_MS = 6 * 60 * 60 * 1000;
+export const SERVER_FAILURE_TTL_MS = 60 * 60 * 1000;
+
+export interface ProbeModel {
+  provider: string;
+  id: string;
+  api?: string;
+  baseUrl?: string;
+}
+
+export interface ProbeContext {
+  modelRegistry?: { getApiKey?: (model: unknown) => Promise<string | undefined> | string | undefined };
+}
+
+export type ServerFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+interface ServerCacheEntry extends ServerWindow {
+  expiresAt: number;
+}
+
+interface ServerCacheFile {
+  entries: Record<string, ServerCacheEntry>;
+}
+
+interface StoreCache {
+  path: string;
+  mtimeMs: number;
+  providers: Json | null;
+}
+
+const serverMemoryCache = new Map<string, ServerCacheEntry>();
+const serverInFlight = new Map<string, Promise<ServerWindow>>();
+let serverDiskCachePath: string | null = null;
+let storeCache: StoreCache | null = null;
+let serverFetchOverride: ServerFetch | undefined;
+
+export function setServerFetchForTests(fetchImpl?: ServerFetch): void {
+  serverFetchOverride = fetchImpl;
+}
+
+export function serverKey(provider: string, modelId: string): string {
+  return `${provider}\u0000${modelId}`;
+}
+
+export function modelsStorePath(agentDir: string): string {
+  return join(agentDir, "models-store.json");
+}
+
+export function serverCachePath(agentDir: string): string {
+  return join(agentDir, "state", "context-server-window.json");
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, "");
+}
+
+function endpointUrl(baseUrl: string, path: string): string {
+  return `${normalizeBaseUrl(baseUrl)}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function dataArray(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body;
+  const object = asObject(body);
+  if (!object) return [];
+  const data = object.data;
+  return Array.isArray(data) ? data : [];
+}
+
+function modelIdsMatch(candidate: unknown, modelId: string): boolean {
+  if (typeof candidate !== "string") return false;
+  if (candidate === modelId) return true;
+  // Tolerate provider-prefixed or route-prefixed forms carrying the same tail.
+  return candidate.endsWith(`/${modelId}`) || candidate.endsWith(`:${modelId}`);
+}
+
+function contextFromLimit(entry: Json): number | null {
+  const limit = asObject(entry.limit);
+  if (!limit) return null;
+  return isPositiveNumber(limit.context) ? limit.context : null;
+}
+
+function maxInputTokens(entry: Json): number | null {
+  const modelInfo = asObject(entry.model_info);
+  if (!modelInfo) return null;
+  const value = modelInfo.max_input_tokens ?? modelInfo.maxInputTokens;
+  return isPositiveNumber(value) ? value : null;
+}
+
+export function parseServerContextFromModels(body: unknown, modelId: string): number | null {
+  let best: number | null = null;
+  for (const item of dataArray(body)) {
+    const entry = asObject(item);
+    if (!entry) continue;
+    const id = entry.id ?? entry.model ?? entry.name ?? entry.model_name;
+    if (!modelIdsMatch(id, modelId)) continue;
+    const limitContext = contextFromLimit(entry);
+    if (limitContext !== null) return limitContext;
+    // Accepted from direct /models response only if present.
+    const maxInput = maxInputTokens(entry);
+    if (maxInput !== null && (best === null || maxInput < best)) best = maxInput;
+  }
+  return best;
+}
+
+export function parseServerContextFromModelInfo(body: unknown, modelId: string): number | null {
+  let best: number | null = null;
+  for (const item of dataArray(body)) {
+    const entry = asObject(item);
+    if (!entry) continue;
+    const candidates = [entry.model_name, entry.model, entry.id, entry.route];
+    const litellmParams = asObject(entry.litellm_params);
+    if (litellmParams) candidates.push(litellmParams.model);
+    if (!candidates.some((candidate) => modelIdsMatch(candidate, modelId))) continue;
+    const maxInput = maxInputTokens(entry);
+    if (maxInput !== null && (best === null || maxInput < best)) best = maxInput;
+  }
+  return best;
+}
+
+export function readServerWindowFromStore(
+  storePath: string,
+  provider: string,
+  modelId: string,
+  now = Date.now(),
+): ServerWindow {
+  void now;
+  let mtimeMs = -1;
+  try {
+    mtimeMs = statSync(storePath).mtimeMs;
+  } catch {
+    storeCache = null;
+    return { value: null, source: "unset", reason: "models-store unavailable" };
+  }
+  if (!storeCache || storeCache.path !== storePath || storeCache.mtimeMs !== mtimeMs) {
+    try {
+      const parsed = JSON.parse(readFileSync(storePath, "utf8")) as unknown;
+      storeCache = { path: storePath, mtimeMs, providers: asObject(asObject(parsed)?.providers) };
+    } catch {
+      storeCache = { path: storePath, mtimeMs, providers: null };
+      return { value: null, source: "unset", reason: "models-store unreadable" };
+    }
+  }
+  const providers = storeCache.providers;
+  if (!providers) return { value: null, source: "unset", reason: "models-store unreadable" };
+  const section = asObject(providers[provider]);
+  const models = section?.models;
+  if (!Array.isArray(models)) return { value: null, source: "unset", reason: "no store match" };
+  for (const item of models) {
+    const entry = asObject(item);
+    if (!entry) continue;
+    if (entry.id !== modelId) continue;
+    if (isPositiveNumber(entry.contextWindow)) return { value: entry.contextWindow, source: "store" };
+    return { value: null, source: "unset", reason: "no store match" };
+  }
+  return { value: null, source: "unset", reason: "no store match" };
+}
+
+function ensureServerDiskCacheLoaded(statePath: string): void {
+  if (serverDiskCachePath === statePath) return;
+  serverMemoryCache.clear();
+  serverDiskCachePath = statePath;
+  try {
+    const parsed = JSON.parse(readFileSync(statePath, "utf8")) as unknown;
+    const entries = asObject(asObject(parsed)?.entries);
+    if (!entries) return;
+    const now = Date.now();
+    for (const [key, raw] of Object.entries(entries)) {
+      const entry = asObject(raw);
+      if (!entry) continue;
+      const expiresAt = typeof entry.expiresAt === "number" ? entry.expiresAt : 0;
+      if (expiresAt <= now) continue;
+      const value = isPositiveNumber(entry.value) ? entry.value : null;
+      const source = entry.source === "live" || entry.source === "store" ? entry.source : "unset";
+      if (value === null && source !== "unset") continue;
+      const reason = typeof entry.reason === "string" ? entry.reason : undefined;
+      serverMemoryCache.set(key, { value, source, reason, expiresAt });
+    }
+  } catch {
+    // Missing or unreadable cache is not fatal.
+  }
+}
+
+function persistServerCache(statePath: string): void {
+  const entries: Record<string, ServerCacheEntry> = {};
+  for (const [key, entry] of serverMemoryCache) entries[key] = entry;
+  const body = serialize({ entries });
+  try {
+    mkdirSync(dirname(statePath), { recursive: true });
+    const temporary = join(dirname(statePath), `.${basename(statePath)}.${process.pid}.tmp`);
+    writeFileSync(temporary, body, "utf8");
+    renameSync(temporary, statePath);
+  } catch {
+    // Persisting the server cache is best-effort.
+  }
+}
+
+function putServerCache(statePath: string, key: string, window: ServerWindow): void {
+  const ttl = window.value !== null ? SERVER_VALUE_TTL_MS : SERVER_FAILURE_TTL_MS;
+  serverMemoryCache.set(key, { ...window, expiresAt: Date.now() + ttl });
+  persistServerCache(statePath);
+}
+
+export function getCachedServerWindow(agentDir: string, provider: string, modelId: string): ServerWindow | null {
+  const statePath = serverCachePath(agentDir);
+  ensureServerDiskCacheLoaded(statePath);
+  const key = serverKey(provider, modelId);
+  const entry = serverMemoryCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    serverMemoryCache.delete(key);
+    return null;
+  }
+  return { value: entry.value, source: entry.source, reason: entry.reason };
+}
+
+async function fetchJson(
+  url: string,
+  init: RequestInit,
+  fetchImpl: ServerFetch,
+  timeoutMs: number,
+): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(url, { ...init, signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return (await response.json()) as unknown;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function resolveApiKey(model: ProbeModel, ctx: ProbeContext | undefined): Promise<string | undefined> {
+  try {
+    const key = await ctx?.modelRegistry?.getApiKey?.(model);
+    return typeof key === "string" && key.length > 0 ? key : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function probeServerContext(
+  model: ProbeModel,
+  options: { fetch?: ServerFetch; ctx?: ProbeContext; timeoutMs?: number } = {},
+): Promise<ServerWindow> {
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  if (typeof fetchImpl !== "function") {
+    return { value: null, source: "unset", reason: "fetch unavailable" };
+  }
+  if (model.api !== "openai-completions") {
+    return { value: null, source: "unset", reason: `unsupported api ${model.api ?? "unknown"}` };
+  }
+  const baseUrl = typeof model.baseUrl === "string" ? model.baseUrl : "";
+  if (baseUrl.length === 0) {
+    return { value: null, source: "unset", reason: "missing baseUrl" };
+  }
+  const timeoutMs = options.timeoutMs ?? SERVER_PROBE_TIMEOUT_MS;
+  const apiKey = await resolveApiKey(model, options.ctx);
+  const headers: Record<string, string> = {};
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const init: RequestInit = { method: "GET", headers };
+
+  try {
+    const modelsBody = await fetchJson(endpointUrl(baseUrl, "/models"), init, fetchImpl, timeoutMs);
+    const fromModels = parseServerContextFromModels(modelsBody, model.id);
+    if (fromModels !== null) return { value: fromModels, source: "live" };
+
+    try {
+      const infoBody = await fetchJson(endpointUrl(baseUrl, "/model/info"), init, fetchImpl, timeoutMs);
+      const fromInfo = parseServerContextFromModelInfo(infoBody, model.id);
+      if (fromInfo !== null) return { value: fromInfo, source: "live" };
+    } catch {
+      // /model/info is optional; absence leaves the /models result as authoritative miss.
+    }
+    return { value: null, source: "unset", reason: "no server match" };
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    return { value: null, source: "unset", reason: reason || "probe failed" };
+  }
+}
+
+export function resolveServerWindowSync(agentDir: string, provider: string, modelId: string): ServerWindow {
+  const cached = getCachedServerWindow(agentDir, provider, modelId);
+  if (cached) return cached;
+  const store = readServerWindowFromStore(modelsStorePath(agentDir), provider, modelId);
+  putServerCache(serverCachePath(agentDir), serverKey(provider, modelId), store);
+  return store;
+}
+
+export function currentServerWindow(agentDir: string, model: ActiveModel | RuntimeModel | null | undefined): ServerWindow {
+  if (!model) return { value: null, source: "unset", reason: "no active model" };
+  return resolveServerWindowSync(agentDir, model.provider, model.id);
+}
+
+export async function refreshServerWindow(
+  agentDir: string,
+  model: ProbeModel,
+  options: { fetch?: ServerFetch; ctx?: ProbeContext; timeoutMs?: number } = {},
+): Promise<ServerWindow> {
+  const key = serverKey(model.provider, model.id);
+  const existing = serverInFlight.get(key);
+  if (existing) return existing;
+  const statePath = serverCachePath(agentDir);
+  ensureServerDiskCacheLoaded(statePath);
+  const promise = (async () => {
+    const probed = await probeServerContext(model, { ...options, fetch: options.fetch ?? serverFetchOverride });
+    if (probed.value !== null) {
+      putServerCache(statePath, key, probed);
+      return probed;
+    }
+    // A live miss/failure falls back to the store when it can answer; otherwise
+    // keep the probe's unavailable reason. The store is authoritative enough to
+    // clamp, but it is not a "live" source.
+    const store = readServerWindowFromStore(modelsStorePath(agentDir), model.provider, model.id);
+    if (store.value !== null) {
+      putServerCache(statePath, key, store);
+      return store;
+    }
+    const reason = probed.reason ?? store.reason ?? "probe failed";
+    const result: ServerWindow = { value: null, source: "unset", reason };
+    putServerCache(statePath, key, result);
+    return result;
+  })().finally(() => {
+    serverInFlight.delete(key);
+  });
+  serverInFlight.set(key, promise);
+  return promise;
+}
+
+// Test-only reset for module-level server caches.
+export function resetServerState(): void {
+  serverMemoryCache.clear();
+  serverInFlight.clear();
+  serverDiskCachePath = null;
+  storeCache = null;
+  serverFetchOverride = undefined;
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -450,13 +836,15 @@ export function modelWindow(models: Json | null, provider: string, modelId: stri
 }
 
 // Effective window for one model, with the cap from the write mirror when a
-// global write happened, and from `settings` otherwise.
-export function effectiveWindow(model: ActiveModel, input: WindowInput): { window: number; source: Source } {
+// global write happened, and from `settings` otherwise. The server limit clamps
+// the client-resolved window when known.
+export function effectiveWindow(model: ActiveModel, input: WindowInput): ResolvedWindow {
   return resolveWindow({
     baseline: input.baseline,
     session: input.session,
     explicit: modelWindow(input.models, model.provider, model.id),
     cap: resolveCap(input.settings),
+    server: input.server ?? null,
   });
 }
 
@@ -467,8 +855,9 @@ export function syncModelWindow(
   models: Json | null,
   settings: unknown,
   ui?: StatusUi,
-): { changed: boolean; window: number; source: Source } {
-  const result = effectiveWindow(model, { baseline, session, models, settings });
+  server?: number | null,
+): { changed: boolean; window: number; source: Source; clientWindow: number; clientSource: Exclude<Source, "server"> } {
+  const result = effectiveWindow(model, { baseline, session, models, settings, server: server ?? null });
   const changed = model.contextWindow !== result.window;
   if (changed) model.contextWindow = result.window;
   // The in-place mutation is deliberate: pi's own usage and compaction math
@@ -476,7 +865,13 @@ export function syncModelWindow(
   // a footer that caches on the transcript leaf still needs the re-selection
   // applyCap performs.
   if (changed && ui) nudgeStatus(ui);
-  return { changed, window: result.window, source: result.source };
+  return {
+    changed,
+    window: result.window,
+    source: result.source,
+    clientWindow: result.clientWindow,
+    clientSource: result.clientSource,
+  };
 }
 
 // A status set and cleared again: writing one is what makes pi repaint, and the
@@ -692,7 +1087,7 @@ export function restoreRoutedWindows(): void {
 // One re-apply path for a selection, a status command, and a watchdog tick: a
 // tick has to do exactly what a selection does, so the body lives here and takes
 // the handle and the agent paths it needs instead of closing over them.
-async function applyCap(
+export async function applyCap(
   pi: CapHost,
   paths: FilePaths,
   model: RuntimeModel,
@@ -706,7 +1101,17 @@ async function applyCap(
   const cached = nativeCache.get(model);
   const baseline = cached ?? model.contextWindow;
   if (cached === undefined) nativeCache.set(model, baseline);
-  const result = syncModelWindow(model, baseline, sessionOverride, readJson(paths.models), pi.getSettings(), ui);
+  const agentDir = dirname(paths.settings);
+  const server = currentServerWindow(agentDir, model);
+  const result = syncModelWindow(
+    model,
+    baseline,
+    sessionOverride,
+    readJson(paths.models),
+    pi.getSettings(),
+    ui,
+    server.value,
+  );
   // The window pi should hold from here on, set before the early return so the
   // watchdog has a value to compare against when nothing was re-selected.
   lastWindow = result.window;
@@ -779,12 +1184,24 @@ export function stopWatchdog(): void {
 export default function (pi: ExtensionAPI) {
   const paths = agentPaths();
 
+  const probeAndRefresh = (model: RuntimeModel, ctx: RoutedSource & { ui?: CapUi; model?: RuntimeModel }): void => {
+    const probeModel = model as ProbeModel;
+    void refreshServerWindow(resolveAgentDir(), probeModel, { ctx }).then(() => {
+      const current = ctx.model;
+      if (!current) return;
+      if (current.provider !== probeModel.provider || current.id !== probeModel.id) return;
+      return applyCap(pi, paths, current, ctx.ui, ctx);
+    });
+  };
+
   // The host repaints after a model switch, but the effective window can change
   // here without changing the model, so nudge explicitly rather than relying on
   // that render. The re-selection this triggers must not come back through here.
   pi.on("model_select", ({ model }, ctx) => {
     if (refreshing) return;
-    return applyCap(pi, paths, model, ctx.ui, ctx);
+    const applied = applyCap(pi, paths, model, ctx.ui, ctx);
+    void applied.then(() => probeAndRefresh(model, ctx));
+    return applied;
   });
   pi.on("session_shutdown", () => {
     stopWatchdog();
@@ -804,6 +1221,7 @@ export default function (pi: ExtensionAPI) {
     // The context itself is the source, not a copy of it: its model is a getter,
     // so every tick reads whatever model pi is holding at that moment.
     if (ctx.model) startWatchdog(pi, ctx);
+    if (ctx.model) probeAndRefresh(ctx.model, ctx);
   });
 
   pi.registerCommand("context-window", {
@@ -841,11 +1259,13 @@ export default function (pi: ExtensionAPI) {
       const settings = readJson(paths.settings);
       const models = readJson(paths.models);
       const baseline = nativeCache.get(model) ?? model.contextWindow;
+      const server = currentServerWindow(resolveAgentDir(), model);
       const result = resolveWindow({
         baseline,
         session: sessionOverride,
         explicit: modelWindow(models, active.provider, active.id),
         cap: readCap(settings),
+        server: server.value,
       });
 
       if (command.kind === "status" && command.scope !== "all") {
@@ -876,8 +1296,11 @@ export default function (pi: ExtensionAPI) {
         model: modelWindow(models, active.provider, active.id),
         provider: providerWindow(ctx.modelRegistry, active.provider, models),
         global: readCap(settings),
+        server,
         effective: result.window,
         source: result.source,
+        clientWindow: result.clientWindow,
+        clientSource: result.clientSource,
         native: baseline,
       });
       ctx.ui.notify(lines.join("\n"), "info");

@@ -15,19 +15,27 @@ import contextCap, {
   effectiveWindow,
   formatFullStatus,
   formatScopeStatus,
+  formatServerStatus,
   modelWindow,
   noteWrittenCap,
   parseCommand,
+  parseServerContextFromModelInfo,
+  parseServerContextFromModels,
+  probeServerContext,
   providerWindow,
   readCap,
   readGlobalCap,
+  readServerWindowFromStore,
   refreshActiveModel,
+  resetServerState,
   resetWrittenCap,
   resolveWindow,
   restoreRoutedWindows,
   serialize,
+  serverCachePath,
   setGlobalCap,
   setModelWindow,
+  setServerFetchForTests,
   startWatchdog,
   stopWatchdog,
   syncModelWindow,
@@ -43,6 +51,7 @@ import contextCap, {
   type ModelSelector,
   type RoutedSource,
   type RuntimeModel,
+  type ServerWindow,
   type WatchdogSource,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
 
@@ -222,6 +231,8 @@ describe("resolveWindow", () => {
     expect(resolveWindow({ baseline: 1000000, session: 300000, explicit: 900000, cap: 256000 })).toEqual({
       window: 300000,
       source: "session",
+      clientWindow: 300000,
+      clientSource: "session",
     });
   });
 
@@ -229,6 +240,8 @@ describe("resolveWindow", () => {
     expect(resolveWindow({ baseline: 1000000, session: null, explicit: 900000, cap: 256000 })).toEqual({
       window: 900000,
       source: "model",
+      clientWindow: 900000,
+      clientSource: "model",
     });
   });
 
@@ -236,10 +249,14 @@ describe("resolveWindow", () => {
     expect(resolveWindow({ baseline: 1000000, session: null, explicit: null, cap: 256000 })).toEqual({
       window: 256000,
       source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
     });
     expect(resolveWindow({ baseline: 100000, session: null, explicit: null, cap: 256000 })).toEqual({
       window: 100000,
       source: "native",
+      clientWindow: 100000,
+      clientSource: "native",
     });
   });
 
@@ -247,6 +264,8 @@ describe("resolveWindow", () => {
     expect(resolveWindow({ baseline: 200000, session: null, explicit: null, cap: null })).toEqual({
       window: 200000,
       source: "native",
+      clientWindow: 200000,
+      clientSource: "native",
     });
   });
 });
@@ -275,10 +294,14 @@ describe("readGlobalCap", () => {
     expect(resolveWindow({ baseline: 1000000, session: 300000, explicit: null, cap: readGlobalCap(settings) })).toEqual({
       window: 300000,
       source: "session",
+      clientWindow: 300000,
+      clientSource: "session",
     });
     expect(resolveWindow({ baseline: 1000000, session: null, explicit: 900000, cap: readGlobalCap(settings) })).toEqual({
       window: 900000,
       source: "model",
+      clientWindow: 900000,
+      clientSource: "model",
     });
   });
 });
@@ -451,8 +474,11 @@ describe("formatFullStatus", () => {
         model: 500000,
         provider: "mixed",
         global: 256000,
+        server: { value: null, source: "unset" },
         effective: 256000,
         source: "global",
+        clientWindow: 256000,
+        clientSource: "global",
         native: 1000000,
       }),
     ).toEqual([
@@ -460,6 +486,7 @@ describe("formatFullStatus", () => {
       "model 500000",
       "provider mixed",
       "global 256000",
+      "server unset",
       "effective 256000 (global) of 1000000 native",
     ]);
   });
@@ -489,6 +516,8 @@ describe("effectiveWindow and the written-cap mirror", () => {
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 256000,
       source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
     });
   });
 
@@ -499,6 +528,8 @@ describe("effectiveWindow and the written-cap mirror", () => {
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 100000,
       source: "global",
+      clientWindow: 100000,
+      clientSource: "global",
     });
     expect(effectiveWindow(active, { ...base, settings: { contextWindowCap: 999 } }).window).toBe(100000);
   });
@@ -510,11 +541,15 @@ describe("effectiveWindow and the written-cap mirror", () => {
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 1000000,
       source: "native",
+      clientWindow: 1000000,
+      clientSource: "native",
     });
     resetWrittenCap();
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 256000,
       source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
     });
   });
 
@@ -525,6 +560,8 @@ describe("effectiveWindow and the written-cap mirror", () => {
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 256000,
       source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
     });
   });
 
@@ -532,6 +569,8 @@ describe("effectiveWindow and the written-cap mirror", () => {
     expect(effectiveWindow(active, { baseline: 1000000, session: null, models, settings: staleSettings })).toEqual({
       window: 900000,
       source: "model",
+      clientWindow: 900000,
+      clientSource: "model",
     });
   });
 });
@@ -546,7 +585,7 @@ describe("syncModelWindow", () => {
 
     const result = syncModelWindow(model, 1000000, null, null, { contextWindowCap: 256000 }, ui);
 
-    expect(result).toEqual({ changed: true, window: 256000, source: "global" });
+    expect(result).toEqual({ changed: true, window: 256000, source: "global", clientWindow: 256000, clientSource: "global" });
     expect(model.contextWindow).toBe(256000);
     expect(calls).toEqual([["context-window", ""], ["context-window", undefined]]);
   });
@@ -558,7 +597,7 @@ describe("syncModelWindow", () => {
 
     const result = syncModelWindow(model, 1000000, null, null, { contextWindowCap: 256000 }, ui);
 
-    expect(result).toEqual({ changed: false, window: 256000, source: "global" });
+    expect(result).toEqual({ changed: false, window: 256000, source: "global", clientWindow: 256000, clientSource: "global" });
     expect(model.contextWindow).toBe(256000);
     expect(calls).toEqual([]);
   });
@@ -571,7 +610,7 @@ describe("syncModelWindow", () => {
 
     const result = syncModelWindow(model, 1000000, 300000, models, { contextWindowCap: 256000 });
 
-    expect(result).toEqual({ changed: true, window: 300000, source: "session" });
+    expect(result).toEqual({ changed: true, window: 300000, source: "session", clientWindow: 300000, clientSource: "session" });
     expect(model.contextWindow).toBe(300000);
   });
 
@@ -582,12 +621,12 @@ describe("syncModelWindow", () => {
 
     noteWrittenCap(applyToFiles(parseCommand("100000 global", active), paths, catalog));
     const capped = syncModelWindow(model, 1000000, null, null, staleSettings);
-    expect(capped).toEqual({ changed: true, window: 100000, source: "global" });
+    expect(capped).toEqual({ changed: true, window: 100000, source: "global", clientWindow: 100000, clientSource: "global" });
     expect(model.contextWindow).toBe(100000);
 
     noteWrittenCap(applyToFiles(parseCommand("default global", active), paths, catalog));
     const cleared = syncModelWindow(model, 1000000, null, null, staleSettings);
-    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native", clientWindow: 1000000, clientSource: "native" });
     expect(model.contextWindow).toBe(1000000);
   });
 
@@ -598,7 +637,7 @@ describe("syncModelWindow", () => {
 
     noteWrittenCap(applyToFiles(parseCommand("-1 global", active), paths, catalog));
     const cleared = syncModelWindow(model, 1000000, null, null, staleSettings);
-    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native", clientWindow: 1000000, clientSource: "native" });
     expect(model.contextWindow).toBe(1000000);
   });
 
@@ -609,13 +648,13 @@ describe("syncModelWindow", () => {
     applyToFiles(parseCommand("500000 model", active), paths, catalog);
     const models = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
     const explicit = syncModelWindow(model, 1000000, null, models, { contextWindowCap: 256000 });
-    expect(explicit).toEqual({ changed: true, window: 500000, source: "model" });
+    expect(explicit).toEqual({ changed: true, window: 500000, source: "model", clientWindow: 500000, clientSource: "model" });
     expect(model.contextWindow).toBe(500000);
 
     applyToFiles(parseCommand("default model", active), paths, catalog);
     const clearedModels = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
     const cleared = syncModelWindow(model, 1000000, null, clearedModels, { contextWindowCap: 256000 });
-    expect(cleared).toEqual({ changed: true, window: 256000, source: "global" });
+    expect(cleared).toEqual({ changed: true, window: 256000, source: "global", clientWindow: 256000, clientSource: "global" });
     expect(model.contextWindow).toBe(256000);
   });
 
@@ -626,13 +665,13 @@ describe("syncModelWindow", () => {
     applyToFiles(parseCommand("200000 provider opencode-go", active), paths, catalog);
     const models = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
     const explicit = syncModelWindow(model, 1000000, null, models, {});
-    expect(explicit).toEqual({ changed: true, window: 200000, source: "model" });
+    expect(explicit).toEqual({ changed: true, window: 200000, source: "model", clientWindow: 200000, clientSource: "model" });
     expect(model.contextWindow).toBe(200000);
 
     applyToFiles(parseCommand("-1 provider opencode-go", active), paths, catalog);
     const clearedModels = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
     const cleared = syncModelWindow(model, 1000000, null, clearedModels, {});
-    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native", clientWindow: 1000000, clientSource: "native" });
     expect(model.contextWindow).toBe(1000000);
   });
 });
@@ -917,29 +956,39 @@ type RegisteredHandlers = {
   command: CommandHandler;
 };
 
-function loadContextCap(settings: unknown, setModel: ModelSelector["setModel"]): RegisteredHandlers {
-  const handlers: Partial<RegisteredHandlers> = {};
-  const fakePi = {
-    on: (name: string, handler: unknown) => {
-      if (name === "model_select") handlers.model_select = handler as ModelSelectHandler;
-      if (name === "session_start") handlers.session_start = handler as SessionStartHandler;
-      if (name === "session_shutdown") handlers.session_shutdown = handler as SessionShutdownHandler;
-      return () => {};
-    },
-    registerCommand: (name: string, options: { handler: CommandHandler }) => {
-      if (name === "context-window") handlers.command = options.handler;
-    },
-    getSettings: () => settings,
-    setModel,
-  };
-  contextCap(fakePi as unknown as Parameters<typeof contextCap>[0]);
-  const { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command } =
-    handlers;
-  // A missing handler would make every case below pass vacuously.
-  if (!onModelSelect || !onSessionStart || !onSessionShutdown || !command) {
-    throw new Error("context-cap registered no handlers");
+function loadContextCap(settings: unknown, setModel: ModelSelector["setModel"], agentDirOverride?: string): RegisteredHandlers {
+  resetServerState();
+  const agentDir = agentDirOverride ?? mkdtempSync(join(tmpdir(), "context-cap-agent-"));
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  try {
+    const handlers: Partial<RegisteredHandlers> = {};
+    const fakePi = {
+      on: (name: string, handler: unknown) => {
+        if (name === "model_select") handlers.model_select = handler as ModelSelectHandler;
+        if (name === "session_start") handlers.session_start = handler as SessionStartHandler;
+        if (name === "session_shutdown") handlers.session_shutdown = handler as SessionShutdownHandler;
+        return () => {};
+      },
+      registerCommand: (name: string, options: { handler: CommandHandler }) => {
+        if (name === "context-window") handlers.command = options.handler;
+      },
+      getSettings: () => settings,
+      setModel,
+    };
+    contextCap(fakePi as unknown as Parameters<typeof contextCap>[0]);
+    const { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command } =
+      handlers;
+    // A missing handler would make every case below pass vacuously.
+    if (!onModelSelect || !onSessionStart || !onSessionShutdown || !command) {
+      throw new Error("context-cap registered no handlers");
+    }
+    return { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command };
+  } finally {
+    resetServerState();
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
   }
-  return { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command };
 }
 
 describe("refreshActiveModel", () => {
@@ -1479,7 +1528,7 @@ describe("agent config directory", () => {
     const handlers = loadContextCap({}, async (model) => {
       selected.push(model);
       return true;
-    });
+    }, dir);
     const model: RuntimeModel = { provider: active.provider, id: active.id, contextWindow: 1000000 };
     const ctx = {
       ...unrouted,
@@ -1493,5 +1542,160 @@ describe("agent config directory", () => {
 
     expect(JSON.parse(readFileSync(settingsPath, "utf8"))).toEqual({ contextWindowCap: 256000 });
     expect(selected.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("server context limit", () => {
+  const unsetServer: ServerWindow = { value: null, source: "unset" };
+
+  beforeEach(() => {
+    resetServerState();
+  });
+
+  afterEach(() => {
+    resetServerState();
+    setServerFetchForTests(undefined);
+  });
+
+  test("parseServerContextFromModels reads limit.context for the matching model", () => {
+    const body = {
+      data: [
+        { id: "other", limit: { context: 1 } },
+        { id: "glm-5.1", limit: { context: 1048576 } },
+      ],
+    };
+    expect(parseServerContextFromModels(body, "glm-5.1")).toBe(1048576);
+    expect(parseServerContextFromModels({ data: [{ id: "glm-5.1" }] }, "glm-5.1")).toBeNull();
+    expect(parseServerContextFromModels({ data: [] }, "glm-5.1")).toBeNull();
+  });
+
+  test("parseServerContextFromModels accepts model_info.max_input_tokens from a direct response", () => {
+    const body = {
+      data: [{ id: "glm-5.1", model_info: { max_input_tokens: 131072 } }],
+    };
+    expect(parseServerContextFromModels(body, "glm-5.1")).toBe(131072);
+  });
+
+  test("parseServerContextFromModelInfo reads min model_info.max_input_tokens for matching deployments", () => {
+    const body = {
+      data: [
+        { model_name: "glm-5.1", model_info: { max_input_tokens: 200000 } },
+        { model_name: "glm-5.1", model_info: { max_input_tokens: 1048576 } },
+        { model_name: "other", model_info: { max_input_tokens: 1 } },
+      ],
+    };
+    expect(parseServerContextFromModelInfo(body, "glm-5.1")).toBe(200000);
+    expect(parseServerContextFromModelInfo({ data: [] }, "glm-5.1")).toBeNull();
+  });
+
+  test("readServerWindowFromStore returns the matching contextWindow and is mtime-cached", () => {
+    const dir = mkdtempSync(join(tmpdir(), "context-cap-store-"));
+    const storePath = join(dir, "models-store.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({ providers: { "opencode-go": { models: [{ id: "glm-5.1", contextWindow: 1048576 }] } } }),
+      "utf8",
+    );
+    expect(readServerWindowFromStore(storePath, "opencode-go", "glm-5.1")).toEqual({
+      value: 1048576,
+      source: "store",
+    });
+    // Missing model/provider or unreadable store yields unset with reason.
+    expect(readServerWindowFromStore(storePath, "opencode-go", "missing").value).toBeNull();
+    expect(readServerWindowFromStore(storePath, "missing", "glm-5.1").value).toBeNull();
+    expect(readServerWindowFromStore(join(dir, "nope.json"), "opencode-go", "glm-5.1")).toEqual({
+      value: null,
+      source: "unset",
+      reason: "models-store unavailable",
+    });
+  });
+
+  test("resolveWindow clamps client effective by server when server is lower", () => {
+    expect(resolveWindow({ baseline: 1000000, session: 1200000, explicit: null, cap: null, server: 1048576 })).toEqual({
+      window: 1048576,
+      source: "server",
+      clientWindow: 1200000,
+      clientSource: "session",
+    });
+    expect(resolveWindow({ baseline: 1000000, session: null, explicit: null, cap: 256000, server: 1048576 })).toEqual({
+      window: 256000,
+      source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
+    });
+    expect(resolveWindow({ baseline: 1000000, session: null, explicit: null, cap: 256000, server: null })).toEqual({
+      window: 256000,
+      source: "global",
+      clientWindow: 256000,
+      clientSource: "global",
+    });
+  });
+
+  test("formatFullStatus reports server and makes a clamped effective unambiguous", () => {
+    expect(
+      formatFullStatus({
+        session: 1200000,
+        model: null,
+        provider: null,
+        global: null,
+        server: { value: 1048576, source: "live" },
+        effective: 1048576,
+        source: "server",
+        clientWindow: 1200000,
+        clientSource: "session",
+        native: 1000000,
+      }),
+    ).toEqual([
+      "session 1200000",
+      "model unset",
+      "provider unset",
+      "global unset",
+      "server 1048576 (live)",
+      "effective 1048576 (server clamp, client session 1200000) of 1000000 native",
+    ]);
+
+    expect(formatServerStatus({ value: 1048576, source: "store" })).toBe("server 1048576 (store)");
+    expect(formatServerStatus({ value: null, source: "unset", reason: "probe timeout" })).toBe(
+      "server unavailable (probe timeout)",
+    );
+    expect(formatServerStatus(unsetServer)).toBe("server unset");
+  });
+
+  test("probe failure yields unset with a reported reason and no guessed value", async () => {
+    const failing = await probeServerContext(
+      { provider: "opencode-go", id: "glm-5.1", api: "openai-completions", baseUrl: "https://example.invalid/v1" },
+      { fetch: async () => { throw new Error("probe timeout"); } },
+    );
+    expect(failing).toEqual({ value: null, source: "unset", reason: "probe timeout" });
+
+    const notOk = await probeServerContext(
+      { provider: "opencode-go", id: "glm-5.1", api: "openai-completions", baseUrl: "https://example.invalid/v1" },
+      { fetch: async () => new Response("no", { status: 503 }) },
+    );
+    expect(notOk.value).toBeNull();
+    expect(notOk.source).toBe("unset");
+    expect(notOk.reason).toContain("503");
+
+    const unsupported = await probeServerContext({ provider: "x", id: "y", api: "anthropic-messages" });
+    expect(unsupported.value).toBeNull();
+    expect(unsupported.reason).toContain("unsupported");
+  });
+
+  test("syncModelWindow applies server clamp to the effective context window", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const result = syncModelWindow(model, 1000000, 1200000, null, {}, undefined, 1048576);
+    expect(result).toEqual({
+      changed: true,
+      window: 1048576,
+      source: "server",
+      clientWindow: 1200000,
+      clientSource: "session",
+    });
+    expect(model.contextWindow).toBe(1048576);
+
+    const noServer = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const unchanged = syncModelWindow(noServer, 1000000, 1200000, null, {}, undefined, null);
+    expect(unchanged.source).toBe("session");
+    expect(unchanged.window).toBe(1200000);
   });
 });
