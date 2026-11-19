@@ -183,16 +183,16 @@ function Invoke-ApplyStatus {
   }
 }
 
-function Assert-ApplyKnownFlags {
+function Assert-ApplyKnownFlagSet {
   param(
     [Parameter(Mandatory)][string]$CommandName,
-    [string[]]$Args,
+    [string[]]$ArgList,
     [string[]]$KnownSwitches,
     [string[]]$KnownValueFlags
   )
   $i = 0
-  while ($i -lt @($Args).Count) {
-    $arg = $Args[$i]
+  while ($i -lt @($ArgList).Count) {
+    $arg = $ArgList[$i]
     if ($arg -eq '-h' -or $arg -eq '--help') {
       Get-Help $PSCommandPath -Detailed
       exit 0
@@ -200,7 +200,7 @@ function Assert-ApplyKnownFlags {
     $matchedValueFlag = $false
     foreach ($vf in $KnownValueFlags) {
       if ($arg -eq $vf) {
-        if ($i + 1 -ge @($Args).Count) {
+        if ($i + 1 -ge @($ArgList).Count) {
           Write-NucleusError -CommandName $CommandName "${CommandName}: $vf requires a value"
           exit 1
         }
@@ -226,14 +226,14 @@ function Assert-ApplyKnownFlags {
 
 switch ($Action) {
   'health-check' {
-    Assert-ApplyKnownFlags -CommandName health-check -Args $RemainingArgs `
+    Assert-ApplyKnownFlagSet -CommandName health-check -ArgList $RemainingArgs `
       -KnownSwitches @('--secret-health', '--no-secret-health', '--log-health', '--store-audit', '--no-store-audit') `
       -KnownValueFlags @('--min-free-bytes')
     Write-NucleusInfo -CommandName health-check "health-check is not yet implemented for Windows; exiting 0"
     exit 0
   }
   'audit-store' {
-    Assert-ApplyKnownFlags -CommandName audit-store -Args $RemainingArgs -KnownSwitches @() -KnownValueFlags @()
+    Assert-ApplyKnownFlagSet -CommandName audit-store -ArgList $RemainingArgs -KnownSwitches @() -KnownValueFlags @()
     Write-NucleusInfo -CommandName audit-store "audit-store is not yet implemented for Windows; exiting 0"
     exit 0
   }
@@ -242,7 +242,7 @@ switch ($Action) {
     exit [int]$statusExit
   }
   'apply' {
-    Assert-ApplyKnownFlags -CommandName apply -Args $RemainingArgs `
+    Assert-ApplyKnownFlagSet -CommandName apply -ArgList $RemainingArgs `
       -KnownSwitches @('--ai-sync', '--no-ai-sync', '--replica-sync', '--no-replica-sync', '--store-audit', '--no-store-audit', '--health-check', '--no-health-check', '--vm-sync', '--no-vm-sync', '--vm-setup', '--no-vm-setup') `
       -KnownValueFlags @('--min-free-bytes', '--target-user', '--username')
     Write-NucleusInfo -CommandName apply "apply is handled by the Windows host orchestrator (src/hosts/Windows/apply.ps1); exiting 0"

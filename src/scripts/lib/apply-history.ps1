@@ -60,7 +60,7 @@ function Get-ApplyHistoryNowRfc3339Utc {
   [DateTimeOffset]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 }
 
-function Get-ApplyHistoryGitFields {
+function Get-ApplyHistoryGitFieldMap {
   [CmdletBinding()]
   param(
     [string]$RepoRoot
@@ -147,7 +147,7 @@ function Add-ApplyHistoryRecord {
   }
 
   $appliedAt = Get-ApplyHistoryNowRfc3339Utc
-  $gitFields = Get-ApplyHistoryGitFields -RepoRoot $RepoRoot
+  $gitFields = Get-ApplyHistoryGitFieldMap -RepoRoot $RepoRoot
 
   $phaseVal = $null
   if (-not [string]::IsNullOrWhiteSpace($Phase) -and $Phase -ne 'null') { $phaseVal = $Phase }

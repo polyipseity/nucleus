@@ -1086,7 +1086,7 @@ $nucleusUpdateCommands = @('update', 'lockfile')
 $nucleusCheckCommands = @('packer', 'pwsh', 'sh')
 $nucleusTestCommands = @()
 
-function Get-NucleusCompletionValues {
+function Get-NucleusCompletionItemList {
   param(
     [Parameter(Mandatory)]
     [string]$CommandName,
@@ -1103,11 +1103,11 @@ function Get-NucleusCompletionValues {
   }
 }
 
-function Get-NucleusServiceCompletions {
+function Get-NucleusServiceCompletionItemList {
   param([string]$WordToComplete)
-  $vals = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('--list-services'))
+  $vals = @(Get-NucleusCompletionItemList -CommandName 'nucleus-svc' -Arguments @('--list-services'))
   if ($vals.Count -eq 0) {
-    $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('logs', '--json'))
+    $json = @(Get-NucleusCompletionItemList -CommandName 'nucleus-svc' -Arguments @('logs', '--json'))
     foreach ($line in $json) {
       try { $vals = @($line | ConvertFrom-Json) } catch { $null = $_ } # check-suppress:suppression_doc: dynamic completion probe; ignore parse failures
       if ($vals.Count -gt 0) { break }
@@ -1116,36 +1116,36 @@ function Get-NucleusServiceCompletions {
   $vals | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusEndpointCompletions {
+function Get-NucleusEndpointCompletionItemList {
   param([string]$ServiceName, [string]$WordToComplete)
   if ([string]::IsNullOrWhiteSpace($ServiceName)) { return @() }
-  $vals = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('endpoint', '--list-endpoints', $ServiceName))
+  $vals = @(Get-NucleusCompletionItemList -CommandName 'nucleus-svc' -Arguments @('endpoint', '--list-endpoints', $ServiceName))
   $vals | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusLogNameCompletions {
+function Get-NucleusLogNameCompletionItemList {
   param([string]$WordToComplete)
-  @(Get-NucleusCompletionValues -CommandName 'nucleus-logs' -Arguments @('--list-logs')) | Where-Object { $_ -like "$WordToComplete*" }
+  @(Get-NucleusCompletionItemList -CommandName 'nucleus-logs' -Arguments @('--list-logs')) | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusReplicaCompletions {
+function Get-NucleusReplicaCompletionItemList {
   param([string]$WordToComplete)
-  @(Get-NucleusCompletionValues -CommandName 'nucleus-cloud' -Arguments @('--list-replicas')) | Where-Object { $_ -like "$WordToComplete*" }
+  @(Get-NucleusCompletionItemList -CommandName 'nucleus-cloud' -Arguments @('--list-replicas')) | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusStepCompletions {
+function Get-NucleusStepCompletionItemList {
   param([string]$CommandName, [string]$WordToComplete)
-  @(Get-NucleusCompletionValues -CommandName $CommandName -Arguments @('--list-steps')) | Where-Object { $_ -like "$WordToComplete*" }
+  @(Get-NucleusCompletionItemList -CommandName $CommandName -Arguments @('--list-steps')) | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusSectionCompletions {
+function Get-NucleusSectionCompletionItemList {
   param([string]$WordToComplete)
-  @(Get-NucleusCompletionValues -CommandName 'nucleus-update' -Arguments @('lockfile', '--list-sections')) | Where-Object { $_ -like "$WordToComplete*" }
+  @(Get-NucleusCompletionItemList -CommandName 'nucleus-update' -Arguments @('lockfile', '--list-sections')) | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusVmIdCompletions {
+function Get-NucleusVmIdCompletionItemList {
   param([string]$WordToComplete)
-  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-vm' -Arguments @('list', '--json'))
+  $json = @(Get-NucleusCompletionItemList -CommandName 'nucleus-vm' -Arguments @('list', '--json'))
   $ids = @()
   foreach ($line in $json) {
     try {
@@ -1156,9 +1156,9 @@ function Get-NucleusVmIdCompletions {
   $ids | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusConfigKeyCompletions {
+function Get-NucleusConfigKeyCompletionItemList {
   param([string]$WordToComplete)
-  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-config' -Arguments @('list', '--json'))
+  $json = @(Get-NucleusCompletionItemList -CommandName 'nucleus-config' -Arguments @('list', '--json'))
   $keys = @()
   foreach ($line in $json) {
     try {
@@ -1170,9 +1170,9 @@ function Get-NucleusConfigKeyCompletions {
   $keys | Where-Object { $_ -like "$WordToComplete*" }
 }
 
-function Get-NucleusAiProfileCompletions {
+function Get-NucleusAiProfileCompletionItemList {
   param([string]$WordToComplete)
-  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-ai' -Arguments @('list', '--json'))
+  $json = @(Get-NucleusCompletionItemList -CommandName 'nucleus-ai' -Arguments @('list', '--json'))
   $profiles = @()
   foreach ($line in $json) {
     try {
@@ -1193,12 +1193,12 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
     if ($sub -eq 'endpoint' -and $commandAst.CommandElements.Count -ge 3) {
       $svcName = [string]$commandAst.CommandElements[2].Extent.Text
       if ($wordToComplete -eq $svcName) {
-        Get-NucleusServiceCompletions -WordToComplete $wordToComplete
+        Get-NucleusServiceCompletionItemList -WordToComplete $wordToComplete
       } else {
-        Get-NucleusEndpointCompletions -ServiceName $svcName -WordToComplete $wordToComplete
+        Get-NucleusEndpointCompletionItemList -ServiceName $svcName -WordToComplete $wordToComplete
       }
     } elseif ($nucleusSvcCommands -contains $sub) {
-      Get-NucleusServiceCompletions -WordToComplete $wordToComplete
+      Get-NucleusServiceCompletionItemList -WordToComplete $wordToComplete
     }
   }
   $nucleusSvcFlags | Where-Object { $_ -like "$wordToComplete*" }
@@ -1211,7 +1211,7 @@ Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   if ($commandAst.CommandElements.Count -ge 2) {
     $sub = [string]$commandAst.CommandElements[1].Extent.Text
     if ($sub -in @('get', 'set')) {
-      Get-NucleusConfigKeyCompletions -WordToComplete $wordToComplete
+      Get-NucleusConfigKeyCompletionItemList -WordToComplete $wordToComplete
     }
   }
   $nucleusConfigFlags | Where-Object { $_ -like "$wordToComplete*" }
@@ -1232,10 +1232,10 @@ Register-ArgumentCompleter -CommandName nucleus-logs -ScriptBlock {
     $sub = [string]$commandAst.CommandElements[1].Extent.Text
     $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text
     if ($prev -eq '--log' -or $sub -in @('append', 'show', 'tail')) {
-      Get-NucleusLogNameCompletions -WordToComplete $wordToComplete
+      Get-NucleusLogNameCompletionItemList -WordToComplete $wordToComplete
     }
   } elseif ($wordToComplete -and $wordToComplete -notlike '-*') {
-    Get-NucleusLogNameCompletions -WordToComplete $wordToComplete
+    Get-NucleusLogNameCompletionItemList -WordToComplete $wordToComplete
   }
   $nucleusLogsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
@@ -1247,7 +1247,7 @@ Register-ArgumentCompleter -CommandName nucleus-cloud -ScriptBlock {
   $prev = ''
   if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
   if ($prev -eq '--replica-id') {
-    Get-NucleusReplicaCompletions -WordToComplete $wordToComplete
+    Get-NucleusReplicaCompletionItemList -WordToComplete $wordToComplete
   }
   $nucleusCloudFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
@@ -1259,7 +1259,7 @@ Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
   $prev = ''
   if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
   if ($prev -eq '--sections') {
-    Get-NucleusSectionCompletions -WordToComplete $wordToComplete
+    Get-NucleusSectionCompletionItemList -WordToComplete $wordToComplete
   }
   $nucleusUpdateFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
@@ -1271,7 +1271,7 @@ Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   $prev = ''
   if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
   if ($prev -eq '--only-steps' -or $prev -eq '--verbose') {
-    Get-NucleusStepCompletions -CommandName 'nucleus-check' -WordToComplete $wordToComplete
+    Get-NucleusStepCompletionItemList -CommandName 'nucleus-check' -WordToComplete $wordToComplete
   }
   $nucleusCheckFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
@@ -1285,13 +1285,13 @@ Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
     @('--ai-profile', '--dry-run', '--gc-only', '--help', '--json', '--ollama-profile', '--profile') |
       Where-Object { $_ -like "$wordToComplete*" }
     if ($prev -in @('--profile', '--ai-profile', '--ollama-profile')) {
-      Get-NucleusAiProfileCompletions -WordToComplete $wordToComplete
+      Get-NucleusAiProfileCompletionItemList -WordToComplete $wordToComplete
     }
   } else {
     @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
       Where-Object { $_ -like "$wordToComplete*" }
     if ($prev -in @('--profile', '--ai-profile', '--ollama-profile')) {
-      Get-NucleusAiProfileCompletions -WordToComplete $wordToComplete
+      Get-NucleusAiProfileCompletionItemList -WordToComplete $wordToComplete
     }
     $nucleusAiFlags | Where-Object { $_ -like "$wordToComplete*" }
   }
@@ -1320,7 +1320,7 @@ Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
       $nucleusVmSetupFlags | Where-Object { $_ -like "$wordToComplete*" }
     }
     if ($subcommand -in @('sync', 'build-system', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize')) {
-      Get-NucleusVmIdCompletions -WordToComplete $wordToComplete
+      Get-NucleusVmIdCompletionItemList -WordToComplete $wordToComplete
     }
   }
   $nucleusVmFlags | Where-Object { $_ -like "$wordToComplete*" }
@@ -1345,7 +1345,7 @@ Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
   $prev = ''
   if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
   if ($prev -eq '--only-steps' -or $prev -eq '--verbose') {
-    Get-NucleusStepCompletions -CommandName 'nucleus-test' -WordToComplete $wordToComplete
+    Get-NucleusStepCompletionItemList -CommandName 'nucleus-test' -WordToComplete $wordToComplete
   }
   $nucleusTestFlags | Where-Object { $_ -like "$wordToComplete*" }
 }

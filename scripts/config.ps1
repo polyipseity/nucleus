@@ -159,18 +159,18 @@ function Out-ConfigValueList {
   }
 
   $merged = Merge-Config
-  function Get-FlatEntries($obj, $prefix) {
+  function Get-FlatEntryList($obj, $prefix) {
     foreach ($prop in $obj.PSObject.Properties) {
       $key = if ($prefix) { "$prefix.$($prop.Name)" } else { $prop.Name }
       if ($prop.Value -is [PSCustomObject]) {
-        Get-FlatEntries $prop.Value $key
+        Get-FlatEntryList $prop.Value $key
       } else {
         [pscustomobject]@{ key = $key; value = $prop.Value }
       }
     }
   }
 
-  $entries = @(Get-FlatEntries $merged "")
+  $entries = @(Get-FlatEntryList $merged "")
   if ($asJson) {
     $map = [ordered]@{}
     foreach ($entry in $entries) {
