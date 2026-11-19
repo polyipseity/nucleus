@@ -15,8 +15,12 @@ function Assert-Pass([string]$Name) { $script:Passed++; Write-Output "✓ $Name"
 function Assert-Fail([string]$Name, [string]$Reason) { $script:Failed++; Write-Output "✗ ${Name}: $Reason" }
 
 function New-TestRoot {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
   $root = Join-Path ([System.IO.Path]::GetTempPath()) ("apply-status-test-" + [System.Guid]::NewGuid().ToString('N'))
-  $null = New-Item -ItemType Directory -Path $root -Force # check-suppress:suppression_doc: test setup output not needed
+  if ($PSCmdlet.ShouldProcess($root, 'Create test root directory')) {
+    $null = New-Item -ItemType Directory -Path $root -Force # check-suppress:suppression_doc: test setup output not needed
+  }
   return $root
 }
 

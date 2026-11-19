@@ -53,10 +53,14 @@ if (-not (Get-Command Invoke-ProvisionedToolsInstructionDriftCheck -ErrorAction 
 }
 
 function New-FixtureRepo {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
   $root = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-provisioned-tools-drift-ps-" + [System.Guid]::NewGuid().ToString('N'))
-  $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/modules') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
-  $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/modules/packages') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
-  $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/users/default/agents/instructions') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
+  if ($PSCmdlet.ShouldProcess($root, 'Create fixture repository')) {
+    $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/modules') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
+    $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/modules/packages') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
+    $null = New-Item -ItemType Directory -Path (Join-Path $root 'src/users/default/agents/instructions') -Force # check-suppress:suppression_doc: suppress fixture directory-creation output
+  }
   return $root
 }
 
@@ -107,14 +111,15 @@ function Write-Instruction {
 function Invoke-Drift {
   param([string]$Root)
   $out = & {
+    param([string]$FixtureRoot)
     $ok = $false
     try {
-      Invoke-ProvisionedToolsInstructionDriftCheck -RepoRoot $Root -Passed ([ref]$ok)
+      Invoke-ProvisionedToolsInstructionDriftCheck -RepoRoot $FixtureRoot -Passed ([ref]$ok)
       [pscustomobject]@{ Ok = [bool]$ok }
     } catch {
       [pscustomobject]@{ Ok = $false; Threw = $true; Message = $_.Exception.Message }
     }
-  } 2>&1
+  } $Root 2>&1
   $meta = @($out | Where-Object { $_ -is [pscustomobject] -and $null -ne $_.PSObject.Properties['Ok'] } | Select-Object -Last 1)
   $text = ($out | Where-Object { -not ($_ -is [pscustomobject] -and $null -ne $_.PSObject.Properties['Ok']) } | Out-String)
   if ($meta.Count -eq 0) {

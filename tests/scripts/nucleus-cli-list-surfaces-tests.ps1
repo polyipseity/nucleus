@@ -28,14 +28,14 @@ try {
 } catch {
   $cfgDetail = "parse failed: $($_.Exception.Message)"
 }
-Assert-True $cfgOk 'config.ps1 list --json emits dotted-key object' $cfgDetail
+Assert-True -cond $cfgOk -name 'config.ps1 list --json emits dotted-key object' -detail $cfgDetail
 
 Write-Output "`n=== [2] check/test --list-steps ==="
 $checkSteps = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/check.ps1') -ListSteps 2>$null)
-Assert-True ($checkSteps -contains 'code-formatting' -and $checkSteps -contains 'app-registry' -and $checkSteps -notcontains 'nix-flake-eval') 'check.ps1 -ListSteps prints Windows check step IDs'
+Assert-True -cond ($checkSteps -contains 'code-formatting' -and $checkSteps -contains 'app-registry' -and $checkSteps -notcontains 'nix-flake-eval') -name 'check.ps1 -ListSteps prints Windows check step IDs'
 
 $testSteps = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/test.ps1') --list-steps 2>$null)
-Assert-True ($testSteps -contains 'nix-tests' -and $testSteps -contains 'windows-pester') 'test.ps1 --list-steps prints Windows test step IDs'
+Assert-True -cond ($testSteps -contains 'nix-tests' -and $testSteps -contains 'windows-pester') -name 'test.ps1 --list-steps prints Windows test step IDs'
 
 Write-Output "`n=== [3] logs --list-logs ==="
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-logs-list-" + [Guid]::NewGuid().ToString('n'))
@@ -47,7 +47,7 @@ try {
   $env:NUCLEUS_LOG_DIR = $tmp
   $logs = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/logs.ps1') -ListLogs -Scope user 2>$null)
   $ok = ($logs.Count -eq 2 -and $logs[0] -eq 'alpha' -and $logs[1] -eq 'beta')
-  Assert-True $ok 'logs.ps1 -ListLogs lists live log base names' ($logs -join '|')
+  Assert-True -cond $ok -name 'logs.ps1 -ListLogs lists live log base names' -detail ($logs -join '|')
 } finally {
   # check-suppress:suppression_doc: cleanup of test-owned state must not fail the test when already gone
   Remove-Item Env:NUCLEUS_LOG_DIR -ErrorAction SilentlyContinue
