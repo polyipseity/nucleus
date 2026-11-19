@@ -21,16 +21,24 @@ require_command shasum "shasum is required"
 TMPDIR_TEST="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
-# Use an existing wallpaper image as source
-SRC_IMG="$HOME/Pictures/wallpapers/(2026-09-11) sweet mushroom.png"
-if [ ! -f "$SRC_IMG" ]; then
-  skip "no source wallpaper image available for testing"
-fi
-
 # Setup temp layout
 WALLPAPERS_DIR="$TMPDIR_TEST/wallpapers"
 mkdir -p "$WALLPAPERS_DIR"
-cp "$SRC_IMG" "$WALLPAPERS_DIR/test-wallpaper.png"
+
+# Deterministic source fixture: generate a small PNG (no host-specific assets).
+python3 - "$WALLPAPERS_DIR/test-wallpaper.png" <<'PY'
+import struct, sys, zlib
+path = sys.argv[1]
+w = h = 64
+raw = b"".join(b"\x00" + bytes((i % 256, (i * 2) % 256, (i * 3) % 256)) * w for i in range(h))
+def chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+with open(path, "wb") as f:
+    f.write(b"\x89PNG\r\n\x1a\n")
+    f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)))
+    f.write(chunk(b"IDAT", zlib.compress(raw, 9)))
+    f.write(chunk(b"IEND", b""))
+PY
 
 PREBOOT_ROOT="$TMPDIR_TEST/Preboot"
 GUID="TEST-GUID-1234"
