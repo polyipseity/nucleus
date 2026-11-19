@@ -28,6 +28,6 @@ if [ ! -f "$AUTOSTART_CLI" ]; then
   exit 0
 fi
 
-if ! "$AUTOSTART_CLI" apply; then
+if ! "${BASH}" "$AUTOSTART_CLI" apply; then
   die -l autostart "one or more apps failed to converge."
 fi

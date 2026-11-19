@@ -25,6 +25,6 @@ if [ ! -f "$MENU_BAR_CLI" ]; then
   exit 0
 fi
 
-if ! "$MENU_BAR_CLI" apply; then
+if ! "${BASH}" "$MENU_BAR_CLI" apply; then
   die -l menu-bar "one or more app icons failed to converge."
 fi
