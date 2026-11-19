@@ -49,6 +49,7 @@ export interface PromptToolsDeps {
 	readonly readQueuedPromptList?: (commandsDir: string) => readonly QueuedPrompt[];
 	readonly copyToClipboard?: (text: string) => Promise<boolean>;
 	readonly writeToCommandStdin?: (command: string, args: readonly string[], text: string) => Promise<boolean>;
+	readonly isCompacting?: () => boolean;
 }
 
 /**
@@ -660,16 +661,45 @@ export async function handleCopyUserPrompt(
 	await showCopyFallback(ctx.ui, choice.text);
 }
 
+type PromptSendMode = "immediate" | "followUp" | "waited";
+
+function isCompactingState(isCompacting?: () => boolean): boolean {
+	return typeof isCompacting === "function" && isCompacting();
+}
+
+async function waitForContextIdle(ctx: ExtensionCommandContext): Promise<void> {
+	const waitForIdle = (ctx as ExtensionCommandContext & { waitForIdle?: () => Promise<void> }).waitForIdle;
+	if (typeof waitForIdle === "function") {
+		await waitForIdle.call(ctx);
+	}
+}
+
+async function sendPromptText(
+	text: string,
+	ctx: ExtensionCommandContext,
+	pi: Pick<ExtensionAPI, "sendUserMessage">,
+	isCompacting?: () => boolean,
+): Promise<PromptSendMode> {
+	if (isCompactingState(isCompacting)) {
+		await waitForContextIdle(ctx);
+		pi.sendUserMessage(text);
+		return "waited";
+	}
+	if (ctx.isIdle()) {
+		pi.sendUserMessage(text);
+		return "immediate";
+	}
+	pi.sendUserMessage(text, { deliverAs: "followUp" });
+	return "followUp";
+}
+
 async function sendPromptAsNewTurn(
 	text: string,
 	ctx: ExtensionCommandContext,
 	pi: Pick<ExtensionAPI, "sendUserMessage">,
+	isCompacting?: () => boolean,
 ): Promise<void> {
-	if (ctx.isIdle()) {
-		pi.sendUserMessage(text);
-		return;
-	}
-	pi.sendUserMessage(text, { deliverAs: "followUp" });
+	await sendPromptText(text, ctx, pi, isCompacting);
 }
 
 export async function handleRepeatUserPrompt(
@@ -708,9 +738,11 @@ export async function handleRepeatUserPrompt(
 		}
 	}
 
-	await sendPromptAsNewTurn(choice.text, ctx, pi);
-	if (!ctx.isIdle()) {
+	const sendMode = await sendPromptText(choice.text, ctx, pi, deps.isCompacting);
+	if (sendMode === "followUp") {
 		ctx.ui.notify(`Queued ${choice.source} prompt as a follow-up turn.`, "info");
+	} else if (sendMode === "waited") {
+		ctx.ui.notify(`Queued ${choice.source} prompt.`, "info");
 	}
 }
 
@@ -718,26 +750,39 @@ export async function handleContinue(
 	_ctxArgs: string,
 	ctx: ExtensionCommandContext,
 	pi: Pick<ExtensionAPI, "sendUserMessage">,
+	options: { readonly isCompacting?: () => boolean } = {},
 ): Promise<void> {
 	if (!hasAnySentMessage(ctx)) {
 		ctx.ui.notify(NOTHING_TO_CONTINUE_MESSAGE, "info");
 		return;
 	}
-	if (!ctx.isIdle()) {
-		ctx.ui.notify("Agent is busy.", "warning");
-		return;
+	const mode = await sendPromptText(" ", ctx, pi, options.isCompacting);
+	if (mode !== "immediate") {
+		ctx.ui.notify("Queued /continue.", "info");
 	}
-	pi.sendUserMessage(" ");
 }
 
 export function createPromptToolsExtension(
 	deps: PromptToolsDeps = {},
 ): (pi: ExtensionAPI) => void {
 	return function promptToolsExtension(pi: ExtensionAPI): void {
+		let compacting = false;
+		const runtime = { isCompacting: () => compacting };
+
+		pi.on("session_before_compact", async () => {
+			compacting = true;
+		});
+		pi.on("session_compact", async () => {
+			compacting = false;
+		});
+		pi.on("session_compact_failed", async () => {
+			compacting = false;
+		});
+
 		pi.registerCommand("continue", {
 			description: "Retry or continue the current turn",
 			handler: async (args, ctx) => {
-				await handleContinue(args, ctx as ExtensionCommandContext, pi);
+				await handleContinue(args, ctx as ExtensionCommandContext, pi, runtime);
 			},
 		});
 
@@ -751,7 +796,7 @@ export function createPromptToolsExtension(
 		pi.registerCommand("repeat-user-prompt", {
 			description: "Resubmit a sent or queued prompt as a new user turn (default: sent)",
 			handler: async (args, ctx) => {
-				await handleRepeatUserPrompt(args, ctx as ExtensionCommandContext, pi, deps);
+				await handleRepeatUserPrompt(args, ctx as ExtensionCommandContext, pi, { ...deps, ...runtime });
 			},
 		});
 	};

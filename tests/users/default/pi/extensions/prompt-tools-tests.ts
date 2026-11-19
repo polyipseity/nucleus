@@ -67,6 +67,7 @@ function makeContext(options: {
 	idle?: boolean;
 	selectResult?: string | undefined;
 	confirmResult?: boolean;
+	waitForIdle?: () => Promise<void>;
 } = {}): {
 	ctx: unknown;
 	notifications: Array<[string, string]>;
@@ -79,6 +80,7 @@ function makeContext(options: {
 	const ctx = {
 		hasUI: true,
 		isIdle: () => options.idle ?? true,
+		...(options.waitForIdle ? { waitForIdle: options.waitForIdle } : {}),
 		sessionManager: {
 			getBranch: () => options.branch ?? [],
 		},
@@ -492,6 +494,46 @@ describe("repeat-user-prompt", () => {
 		expect(selectCalls[0]?.[1][0]).toContain("Sent:");
 		expect(sentMessages).toEqual([{ content: "sent prompt", options: undefined }]);
 	});
+
+	test("waits for idle during compaction then repeats confirmed prompt", async () => {
+		let waited = false;
+		let sentBeforeWaitResolved = false;
+		const sentMessages: Array<{ content: unknown; options?: unknown }> = [];
+		const notifications: Array<[string, string]> = [];
+		const confirmCalls: Array<[string, string]> = [];
+		const ctx = {
+			hasUI: true,
+			isIdle: () => false,
+			waitForIdle: async () => {
+				waited = true;
+			},
+			sessionManager: {
+				getBranch: () => [{ type: "message", message: { role: "user", content: "repeat me" } }],
+			},
+			ui: {
+				notify: (message: string, type: string = "info") => notifications.push([message, type]),
+				select: async () => undefined,
+				confirm: async (title: string, message: string) => {
+					confirmCalls.push([title, message]);
+					return true;
+				},
+			},
+		};
+		const pi = {
+			sendUserMessage: (content: unknown, options?: unknown) => {
+				if (!waited) {
+					sentBeforeWaitResolved = true;
+				}
+				sentMessages.push({ content, options });
+			},
+		};
+		await handleRepeatUserPrompt("sent", ctx as never, pi as never, { isCompacting: () => true });
+		expect(confirmCalls).toHaveLength(1);
+		expect(waited).toBe(true);
+		expect(sentBeforeWaitResolved).toBe(false);
+		expect(sentMessages).toEqual([{ content: "repeat me", options: undefined }]);
+		expect(notifications).toEqual([["Queued sent prompt.", "info"]]);
+	});
 });
 
 describe("continue", () => {
@@ -514,15 +556,50 @@ describe("continue", () => {
 		expect(notifications).toEqual([[NOTHING_TO_CONTINUE_MESSAGE, "info"]]);
 	});
 
-	test("warns when agent is busy", async () => {
+	test("queues continue as follow-up when agent is streaming", async () => {
 		const { commands, sentMessages } = registerExtension();
 		const { ctx, notifications } = makeContext({
 			branch: [{ type: "message", message: { role: "user", content: "hello" } }],
 			idle: false,
 		});
 		await commands.continueCommand?.handler("", ctx);
-		expect(sentMessages).toEqual([]);
-		expect(notifications).toEqual([["Agent is busy.", "warning"]]);
+		expect(sentMessages).toEqual([{ content: " ", options: { deliverAs: "followUp" } }]);
+		expect(notifications).toEqual([["Queued /continue.", "info"]]);
+	});
+
+	test("waits for idle during compaction then continues", async () => {
+		let waited = false;
+		let sentBeforeWaitResolved = false;
+		const sentMessages: Array<{ content: unknown; options?: unknown }> = [];
+		const notifications: Array<[string, string]> = [];
+		const ctx = {
+			hasUI: true,
+			isIdle: () => false,
+			waitForIdle: async () => {
+				waited = true;
+			},
+			sessionManager: {
+				getBranch: () => [{ type: "message", message: { role: "user", content: "hello" } }],
+			},
+			ui: {
+				notify: (message: string, type: string = "info") => notifications.push([message, type]),
+				select: async () => undefined,
+				confirm: async () => false,
+			},
+		};
+		const pi = {
+			sendUserMessage: (content: unknown, options?: unknown) => {
+				if (!waited) {
+					sentBeforeWaitResolved = true;
+				}
+				sentMessages.push({ content, options });
+			},
+		};
+		await handleContinue("", ctx as never, pi as never, { isCompacting: () => true });
+		expect(waited).toBe(true);
+		expect(sentBeforeWaitResolved).toBe(false);
+		expect(sentMessages).toEqual([{ content: " ", options: undefined }]);
+		expect(notifications).toEqual([["Queued /continue.", "info"]]);
 	});
 });
 
