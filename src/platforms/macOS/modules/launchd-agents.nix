@@ -204,11 +204,9 @@ in
     };
   };
 
-  # Polls the HeadlessDisplay virtual screen every 60 seconds and reconnects it.
-  # A launchd agent rather than macos-headless-display alone: that runs only
-  # during `home-manager switch`, and a clamshell Mac left closed can lose the
-  # virtual screen connection without a new activation run. KeepAlive gives
-  # crash recovery without a Pro subscription or kernel extension.
+  # Probes the headless display every 60 seconds and converges only when it is
+  # missing. Never relaunches BetterDisplay. Exits on failure so the watchdog
+  # owns restart accounting and crash loops. KeepAlive handles crash recovery.
   launchd.agents."betterdisplay-heartbeat" = {
     enable = true;
     domain = "gui";
@@ -218,6 +216,7 @@ in
       # Start at login and stay alive; the internal loop handles the interval.
       RunAtLoad = true;
       KeepAlive = true;
+      ThrottleInterval = 60;
       # WHY: the house default is the stdout.log/stderr.log pair for every service.
       # Rotation bounds the file, so the loop's no-op output stays diagnosable
       # without filling the log tree.

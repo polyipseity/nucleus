@@ -15,7 +15,7 @@
     }
   },
   "betterdisplay-heartbeat": {
-    "description": "BetterDisplay virtual screen heartbeat with crash-loop protection",
+    "description": "Probe-only BetterDisplay heartbeat with watchdog-owned crash-loop handling",
     "displayName": "BetterDisplay Heartbeat",
     "logging": {
       "capture": "all",
