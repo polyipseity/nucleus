@@ -155,11 +155,26 @@ if ($script:IsEntryScript -and [string]::IsNullOrWhiteSpace($repoRoot) -and [str
   exit 1
 }
 
-$moduleDir = if ($repoRoot) { Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules' } else { $null }
-if ($moduleDir -and (Test-Path -LiteralPath (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1'))) {
+$moduleCandidates = @()
+if (-not [string]::IsNullOrWhiteSpace($repoRoot)) {
+  $moduleCandidates += (Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules')
+}
+# WHY: allow running from the repo with only NUCLEUS_LOG_DIR set (e.g. -ListLogs),
+# resolving modules relative to this script when NUCLEUS_REPO_ROOT is unset.
+$moduleCandidates += (Join-Path -Path $PSScriptRoot -ChildPath '..\src\platforms\Windows\modules')
+
+$moduleDir = $null
+foreach ($candidate in $moduleCandidates) {
+  if ($candidate -and (Test-Path -LiteralPath (Join-Path -Path $candidate -ChildPath 'Invoke-LogManagement.ps1'))) {
+    $moduleDir = $candidate
+    break
+  }
+}
+if ($moduleDir) {
   . (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1')
 } elseif ($script:IsEntryScript) {
-  Write-NucleusError -CommandName logs "Invoke-LogManagement.ps1 not found under '$moduleDir'"
+  $searched = ($moduleCandidates | Where-Object { $_ } | Select-Object -Unique) -join '; '
+  Write-NucleusError -CommandName logs "Invoke-LogManagement.ps1 not found (searched: $searched)"
   exit 1
 }
 
