@@ -191,95 +191,109 @@ in
 
   # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call
   # that nix-darwin appends to postActivation.text at priority 1000.
-  system.activationScripts.postActivation.text = lib.mkBefore ''
-    # ---- remove-command-line-tools -----------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-remove-command-line-tools.sh" \
-      "${config.nucleus.logging.systemLogDir}/command-line-tools.log"
+  # WHY lib.mkMerge: mkBefore runs ahead of Home Manager (appended at priority 1000);
+  # mkAfter runs after it so the Preboot refresh sees decrypted wallpapers.
+  system.activationScripts.postActivation.text = lib.mkMerge [
+    (lib.mkBefore ''
+      # ---- remove-command-line-tools -----------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-remove-command-line-tools.sh" \
+        "${config.nucleus.logging.systemLogDir}/command-line-tools.log"
 
-    # ---- configure-xcode-select --------------------------------------------------
-    # WHY xcode-select and not only DEVELOPER_DIR: DEVELOPER_DIR reaches only
-    # processes that inherit the shell environment, and rustc and cargo need SDK
-    # discovery in launchd services and other non-shell process trees too.
-    /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
+      # ---- configure-xcode-select --------------------------------------------------
+      # WHY xcode-select and not only DEVELOPER_DIR: DEVELOPER_DIR reaches only
+      # processes that inherit the shell environment, and rustc and cargo need SDK
+      # discovery in launchd services and other non-shell process trees too.
+      /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
 
-    # ---- configure-symlink-farm ------------------------------------------------
-    # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
-    # via PATH directly (without xcrun).  Only operates on Nix store symlinks
-    # and leaves regular files and non-Nix symlinks untouched.
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-symlink-farm.sh" \
-      "${symlinkFarmEntries}" \
-      "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
+      # ---- configure-symlink-farm ------------------------------------------------
+      # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
+      # via PATH directly (without xcrun).  Only operates on Nix store symlinks
+      # and leaves regular files and non-Nix symlinks untouched.
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-symlink-farm.sh" \
+        "${symlinkFarmEntries}" \
+        "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
-    # ---- configure-battery-policy ------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
+      # ---- configure-battery-policy ------------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
-    # ---- configure-charge-limit --------------------------------------------------
-    # WHY the `battery` CLI: it is the only convergent gate for the 80 % cap. The
-    # native macOS Charge Limit has no pmset key, no profile payload, and no CLI,
-    # so it stays a manual setting (see MANUAL.md).
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
+      # ---- configure-charge-limit --------------------------------------------------
+      # WHY the `battery` CLI: it is the only convergent gate for the 80 % cap. The
+      # native macOS Charge Limit has no pmset key, no profile payload, and no CLI,
+      # so it stays a manual setting (see MANUAL.md).
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
-    # ---- macos-configure-menu-bar-icons --------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh"
+      # ---- macos-configure-menu-bar-icons --------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh"
 
-    # ---- macos-configure-menu-bar -------------------------------------------------
-    # System items have no apps.json entry, so they stay here.
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar.sh"
+      # ---- macos-configure-menu-bar -------------------------------------------------
+      # System items have no apps.json entry, so they stay here.
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar.sh"
 
-    # ---- configure-ssh-access -----------------------------------------------------
-    # Deleting com.apple.access_ssh is what allows all users. When the group is
-    # already absent, sshd allows any user subject to AllowUsers/AllowGroups.
-    # See System Settings > General > Sharing > Remote Login > (i) > Allow access for.
-    if /usr/sbin/dseditgroup -o delete -q com.apple.access_ssh 2>/dev/null; then
-      echo "ssh: removed com.apple.access_ssh group; all users can now connect via SSH."
-    else
-      echo "ssh: com.apple.access_ssh group does not exist (already allowing all users)." >&2
-    fi
-
-    # ---- configure-app-autostart ------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-app-autostart.sh"
-    # ---- configure-linearmouse-preferences --------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
-    # ---- configure-utm-prefs ----------------------------------------------------
-    # WHY the app container: the sandboxed prefs survive UTM updates. Runs
-    # unconditionally, it is idempotent and harmless when UTM is absent.
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-prefs.sh"
-    # ---- configure-gimp-scroll-sensitivity ---------------------------------------
-    "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
-
-    # ---- configure-mission-control-spans-displays ----------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-mission-control.sh"
-
-    # ---- configure-monitor-color-profile ------------------------------------------
-    # WHY the guard: `defaults delete` on a missing domain prints a noisy
-    # "Domain not found" that is neither a real failure nor actionable.
-    if [ -f /Library/Preferences/com.apple.ColorSync.DeviceCache.plist ]; then
-      /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
-    fi
-
-    # ---- clear-finder-cache -------------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-clear-finder-cache.sh"
-
-    # ---- disable-spotlight -------------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-disable-spotlight.sh"
-
-    # ---- launcher -----------------------------------------------------------
-    # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
-    "${activationBundle}/src/scripts/editors/launch-nvim.sh" ""
-
-    # ---- ensure-camilladsp-log-dir ----------------------------------------------
-    # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
-    _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-    if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
-      /bin/mkdir -p "$_camilladsp_user/Library/Application Support/nucleus/logs/camilladsp"
-    fi
-
-    # ---- verifyNucleusServices ---------------------------------------------------
-    # Warn-only: a service that failed to start must not block activation.
-    if command -v nucleus-svc >/dev/null 2>&1; then
-      if ! nucleus-svc verify; then
-        echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
+      # ---- configure-ssh-access -----------------------------------------------------
+      # Deleting com.apple.access_ssh is what allows all users. When the group is
+      # already absent, sshd allows any user subject to AllowUsers/AllowGroups.
+      # See System Settings > General > Sharing > Remote Login > (i) > Allow access for.
+      if /usr/sbin/dseditgroup -o delete -q com.apple.access_ssh 2>/dev/null; then
+        echo "ssh: removed com.apple.access_ssh group; all users can now connect via SSH."
+      else
+        echo "ssh: com.apple.access_ssh group does not exist (already allowing all users)." >&2
       fi
-    fi
-  '';
+
+      # ---- configure-app-autostart ------------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-app-autostart.sh"
+      # ---- configure-linearmouse-preferences --------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
+      # ---- configure-utm-prefs ----------------------------------------------------
+      # WHY the app container: the sandboxed prefs survive UTM updates. Runs
+      # unconditionally, it is idempotent and harmless when UTM is absent.
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-prefs.sh"
+      # ---- configure-gimp-scroll-sensitivity ---------------------------------------
+      "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
+
+      # ---- configure-mission-control-spans-displays ----------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-mission-control.sh"
+
+      # ---- configure-monitor-color-profile ------------------------------------------
+      # WHY the guard: `defaults delete` on a missing domain prints a noisy
+      # "Domain not found" that is neither a real failure nor actionable.
+      if [ -f /Library/Preferences/com.apple.ColorSync.DeviceCache.plist ]; then
+        /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
+      fi
+
+      # ---- clear-finder-cache -------------------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-clear-finder-cache.sh"
+
+      # ---- disable-spotlight -------------------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-disable-spotlight.sh"
+
+      # ---- launcher -----------------------------------------------------------
+      # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
+      "${activationBundle}/src/scripts/editors/launch-nvim.sh" ""
+
+      # ---- ensure-camilladsp-log-dir ----------------------------------------------
+      # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
+      _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+      if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
+        /bin/mkdir -p "$_camilladsp_user/Library/Application Support/nucleus/logs/camilladsp"
+      fi
+
+      # ---- verifyNucleusServices ---------------------------------------------------
+      # Warn-only: a service that failed to start must not block activation.
+      if command -v nucleus-svc >/dev/null 2>&1; then
+        if ! nucleus-svc verify; then
+          echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
+        fi
+      fi
+    '')
+
+    # WHY lib.mkAfter: home-manager activation (including provision-wallpapers in
+    # wallpapers.nix) runs in the HM phase appended at priority 1000; this refresh
+    # must run after decrypted wallpapers exist in ~/Pictures/wallpapers. The
+    # kickstart of com.apple.wallpaper.agent is blocked by SIP (exit 150), so the
+    # unsupported fallback writes the Preboot Wallpapers store directly.
+    (lib.mkAfter ''
+      # ---- refresh-preboot-wallpaper -----------------------------------------------
+      "${activationBundle}/src/hosts/MacBook/scripts/macos-refresh-preboot-wallpaper.sh"
+    '')
+  ];
 }

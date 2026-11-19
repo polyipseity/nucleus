@@ -46,7 +46,8 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 1. Caddy local-CA trust runs during apply. To redo it: `sudo caddy trust --address 127.0.0.1:2019`.
 2. Lock-screen wallpaper: apply rewrites the WallpaperKit store and warns when macOS denies the write. To fix it by hand, choose Photos in System Settings > Wallpaper > Screen Saver, point it at `~/Pictures/wallpapers`, then lock the screen to confirm.
-3. LiteLLM returning HTTP 429/500 (`Missing credentials`, `No deployments available`) on every `default` request means the daemon was built with no `KEYFILE:ENVVAR` pairs, usually because `src/modules/lib/env-secrets.nix` is out of sync with the decrypted SOPS secrets. Check `sudo launchctl print system/local.litellm | grep ProgramArguments`, then run `nucleus-apply` and `nucleus-svc restart litellm`. `ai.nix` fails eval first when the catalog declares keys that resolve to nothing.
+3. Pre-login (FileVault) wallpaper: apply refreshes the Preboot login-window image after Home Manager provisions wallpapers. Reboot once after the first apply to confirm the pre-login screen matches the managed set.
+4. LiteLLM returning HTTP 429/500 (`Missing credentials`, `No deployments available`) on every `default` request means the daemon was built with no `KEYFILE:ENVVAR` pairs, usually because `src/modules/lib/env-secrets.nix` is out of sync with the decrypted SOPS secrets. Check `sudo launchctl print system/local.litellm | grep ProgramArguments`, then run `nucleus-apply` and `nucleus-svc restart litellm`. `ai.nix` fails eval first when the catalog declares keys that resolve to nothing.
 
 ## speech to text
 
