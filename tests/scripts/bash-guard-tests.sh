@@ -112,23 +112,37 @@ SCRIPT
   fi
 }
 
-# Running scripts/check.sh under bash 3.2 must print remediation and exit 1,
-# never a syntax error or partial run.
-_t_check_sh_guarded_under_bash32() {
+# Running scripts/check.sh under /bin/bash must behave correctly for that
+# /bin/bash version: below 5.1 it must print remediation and exit 1 with no
+# syntax error; at or above 5.1 it must list steps successfully via
+# --list-steps (handled before preflight) with no guard-remediation text.
+_t_check_sh_under_bin_bash() {
   if [ ! -x /bin/bash ]; then
-    assert_fail "scripts/check.sh guarded under /bin/bash (3.2)" "/bin/bash not available"
+    assert_fail "scripts/check.sh under /bin/bash" "/bin/bash not available"
     return
   fi
-  local out="" rc=0
-  out="$(cd "$REPO_ROOT" && /bin/bash scripts/check.sh 2>&1)" || rc=$?
-  local syntax=0
-  case "$out" in
-  *"syntax error"* | *"unexpected"* | *"Syntax error"*) syntax=1 ;;
-  esac
-  if [ "$rc" -eq 1 ] && [ "$syntax" -eq 0 ] && printf '%s\n' "$out" | grep -q '5\.1'; then
-    assert_pass "scripts/check.sh exits 1 under bash 3.2 with remediation and no syntax error"
+  local ver_out major minor out="" rc=0
+  ver_out="$(/bin/bash -c 'printf "%s %s" "${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}"')"
+  major="${ver_out%% *}"
+  minor="${ver_out##* }"
+  if [ "$major" -lt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -lt 1 ]; }; then
+    out="$(cd "$REPO_ROOT" && /bin/bash scripts/check.sh 2>&1)" || rc=$?
+    local syntax=0
+    case "$out" in
+    *"syntax error"* | *"unexpected"* | *"Syntax error"*) syntax=1 ;;
+    esac
+    if [ "$rc" -eq 1 ] && [ "$syntax" -eq 0 ] && printf '%s\n' "$out" | grep -q '5\.1'; then
+      assert_pass "scripts/check.sh exits 1 under /bin/bash < 5.1 with remediation and no syntax error"
+    else
+      assert_fail "scripts/check.sh under /bin/bash < 5.1" "rc=$rc syntax=$syntax output=[$out]"
+    fi
   else
-    assert_fail "scripts/check.sh under bash 3.2" "rc=$rc syntax=$syntax output=[$out]"
+    out="$(cd "$REPO_ROOT" && /bin/bash scripts/check.sh --list-steps 2>&1)" || rc=$?
+    if [ "$rc" -eq 0 ] && [ -n "$out" ] && ! printf '%s\n' "$out" | grep -q 'requires bash >='; then
+      assert_pass "scripts/check.sh --list-steps succeeds under /bin/bash >= 5.1 with no guard-remediation text"
+    else
+      assert_fail "scripts/check.sh --list-steps under /bin/bash >= 5.1" "rc=$rc output=[$out]"
+    fi
   fi
 }
 
@@ -182,16 +196,65 @@ _t_no_duplicated_inline_guards() {
   fi
 }
 
+# Every bash_guard_require <major> <minor> declaration in scripts/**/*.sh and
+# src/scripts/**/*.sh must declare at least 5 1, except the bootstrap-path set
+# (scripts/bootstrap.sh, src/scripts/packages/install-pwsh-module.sh) which must
+# declare 3 2.
+_t_bash_guard_floor_policy() {
+  local match file lnum text rel major minor ok=1
+  local violations=""
+  while IFS= read -r match; do
+    [ -n "$match" ] || continue
+    file="${match%%:*}"
+    lnum="${match#*:}"
+    lnum="${lnum%%:*}"
+    text="${match#*:*:}"
+    rel="${file#"$REPO_ROOT"/}"
+    # Only numeric floor declarations/calls are subject to the policy.
+    # Definition lines and argument-forwarding calls are not declarations.
+    if [[ $text =~ bash_guard_require[[:space:]]+([0-9]+)[[:space:]]+([0-9]+) ]]; then
+      major="${BASH_REMATCH[1]}"
+      minor="${BASH_REMATCH[2]}"
+    else
+      continue
+    fi
+    case "$rel" in
+    scripts/bootstrap.sh | src/scripts/packages/install-pwsh-module.sh)
+      if [ "$major" -ne 3 ] || [ "$minor" -ne 2 ]; then
+        violations="${violations}${rel}:${lnum}: bootstrap-path exception must declare 3 2 (got ${major} ${minor})"$'\n'
+        ok=0
+      fi
+      ;;
+    *)
+      if [ "$major" -lt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -lt 1 ]; }; then
+        violations="${violations}${rel}:${lnum}: must declare at least 5 1 (got ${major} ${minor})"$'\n'
+        ok=0
+      fi
+      ;;
+    esac
+  done < <(
+    find "$REPO_ROOT/scripts" "$REPO_ROOT/src/scripts" -type f -name '*.sh' -print0 |
+      xargs -0 grep -nH 'bash_guard_require' 2>/dev/null |
+      LC_ALL=C sort
+  )
+  if [ "$ok" -eq 1 ]; then
+    assert_pass "bash guard floors: bootstrap-path scripts (scripts/bootstrap.sh, src/scripts/packages/install-pwsh-module.sh) declare 3 2; all others >= 5.1"
+  else
+    assert_fail "bash guard floor policy" "$(printf '%s' "$violations")"
+  fi
+}
+
 _t_guard_lib_exists
 _t_guard_parses_under_current_bash
 _t_guard_parses_under_bash32
 _t_require_fails_with_message
 _t_require_passes_when_met
 _t_require_names_actual_script_outside_scripts
-_t_check_sh_guarded_under_bash32
+_t_check_sh_under_bin_bash
 _t_bootstrap_help_under_bash32
 _t_bootstrap_no_modern_bash_constructs
-_t_no_duplicated_inline_guards nargs
+_t_no_duplicated_inline_guards
+_t_bash_guard_floor_policy
 
 # F1 sweep: every directly invocable POSIX bash script in scripts/*.sh and
 # src/scripts/**/*.sh must have a bash guard (bash_guard_require). Bootstrap is
