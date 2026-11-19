@@ -198,10 +198,26 @@ test_body_is_capped() {
 test_missing_hermes_is_non_fatal() {
   write_config '{"harness-notify":{"channels":["telegram"]}}'
   reset_log
+  local compatible_bash=""
   local rc=0
+  # Resolve a bash >= 5.1 from the full test environment before restricting PATH,
+  # so the hook exercises the missing-hermes path rather than the bash guard.
+  # shellcheck disable=SC2016 # reason: BASH_VERSINFO must expand inside the invoked bash, not the outer shell
+  if [ -n "${BASH-}" ] && [ -x "${BASH}" ] &&
+    "${BASH}" -c 'exit $(( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) ? 0 : 1 ))' 2>/dev/null; then
+    compatible_bash="$BASH"
+  else
+    compatible_bash="$(command -v bash 2>/dev/null || true)"
+  fi
+  # shellcheck disable=SC2016 # reason: BASH_VERSINFO must expand inside the invoked bash, not the outer shell
+  if [ -z "$compatible_bash" ] || [ ! -x "$compatible_bash" ] ||
+    ! "$compatible_bash" -c 'exit $(( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) ? 0 : 1 ))' 2>/dev/null; then
+    assert_fail "missing-hermes" "no compatible bash (>= 5.1) available in the test environment"
+    return
+  fi
   # PATH deliberately excludes the stub directory.
   printf '' | HOME="$TMPDIR_ROOT/home" PATH="/usr/bin:/bin" \
-    bash "$NOTIFY" pi "done" "no hermes" 2>/dev/null || rc=$?
+    "$compatible_bash" "$NOTIFY" pi "done" "no hermes" 2>/dev/null || rc=$?
   if [ "$rc" -eq 0 ] && [ ! -s "$HARNESS_NOTIFY_LOG" ]; then
     assert_pass "missing hermes exits 0 (hooks must never fail the harness)"
   else
