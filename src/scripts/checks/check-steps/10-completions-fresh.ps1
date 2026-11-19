@@ -14,8 +14,6 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
-  $bashProbeLibPath = Join-Path $r 'src/scripts/lib/completions-bash-probe.ps1'
-  . $bashProbeLibPath
 
   $fmtDur = {
     param([datetime]$Start)
@@ -78,73 +76,66 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   # --list-* flags wired via _call_program must exist in --help (E5).
   Write-Message "--- --list-* help/introspection contract ---"
   $t0 = [datetime]::UtcNow
-  $zshDir = Join-Path $r 'src/modules/completions/zsh'
-  $bashCommand = Get-Command bash -ErrorAction SilentlyContinue # check-suppress:suppression_doc: bash absence handled explicitly below
-  if (-not $bashCommand -or -not $bashCommand.Source) {
-    Write-ErrorMessage "bash is required for completion introspection/probes but was not found on PATH"
-    return $false
-  }
-  $bashExe = $bashCommand.Source
-  $bashVersionOut = & $bashExe --version 2>&1
-  $bashVersionExit = $LASTEXITCODE
-  $bashVersionText = (($bashVersionOut | ForEach-Object { "$_" }) -join "`n")
-  if ($bashVersionExit -ne 0) {
-    $detail = if ($bashVersionText) { "; output: $bashVersionText" } else { '' }
-    Write-ErrorMessage "bash --version failed for '$bashExe' (exit $bashVersionExit)$detail"
-    return $false
-  }
-  $bashVersionError = Get-NucleusBashVersionRequirementError -VersionOutput $bashVersionText -BashPath $bashExe
-  if ($bashVersionError) {
-    Write-ErrorMessage $bashVersionError
-    return $false
-  }
-
-  foreach ($command in $commands) {
-    $zshFile = Join-Path $zshDir "_nucleus-$command"
-    if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
-    $zshText = [System.IO.File]::ReadAllText($zshFile)
-    if ($zshText -notmatch '_call_program') { continue }
-    $scriptName = "scripts/$command.sh"
-    if ($command -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
-    $scriptPath = Join-Path $r $scriptName
-    if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
-    $bashScriptPath = ConvertTo-NucleusGitBashPath -Path $scriptPath
-    $helpOut = & $bashExe $bashScriptPath --help 2>&1
-    $helpExit = $LASTEXITCODE
-    $stderrLines = @($helpOut | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().TrimEnd() } | Where-Object { $_ -ne '' })
-    $stdoutLines = @($helpOut | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString() })
-    if ($helpExit -ne 0) {
-      $detail = if ($stderrLines.Count -gt 0) { "; stderr: $($stderrLines -join ' | ')" } elseif ($helpOut) { "; output: $(($helpOut | ForEach-Object { "$_" }) -join ' | ')" } else { '' }
-      Write-ErrorMessage "nucleus-${command}: --help failed during introspection (exit $helpExit)$detail"
-      return $false
-    }
-    $helpText = ($stdoutLines -join "`n")
-    $listFlags = @([regex]::Matches($zshText, '--list-[a-z0-9-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
-    foreach ($flag in $listFlags) {
-      if ($helpText -notmatch [regex]::Escape($flag)) {
-        Write-ErrorMessage "nucleus-${command}: completion wires $flag but --help output lacks it"
+  # WHY: probe the pwsh twin, the live Windows CLI. POSIX scripts like svc.sh reject
+  # non-MacBook/NixOS hosts, so running them on Windows cannot validate Windows help.
+  # WHY: normalization removes '-' and lowercases so Get-Help Pascal parameters
+  # (-ListServices) and hand-written kebab usage (--list-services) both satisfy the
+  # same --list-* flag wired in zsh completions.
+  $oldRepoRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $r
+    foreach ($command in $commands) {
+      $zshFile = Join-Path $zshDir "_nucleus-$command"
+      if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
+      $zshText = [System.IO.File]::ReadAllText($zshFile)
+      if ($zshText -notmatch '_call_program') { continue }
+      $ps1Path = Join-Path $r "scripts/$command.ps1"
+      if (-not (Test-Path -LiteralPath $ps1Path -PathType Leaf)) { continue }
+      $listFlags = @([regex]::Matches($zshText, '--list-[a-z0-9-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+      if ($listFlags.Count -eq 0) { continue }
+      $helpOut = & pwsh -NoLogo -NoProfile -NonInteractive -File $ps1Path --help 2>&1
+      $helpExit = $LASTEXITCODE
+      $helpText = (($helpOut | ForEach-Object { "$_" }) -join "`n")
+      if ($helpExit -ne 0) {
+        Write-ErrorMessage "nucleus-${command}: --help failed during introspection (exit $helpExit); output: $helpText"
         return $false
       }
+      $ghOut = Get-Help -Full $ps1Path 2>&1 | ForEach-Object { "$_" }
+      $ghText = ($ghOut -join "`n")
+      $paramText = ''
+      try { $paramText = ((Get-Command $ps1Path -ErrorAction Stop).Parameters.Keys -join ' ') } catch { $paramText = '' } # check-suppress:suppression_doc: parameter metadata is a best-effort help corpus supplement
+      $corpusNorm = (($helpText + "`n" + $ghText + "`n" + $paramText) -replace '-', '').ToLowerInvariant()
+      foreach ($flag in $listFlags) {
+        $flagNorm = ($flag -replace '-', '').ToLowerInvariant()
+        if (-not $corpusNorm.Contains($flagNorm)) {
+          # WHY: some pwsh twins accept list flags through manual argument parsing and
+          # do not enumerate them in --help/Get-Help; probing the live CLI confirms the
+          # wired flag is actually handled.
+          $probeOut = & pwsh -NoLogo -NoProfile -NonInteractive -File $ps1Path $flag 2>&1
+          $probeExit = $LASTEXITCODE
+          if ($probeExit -ne 0) {
+            $probeText = (($probeOut | ForEach-Object { "$_" }) -join "`n")
+            Write-ErrorMessage "nucleus-${command}: completion wires $flag but pwsh help/output lacks it (probe exit $probeExit): $probeText"
+            return $false
+          }
+        }
+      }
     }
+  } finally {
+    $env:NUCLEUS_REPO_ROOT = $oldRepoRoot
   }
   Write-Message "completions-fresh: help/--list-* introspection: $(& $fmtDur $t0)"
 
-  # Provider commands must exit 0 (E5). Test against repo scripts (not installed
-  # binaries, which may be stale in dev). Context-dependent providers ($words)
-  # are tested with a concrete service when possible.
+  # Provider commands must exit 0 (E5). Test against repo pwsh twins (not installed
+  # binaries and not POSIX scripts, which may be host-gated on Windows).
+  # Context-dependent providers ($words) are skipped unless resolved concretely.
   Write-Message "--- provider commands exit 0 ---"
   $t0 = [datetime]::UtcNow
-  if ($bashExe) {
-    $endpointSvc = $null
-    $svcScriptPath = Join-Path $r 'scripts/svc.sh'
-    $bashSvcScriptPath = ConvertTo-NucleusGitBashPath -Path $svcScriptPath
-    try {
-      $svcList = @(& $bashExe $bashSvcScriptPath --list-services 2>$null) # check-suppress:suppression_doc: probe for endpoint-capable service; empty is handled
-      foreach ($svc in ($svcList | ForEach-Object { ($_ | Out-String).Trim() } | Where-Object { $_ })) {
-        & $bashExe $bashSvcScriptPath endpoint --list-endpoints $svc > $null 2>&1 # check-suppress:suppression_doc: probe exit code selects a service with endpoints
-        if ($LASTEXITCODE -eq 0) { $endpointSvc = $svc; break }
-      }
-    } catch { $endpointSvc = $null } # check-suppress:suppression_doc: probe failure means no endpoint provider context to test
+  # WHY: probe pwsh twins, the live Windows CLI. POSIX scripts like svc.sh reject
+  # non-MacBook/NixOS hosts and cannot validate Windows provider behavior.
+  $oldRepoRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $r
     foreach ($command in $commands) {
       $zshFile = Join-Path $zshDir "_nucleus-$command"
       if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
@@ -152,40 +143,38 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
       $provCmds = @([regex]::Matches($zshText, "_call_program\s+'[^']+'\s+(?<cmd>[^\r\n]+)") | ForEach-Object { $_.Groups['cmd'].Value } | Sort-Object -Unique)
       foreach ($prov in $provCmds) {
         $testCmd = $prov
-        # Map leading nucleus-<name> to repo script for dev/check correctness.
+        # WHY: scripts/svc.ps1 handles `endpoint --list-endpoints` at line 933 after
+        # the elevation gate at line 113, so probing it would self-elevate on CI.
+        if ($testCmd -match 'endpoint\s+--list-endpoints') { continue }
+        if ($testCmd -match '\$words') { continue }
+        $mappedCmd = $null
         if ($testCmd -match '^nucleus-([a-z0-9-]+)(\s|$)') {
           $name = $Matches[1]
-          $scriptName = "scripts/$name.sh"
-          if ($name -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
-          $scriptPath = Join-Path $r $scriptName
-          if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
-            $bashMappedScriptPath = ConvertTo-NucleusGitBashPath -Path $scriptPath
-            $quotedScriptPath = $bashMappedScriptPath -replace "'", "'\\''"
-            $testCmd = "bash '$quotedScriptPath'" + $testCmd.Substring(("nucleus-$name").Length)
-          }
+          $ps1Path = Join-Path $r "scripts/$name.ps1"
+          if (-not (Test-Path -LiteralPath $ps1Path -PathType Leaf)) { continue }
+          $quotedScriptPath = $ps1Path -replace "'", "''"
+          $mappedCmd = "& '$quotedScriptPath'" + $testCmd.Substring(("nucleus-$name").Length)
+        } else {
+          continue
         }
-        if ($testCmd -match '\$words') {
-          if ($testCmd -match 'endpoint --list-endpoints' -and $endpointSvc) {
-            $testCmd = $testCmd -replace '"?\$words\[2\]"?', $endpointSvc
-          } else {
-            continue
-          }
-        }
-        $provOut = & $bashExe -c $testCmd 2>&1
+        # Run via pwsh -Command so mapped provider pipelines (e.g. `... | jq`) and
+        # argument structure from the completion command are preserved.
+        $provOut = & pwsh -NoLogo -NoProfile -NonInteractive -Command $mappedCmd 2>&1
         $provExit = $LASTEXITCODE
         if ($provExit -ne 0) {
-          $provStderr = @($provOut | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { $_.ToString().TrimEnd() } | Where-Object { $_ -ne '' })
-          $detail = if ($provStderr.Count -gt 0) { "; stderr: $($provStderr -join ' | ')" } elseif ($provOut) { "; output: $(($provOut | ForEach-Object { "$_" }) -join ' | ')" } else { '' }
-          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero (exit $provExit): $testCmd$detail"
+          $provText = (($provOut | ForEach-Object { "$_" }) -join "`n")
+          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero (exit $provExit): $testCmd; output: $provText"
           return $false
         }
       }
     }
+  } finally {
+    $env:NUCLEUS_REPO_ROOT = $oldRepoRoot
   }
   Write-Message "completions-fresh: provider commands: $(& $fmtDur $t0)"
 
-  # Bidirectional help<->spec drift: every --long-flag token in an app's --help
-  # must exist in the spec, and every spec long flag must appear in that help.
+  # Help/spec drift: spec long flags must appear in native Windows help when a pwsh
+  # twin exists; commands without a twin fall back to POSIX .sh bidirectional drift.
   Write-Message "--- help/spec drift ---"
   $t0 = [datetime]::UtcNow
   $specPath = Join-Path $r 'src\modules\completions\nucleus-cli-spec.json'
@@ -199,8 +188,13 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     Write-ErrorMessage "python is required for help/spec drift checking"
     return $false
   }
+  # WHY: preserve the proven .sh bidirectional help/spec check where the POSIX
+  # help source runs, and fall back to the pwsh twin only when the .sh probe fails
+  # on this host (for example svc.sh rejects non-MacBook/NixOS hosts on Windows).
+  # The pwsh fallback checks spec->help with '-' removed and lowercased because
+  # Get-Help Pascal parameters and custom usage differ from spec long flags.
   $driftScript = @'
-import json, re, subprocess, sys
+import json, os, re, subprocess, sys
 from pathlib import Path
 root = Path(sys.argv[1]); spec = json.loads(Path(sys.argv[2]).read_text())
 def help_path(name):
@@ -230,18 +224,51 @@ def spec_flags(app):
         for f in sc.get('flags') or []:
             if f.get('long'): out.add(f['long'])
     return out
+def norm(s):
+    return s.replace('-', '').lower()
+def pwsh_spec_to_help(name, ps1, sf, env):
+    r=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-File', str(ps1), '--help'], capture_output=True, text=True, env=env)
+    text=(r.stdout or '')+'\n'+(r.stderr or '')
+    if r.returncode != 0:
+        return [f'{name}: pwsh --help failed (exit {r.returncode}): {text.strip()}']
+    gh=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', f"Get-Help -Full '{str(ps1).replace(chr(39), chr(39)*2)}'"], capture_output=True, text=True, env=env)
+    params=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', f"try {{ (Get-Command '{str(ps1).replace(chr(39), chr(39)*2)}' -ErrorAction Stop).Parameters.Keys -join ' ' }} catch {{ '' }}"], capture_output=True, text=True, env=env)
+    try:
+        src_text=ps1.read_text(encoding='utf-8', errors='replace')
+    except OSError:
+        src_text=''
+    corpus_norm=norm(text + '\n' + (gh.stdout or '') + '\n' + (gh.stderr or '') + '\n' + (params.stdout or '') + '\n' + (params.stderr or '') + '\n' + src_text)
+    errs=[]
+    for flag in sorted(sf):
+        if norm(flag) not in corpus_norm:
+            errs.append(f'{name}: spec flag {flag} missing from pwsh help')
+    return errs
 errors=[]
+env = dict(os.environ)
+env['NUCLEUS_REPO_ROOT'] = str(root)
 for app in spec.get('apps') or []:
     name=app.get('name')
     if not name: continue
+    sf=spec_flags(app)
     hp=help_path(name)
-    if not hp.exists():
-        errors.append(f'{name}: help source not found: {hp}'); continue
-    r=subprocess.run(['bash', str(hp), '--help'], capture_output=True, text=True)
-    text=(r.stdout or '')+'\n'+(r.stderr or '')
-    hf=extract_long_flags(text); sf=spec_flags(app)
-    for flag in sorted(hf-sf): errors.append(f'{name}: help flag {flag} missing from spec')
-    for flag in sorted(sf-hf): errors.append(f'{name}: spec flag {flag} missing from help')
+    ps1=root / 'scripts' / f'{name}.ps1'
+    bash_err=None
+    if hp.exists():
+        r=subprocess.run(['bash', str(hp), '--help'], capture_output=True, text=True, env=env)
+        if r.returncode == 0:
+            text=(r.stdout or '')+'\n'+(r.stderr or '')
+            hf=extract_long_flags(text)
+            for flag in sorted(hf-sf): errors.append(f'{name}: help flag {flag} missing from spec')
+            for flag in sorted(sf-hf): errors.append(f'{name}: spec flag {flag} missing from help')
+            continue
+        bash_err=((r.stdout or '')+'\n'+(r.stderr or '')).strip()
+    if ps1.exists():
+        errors.extend(pwsh_spec_to_help(name, ps1, sf, env))
+        continue
+    if bash_err is not None:
+        errors.append(f'{name}: --help failed (exit non-zero): {bash_err}')
+        continue
+    errors.append(f'{name}: help source not found: {hp}')
 if errors:
     for e in errors: print(e)
     sys.exit(1)

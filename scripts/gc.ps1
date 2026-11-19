@@ -97,6 +97,7 @@ param(
   [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
+  [switch]$ListLogs,
   [Alias("h")]
   [switch]$Help
 )
@@ -112,6 +113,18 @@ Import-Module $modulePath -Force -DisableNameChecking
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
+}
+
+if ($ListLogs) {
+  # WHY: parity with gc.sh --list-logs; the live Windows CLI must expose the
+  # same wired flag so completion introspection and help/spec drift stay green.
+  $logsBin = if ($env:NUCLEUS_LOGS_BIN) {
+    $env:NUCLEUS_LOGS_BIN
+  } else {
+    Join-Path -Path $PSScriptRoot -ChildPath 'logs.ps1'
+  }
+  & (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin -ListLogs
+  exit $LASTEXITCODE
 }
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
