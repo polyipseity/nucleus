@@ -71,6 +71,7 @@ try {
     Set-StrictMode -Version Latest
     $RepoRoot = $repo
     $FrameworkDir = $fwDir
+    $null = $RepoRoot  # check-suppress:suppression_doc: cross-scope read by dot-sourced check-lib.ps1; PSSA cannot track it
     $null = $FrameworkDir
     . (Join-Path $repo 'src/scripts/checks/check-lib.ps1')
     $recreated = [scriptblock]::Create($action)

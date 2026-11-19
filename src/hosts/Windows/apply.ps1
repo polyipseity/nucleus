@@ -792,7 +792,8 @@ $script:ApplyHistoryRecorded = $true
       Add-ApplyHistoryRecord -Result failure -Phase $script:ApplyHistoryPhase -RepoRoot $ahRepo -HostName $script:ApplyHistoryHost -User $ahUser
       $script:ApplyHistoryRecorded = $true
     } catch {
-      # best-effort: do not mask the original apply failure
+      # WHY: failure-history recording is best-effort; the original apply failure must not be masked.
+      Write-Verbose "apply-history: failed to record apply failure: $($_.Exception.Message)" -ErrorAction SilentlyContinue # check-suppress:suppression_doc: best-effort failure-record logging must not mask the original apply failure
     }
   }
   throw

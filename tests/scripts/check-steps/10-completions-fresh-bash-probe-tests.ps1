@@ -62,29 +62,29 @@ foreach ($name in @(
 Assert-Pass 'bash probe helpers exist after dot-sourcing'
 
 # Path conversion: Windows drive path -> git-bash path (/d/... form), backslashes normalized.
-Assert-Equal 'converts Windows drive path to git-bash path' `
-  (ConvertTo-NucleusGitBashPath -Path 'D:\a\nucleus\nucleus\scripts\svc.sh') `
-  '/d/a/nucleus/nucleus/scripts/svc.sh'
-Assert-Equal 'converts lowercase drive letter path' `
-  (ConvertTo-NucleusGitBashPath -Path 'c:\repo\scripts\svc.sh') `
-  '/c/repo/scripts/svc.sh'
-Assert-Equal 'normalizes backslashes without drive letter' `
-  (ConvertTo-NucleusGitBashPath -Path 'scripts\svc.sh') `
-  'scripts/svc.sh'
-Assert-Equal 'leaves POSIX path unchanged aside from separator normalization' `
-  (ConvertTo-NucleusGitBashPath -Path '/usr/bin/bash') `
-  '/usr/bin/bash'
+Assert-Equal -Name 'converts Windows drive path to git-bash path' `
+  -Actual (ConvertTo-NucleusGitBashPath -Path 'D:\a\nucleus\nucleus\scripts\svc.sh') `
+  -Expected '/d/a/nucleus/nucleus/scripts/svc.sh'
+Assert-Equal -Name 'converts lowercase drive letter path' `
+  -Actual (ConvertTo-NucleusGitBashPath -Path 'c:\repo\scripts\svc.sh') `
+  -Expected '/c/repo/scripts/svc.sh'
+Assert-Equal -Name 'normalizes backslashes without drive letter' `
+  -Actual (ConvertTo-NucleusGitBashPath -Path 'scripts\svc.sh') `
+  -Expected 'scripts/svc.sh'
+Assert-Equal -Name 'leaves POSIX path unchanged aside from separator normalization' `
+  -Actual (ConvertTo-NucleusGitBashPath -Path '/usr/bin/bash') `
+  -Expected '/usr/bin/bash'
 
 # Version parsing.
-Assert-Equal 'parses GNU bash version string' `
-  (Get-NucleusBashVersionString -VersionOutput 'GNU bash, version 4.4.23(1)-release (x86_64-pc-msys)') `
-  '4.4.23'
-Assert-Equal 'parses simple version string' `
-  (Get-NucleusBashVersionString -VersionOutput 'GNU bash, version 5.2.15(1)-release (aarch64-apple-darwin23.0.0)') `
-  '5.2.15'
-Assert-Equal 'returns null for unparseable version output' `
-  (Get-NucleusBashVersionString -VersionOutput 'not bash') `
-  $null
+Assert-Equal -Name 'parses GNU bash version string' `
+  -Actual (Get-NucleusBashVersionString -VersionOutput 'GNU bash, version 4.4.23(1)-release (x86_64-pc-msys)') `
+  -Expected '4.4.23'
+Assert-Equal -Name 'parses simple version string' `
+  -Actual (Get-NucleusBashVersionString -VersionOutput 'GNU bash, version 5.2.15(1)-release (aarch64-apple-darwin23.0.0)') `
+  -Expected '5.2.15'
+Assert-Equal -Name 'returns null for unparseable version output' `
+  -Actual (Get-NucleusBashVersionString -VersionOutput 'not bash') `
+  -Expected $null
 
 # Version floor (>= 5.1).
 if (Test-NucleusBashVersionAtLeast -VersionOutput 'GNU bash, version 5.2.15(1)-release') { Assert-Pass 'accepts bash 5.2.15' } else { Assert-Fail 'accepts bash 5.2.15' 'expected >= 5.1' }
