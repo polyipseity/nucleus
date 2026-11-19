@@ -101,6 +101,7 @@ function Invoke-CloudStatus {
     .\scripts\cloud.ps1 status
   #>
   [CmdletBinding()]
+  [OutputType([string])]
   param(
     [switch]$Json
   )
@@ -192,6 +193,7 @@ function Invoke-CloudRestart {
     .\scripts\cloud.ps1 restart
   #>
   [CmdletBinding()]
+  [OutputType([string])]
   param()
 
   $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
@@ -601,7 +603,7 @@ function Invoke-CloudSetup {
         $gdAckAlreadySet = $true
       }
     } catch {
-      # config dump failed; proceed with update anyway
+      # WHY: rclone config dump is a best-effort probe; proceed with update when provider state cannot be read.
       Write-Debug "cloud-setup: rclone config dump failed: $_"
     }
     if (-not $gdAckAlreadySet) {

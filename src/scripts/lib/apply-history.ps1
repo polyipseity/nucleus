@@ -12,6 +12,7 @@ function Get-ApplyHistoryConfigFile {
 
 function Get-ApplyHistoryLimit {
   [CmdletBinding()]
+  [OutputType([int])]
   param()
   $configFile = Get-ApplyHistoryConfigFile
   if (-not (Test-Path -LiteralPath $configFile)) {
@@ -24,7 +25,8 @@ function Get-ApplyHistoryLimit {
       return $val
     }
   } catch {
-    # fall through
+    # WHY: unreadable or malformed apply config must not block history operations; use the default limit.
+    Write-Verbose "apply-history: ignoring config read/parse failure for applyHistoryLimit: $($_.Exception.Message)"
   }
   return 256
 }
@@ -62,6 +64,7 @@ function Get-ApplyHistoryNowRfc3339Utc {
 
 function Get-ApplyHistoryGitFieldMap {
   [CmdletBinding()]
+  [OutputType([hashtable])]
   param(
     [string]$RepoRoot
   )
@@ -85,6 +88,8 @@ function Get-ApplyHistoryGitFieldMap {
     $inside = & git -C $RepoRoot rev-parse --is-inside-work-tree 2>$null # check-suppress:suppression_doc: probe whether repoRoot is a git work tree
     if ($inside -ne 'true') { return $fields }
   } catch {
+    # WHY: git probe failures mean repository metadata is unavailable; return null git fields.
+    Write-Verbose "apply-history: git work-tree probe failed for '$RepoRoot': $($_.Exception.Message)"
     return $fields
   }
   try { $fields.commitHash = (& git -C $RepoRoot rev-parse --short HEAD 2>$null) } catch { $fields.commitHash = $null } # check-suppress:suppression_doc: best-effort git field derivation
@@ -195,7 +200,8 @@ function Add-ApplyHistoryRecord {
         $origMode = [System.IO.File]::GetUnixFileMode($histPath)
       }
     } catch {
-      # Best-effort preservation.
+      # WHY: preserving prior ACL/mode is best-effort; history write must still proceed.
+      Write-Verbose "apply-history: could not read existing history file metadata: $($_.Exception.Message)"
     }
   }
 
@@ -211,7 +217,8 @@ function Add-ApplyHistoryRecord {
           [System.IO.File]::SetUnixFileMode($tmp, $origMode)
         }
       } catch {
-        # Best-effort preservation.
+        # WHY: preserving prior ACL/mode is best-effort; history content was already written.
+        Write-Verbose "apply-history: could not restore history file metadata: $($_.Exception.Message)"
       }
     }
     Move-Item -LiteralPath $tmp -Destination $histPath -Force
@@ -225,6 +232,7 @@ function Add-ApplyHistoryRecord {
 
 function Get-ApplyHistoryEntriesJson {
   [CmdletBinding()]
+  [OutputType([string])]
   param([int]$Count = 0)
   $histPath = Get-ApplyHistoryPath
   if (-not (Test-Path -LiteralPath $histPath)) {
