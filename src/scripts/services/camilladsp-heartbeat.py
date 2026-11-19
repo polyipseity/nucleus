@@ -46,7 +46,18 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
+# WHY: --help must not require runtime deps (PyYAML), so yaml is imported lazily.
+_yaml_module = None
+
+
+def _yaml():
+    global _yaml_module
+    if _yaml_module is None:
+        import yaml as yaml_module
+
+        _yaml_module = yaml_module
+    return _yaml_module
+
 
 BASE_SLEEP = 5
 MAX_SLEEP = 300
@@ -499,7 +510,7 @@ def clear_last_device() -> None:
 
 
 def _load_config(config_file: Path) -> dict:
-    return yaml.safe_load(config_file.read_text()) or {}
+    return _yaml().safe_load(config_file.read_text()) or {}
 
 
 def _devices(config: dict) -> dict:
@@ -516,7 +527,7 @@ def _device_of(config: dict, direction: str) -> str:
 
 
 def _dump_config(config: dict) -> str:
-    return yaml.safe_dump(config, sort_keys=False, allow_unicode=True)
+    return _yaml().safe_dump(config, sort_keys=False, allow_unicode=True)
 
 
 def _with_device(config: dict, device: str) -> str:
@@ -571,8 +582,8 @@ def target_playback_device(config_file: Path) -> str:
     if not config_file.is_file():
         return ""
     try:
-        config = yaml.safe_load(resolve_playback_device(config_file)) or {}
-    except yaml.YAMLError as error:
+        config = _yaml().safe_load(resolve_playback_device(config_file)) or {}
+    except _yaml().YAMLError as error:
         _warn(f"resolved config is not valid YAML: {error}")
         return ""
     return _device_of(config, "playback")
@@ -589,7 +600,7 @@ def probe(config_file: Path) -> int:
     if config_file.is_file():
         try:
             capture = _device_of(_load_config(config_file), "capture")
-        except (OSError, yaml.YAMLError) as error:
+        except (OSError, _yaml().YAMLError) as error:
             _warn(f"cannot read {config_file}: {error}")
             return 1
     default = probe_default_output() or ""
@@ -712,8 +723,8 @@ def _live_device(client: CamillaClient) -> str:
     if not isinstance(text, str):
         return ""
     try:
-        config = yaml.safe_load(text) or {}
-    except yaml.YAMLError:
+        config = _yaml().safe_load(text) or {}
+    except _yaml().YAMLError:
         return ""
     return _device_of(config, "playback")
 
@@ -742,8 +753,8 @@ def push_config(client: CamillaClient, config_file: Path, target_device: str) ->
 
     pushed = ""
     try:
-        pushed = _device_of(yaml.safe_load(text) or {}, "playback")
-    except yaml.YAMLError as error:
+        pushed = _device_of(_yaml().safe_load(text) or {}, "playback")
+    except _yaml().YAMLError as error:
         _warn(f"pushed config is not valid YAML: {error}")
     save_last_device(pushed)
     record_push(config_fingerprint(config_file, pushed))

@@ -790,6 +790,9 @@
               pkgs.pinact
               pkgs.powershell
               pkgs.check-jsonschema
+              # WHY: step 10 requires python3 and runs camilladsp-heartbeat.sh --help,
+              # whose Python payload imports PyYAML.
+              (pkgs.python3.withPackages (p: [ p.pyyaml ]))
               pkgs.shfmt
               pkgs.taplo
               treefmtWrapper
