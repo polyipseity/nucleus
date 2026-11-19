@@ -47,7 +47,7 @@ _t_guard_parses_under_bash32() {
 }
 
 # A requirement above the running bash must fail, name the required version, the
-# actual bash, and a copy-pastable remediation.
+# actual bash, and a copy-pastable provisioned-bash remediation.
 _t_require_fails_with_message() {
   local out="" rc=0
   out="$(bash -c '. "$1"; bash_guard_require 99 0 check' _ "$GUARD_LIB" 2>&1)" || rc=$?
@@ -66,11 +66,11 @@ _t_require_fails_with_message() {
   *) ok=0 ;;
   esac
   case "$out" in
-  *"nix run ./src#check"* | *"/run/current-system/sw/bin/bash"* | *"nucleus-check"*) ;;
+  *'PATH="'*'/run/current-system/sw/bin/bash '*) ;;
   *) ok=0 ;;
   esac
   if [ "$ok" -eq 1 ]; then
-    assert_pass "bash_guard_require reports required version, actual bash, and remediation"
+    assert_pass "bash_guard_require reports required version, actual bash, and provisioned-bash remediation"
   else
     assert_fail "bash_guard_require failure message" "rc=$rc output=[$out]"
   fi
@@ -84,6 +84,31 @@ _t_require_passes_when_met() {
     assert_pass "bash_guard_require passes when the requirement is met"
   else
     assert_fail "bash_guard_require passes when requirement is met" "exit $rc"
+  fi
+}
+
+# A temp script outside scripts/ must be named by its actual path in remediation.
+_t_require_names_actual_script_outside_scripts() {
+  local tmp_dir tmp_script out="" rc=0
+  tmp_dir="$(mktemp -d)"
+  tmp_script="$tmp_dir/outside-scripts-guarded.sh"
+  cat >"$tmp_script" <<SCRIPT
+#!/usr/bin/env bash
+# shellcheck source=/dev/null
+. "$GUARD_LIB"
+bash_guard_require 9 9 custom-outside
+SCRIPT
+  chmod +x "$tmp_script"
+  out="$(bash "$tmp_script" 2>&1)" || rc=$?
+  rm -rf "$tmp_dir"
+  if [ "$rc" -eq 0 ]; then
+    assert_fail "bash_guard_require names the actual script outside scripts/" "expected non-zero exit"
+    return
+  fi
+  if printf '%s\n' "$out" | grep -qF "$tmp_script" && ! printf '%s\n' "$out" | grep -q './scripts/'; then
+    assert_pass "bash_guard_require remediation names the actual script path outside scripts/"
+  else
+    assert_fail "bash_guard_require remediation names actual script path" "rc=$rc output=[$out]"
   fi
 }
 
@@ -162,10 +187,11 @@ _t_guard_parses_under_current_bash
 _t_guard_parses_under_bash32
 _t_require_fails_with_message
 _t_require_passes_when_met
+_t_require_names_actual_script_outside_scripts
 _t_check_sh_guarded_under_bash32
 _t_bootstrap_help_under_bash32
 _t_bootstrap_no_modern_bash_constructs
-_t_no_duplicated_inline_guards
+_t_no_duplicated_inline_guards nargs
 
 # F1 sweep: every directly invocable POSIX bash script in scripts/*.sh and
 # src/scripts/**/*.sh must have a bash guard (bash_guard_require). Bootstrap is

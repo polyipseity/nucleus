@@ -11,12 +11,13 @@
 #   bash_guard_require 5 1 check
 
 bash_guard_require() {
-  local _bg_min_major _bg_min_minor _bg_name
+  local _bg_min_major _bg_min_minor _bg_name _bg_script
   local _bg_have_major _bg_have_minor _bg_have
 
   _bg_min_major="${1:-0}"
   _bg_min_minor="${2:-0}"
   _bg_name="${3:-script}"
+  _bg_script="${BASH_SOURCE[1]:-${0}}"
   _bg_have_major="${BASH_VERSINFO[0]:-0}"
   _bg_have_minor="${BASH_VERSINFO[1]:-0}"
   _bg_have="${BASH_VERSION:-unknown}"
@@ -30,9 +31,8 @@ bash_guard_require() {
 
   printf '%s\n' "error: ${_bg_name} requires bash >= ${_bg_min_major}.${_bg_min_minor}, but this shell is ${_bg_have}." >&2
   printf '%s\n' "hint: rerun with a compatible bash, for example:" >&2
-  printf '%s\n' "  nix run ./src#${_bg_name}" >&2
   # shellcheck disable=SC2016 # reason: show literal $USER/$PATH in copy-pastable remediation
-  printf '%s\n' "  PATH=\"/etc/profiles/per-user/\$USER/bin:/run/current-system/sw/bin:\$PATH\" /run/current-system/sw/bin/bash ./scripts/${_bg_name}.sh" >&2
+  printf '%s\n' "  PATH=\"/etc/profiles/per-user/\$USER/bin:/run/current-system/sw/bin:\$PATH\" /run/current-system/sw/bin/bash ${_bg_script}" >&2
   exit 1
 }
 
