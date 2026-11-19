@@ -350,9 +350,9 @@ describe("continue", () => {
 		});
 	});
 
-	test("returns busy message when agent is busy", async () => {
+	test("returns a space when busy and session has a sent message", async () => {
 		await expect(handleContinue("", { messages: [{ role: "user", content: "hello" }], isIdle: () => false }, { readQueuedPromptFile: () => null })).resolves.toEqual({
-			text: "Agent is busy.",
+			text: " ",
 		});
 	});
 });

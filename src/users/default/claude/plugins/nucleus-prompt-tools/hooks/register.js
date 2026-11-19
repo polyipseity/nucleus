@@ -14,9 +14,10 @@
  *   visible fallback when no clipboard command works.
  * - repeat returns the selected prompt as `{ text }` so command.run injects it
  *   as a new user turn.
- * - continue returns `{ text: " " }` to continue/retry the turn when a sent
- *   message exists and the runtime is idle; otherwise it returns a one-line
- *   message and does nothing else.
+ * - continue returns `{ text: " " }` when a sent message exists. /continue injects
+ *   a turn and relies on the harness to queue when busy; this is unverified on
+ *   this host (no Claude CLI). Returns a one-line message when no sent message
+ *   exists.
  * - empty state returns one line and does nothing else.
  */
 
@@ -453,18 +454,6 @@ export function getCommandArgs(event) {
   return "";
 }
 
-export function isRuntimeBusy($, deps = {}) {
-  if (typeof deps.isRuntimeBusy === "function") return deps.isRuntimeBusy($);
-  const ctx = isRecord($) ? $ : {};
-  if (typeof ctx.isIdle === "function") return !ctx.isIdle();
-  if (typeof ctx.session?.isIdle === "function") return !ctx.session.isIdle();
-  const status = ctx.status ?? ctx.session?.status ?? ctx.data?.session?.status;
-  if (typeof status === "string") {
-    return status === "running" || status === "busy" || status === "streaming";
-  }
-  return false;
-}
-
 export async function handleCopyUserPrompt(args, $, deps = {}) {
   const parsed = parsePromptSourceArg(args);
   if (isRecord(parsed) && typeof parsed.error === "string") {
@@ -501,13 +490,11 @@ export async function handleRepeatUserPrompt(args, $, deps = {}) {
   return { text: resolved.choice.text };
 }
 
+// /continue injects a turn and relies on the harness to queue when busy; unverified on this host (no Claude CLI).
 export async function handleContinue(_args, $, deps = {}) {
   const sent = readSentPromptFromContext($, deps);
   if (!sent) {
     return { text: NOTHING_TO_CONTINUE_MESSAGE };
-  }
-  if (isRuntimeBusy($, deps)) {
-    return { text: "Agent is busy." };
   }
   return { text: " " };
 }
