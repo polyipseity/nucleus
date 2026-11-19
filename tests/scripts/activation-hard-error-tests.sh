@@ -177,8 +177,49 @@ test_managed_symlink_verify() {
   rm -rf "$tmp"
 }
 
+test_activation_wrappers_invoke_repo_cli_via_bash() {
+  local mac_menu_bar="$REPO_ROOT/src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh"
+  local mac_autostart="$REPO_ROOT/src/hosts/MacBook/scripts/macos-configure-app-autostart.sh"
+  local nix_menu_bar="$REPO_ROOT/src/hosts/NixOS/scripts/nixos-configure-menu-bar.sh"
+  local nix_autostart="$REPO_ROOT/src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
+
+  # WHY: match the literal ${BASH} invocation token; single quotes prevent expansion.
+  # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+  if grep -Fq '"${BASH}" "$MENU_BAR_CLI" apply' "$mac_menu_bar"; then
+    assert_pass "macOS menu-bar wrapper invokes repo CLI via \${BASH}"
+  else
+    # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+    assert_fail "macOS menu-bar wrapper invokes repo CLI via \${BASH}" 'missing "${BASH}" "$MENU_BAR_CLI" apply'
+  fi
+
+  # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+  if grep -Fq '"${BASH}" "$AUTOSTART_CLI" apply' "$mac_autostart"; then
+    assert_pass "macOS autostart wrapper invokes repo CLI via \${BASH}"
+  else
+    # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+    assert_fail "macOS autostart wrapper invokes repo CLI via \${BASH}" 'missing "${BASH}" "$AUTOSTART_CLI" apply'
+  fi
+
+  # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+  if grep -Fq '"${BASH}" "$MENU_BAR_CLI" apply' "$nix_menu_bar"; then
+    assert_pass "NixOS menu-bar wrapper invokes repo CLI via \${BASH}"
+  else
+    # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+    assert_fail "NixOS menu-bar wrapper invokes repo CLI via \${BASH}" 'missing "${BASH}" "$MENU_BAR_CLI" apply'
+  fi
+
+  # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+  if grep -Fq '"${BASH}" "$AUTOSTART_CLI" apply' "$nix_autostart"; then
+    assert_pass "NixOS autostart wrapper invokes repo CLI via \${BASH}"
+  else
+    # shellcheck disable=SC2016 # check-suppress:suppression_doc: match literal ${BASH} token, not expansion
+    assert_fail "NixOS autostart wrapper invokes repo CLI via \${BASH}" 'missing "${BASH}" "$AUTOSTART_CLI" apply'
+  fi
+}
+
 test_menu_bar_activation_script_die
 test_menu_bar_unknown_app_nonzero
 test_autostart_xdg_desktop_die
 test_managed_symlink_verify
+test_activation_wrappers_invoke_repo_cli_via_bash
 finish_tests
