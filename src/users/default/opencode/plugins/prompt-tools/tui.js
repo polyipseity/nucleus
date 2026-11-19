@@ -687,13 +687,13 @@ export async function handleContinue(_args, context, deps = {}) {
     return;
   }
   const running = await isSessionRunning(context, deps);
-  if (running) {
-    printLine(context, "Agent is busy.");
-    return;
-  }
   const ok = await promptSession(context, " ", deps);
   if (!ok) {
     printLine(context, "Failed to continue.");
+    return;
+  }
+  if (running) {
+    printLine(context, "Queued /continue as a new turn.");
   }
 }
 

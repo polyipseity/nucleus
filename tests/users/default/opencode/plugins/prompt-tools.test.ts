@@ -482,14 +482,15 @@ describe("continue", () => {
     expect(printed).toEqual([NOTHING_TO_CONTINUE_MESSAGE]);
   });
 
-  test("warns when agent is busy", async () => {
+  test("queues continue as a new turn when session is running", async () => {
     const { context, promptCalls, printed } = makeContext({
       messages: [{ role: "user", content: "hello" }],
       running: true,
     });
     await handleContinue("", context);
-    expect(promptCalls).toEqual([]);
-    expect(printed).toEqual(["Agent is busy."]);
+    expect(promptCalls).toHaveLength(1);
+    expect(JSON.stringify(promptCalls[0])).toContain('" "');
+    expect(printed).toEqual(["Queued /continue as a new turn."]);
   });
 });
 
