@@ -593,7 +593,9 @@ rotate_logs_in_directory() {
   # *.log, so a second pass would nest that history as <base>.<N>.1.log and
   # truncate the archive. A live log whose own name carries a digit-led segment
   # before .log is skipped too, the trade-off the Windows rotator already makes.
-  find "$_rld_dir" -name '*.log' -type f ! -name '*.[0-9]*.log' | while IFS= read -r _rld_logfile; do
+  # WHY -H: the managed log root may itself be a symlink (deployed layout), so
+  # follow only the command-line operand to traverse into it.
+  find -H "$_rld_dir" -name '*.log' -type f ! -name '*.[0-9]*.log' | while IFS= read -r _rld_logfile; do
     rotate_log_file "$_rld_logfile" "$_rld_maxsize" "$_rld_maxfiles" "$_rld_compress"
   done
 }
@@ -615,7 +617,8 @@ expire_logs_in_directory() {
   _eld_days="$(parse_expiry_days "$_eld_expiry")"
   [ "$_eld_days" -gt 0 ] || return 0
 
-  find "$_eld_dir" -type f \
+  # WHY -H: the managed log root may itself be a symlink (deployed layout).
+  find -H "$_eld_dir" -type f \
     \( -name '*.[0-9]*.log' -o -name '*.log.gz' \) \
     -mtime +"${_eld_days}" -delete
 }

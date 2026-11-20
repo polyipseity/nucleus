@@ -405,6 +405,102 @@ test_show_filters_by_kind() {
   fi
 }
 
+# ---- rotate works through the deployed symlinked logs layout ----
+
+test_rotate_with_symlinked_nucleus_log_dir() {
+  local root physical logdir big size archived_id status=0
+  root="$(mktemp -d)"
+  physical="$(mktemp -d)"
+  ln -s "$physical" "$root/logs"
+  logdir="$root/logs"
+
+  big="$(printf 's%.0s' $(seq 3000))"
+  printf '{"id":"sym","summary":"%s"}\n' "$big" >"$logdir/deployed.log"
+
+  # Run from / so rotation cannot depend on the caller's working directory.
+  (cd / && NUCLEUS_LOG_DIR="$logdir" bash "$LOGS_SH" rotate --max-size 1024 --max-files 4 --compress true) || status=$?
+  if [ "$status" -eq 0 ]; then
+    assert_pass "rotate succeeds when NUCLEUS_LOG_DIR is a symlinked logs directory"
+  else
+    assert_fail "rotate-symlink-status" "rotate failed with status $status"
+  fi
+
+  if [ -f "$logdir/deployed.1.log.gz" ] && [ -f "$physical/deployed.1.log.gz" ]; then
+    assert_pass "rotate creates the archive through a symlinked logs directory"
+  else
+    assert_fail "rotate-symlink-archive" "archive missing at symlink path or physical path"
+  fi
+
+  if [ -f "$logdir/deployed.log" ]; then
+    assert_pass "rotate keeps the live log file present through a symlinked logs directory"
+  else
+    assert_fail "rotate-symlink-live-missing" "live log file was removed"
+  fi
+
+  size="$(wc -c <"$logdir/deployed.log" | tr -d ' ')"
+  if [ "$size" -eq 0 ]; then
+    assert_pass "rotate truncates the live log in place through a symlinked logs directory"
+  else
+    assert_fail "rotate-symlink-truncate" "live log still $size bytes"
+  fi
+
+  archived_id="$(gzip -dc "$logdir/deployed.1.log.gz" | jq -r '.id' 2>/dev/null || true)"
+  if [ "$archived_id" = "sym" ]; then
+    assert_pass "the rotated archive is readable through a symlinked logs directory"
+  else
+    assert_fail "rotate-symlink-readable" "archive content unreadable or unexpected: $archived_id"
+  fi
+
+  rm -rf "$root" "$physical"
+}
+
+test_rotate_with_physical_nucleus_log_dir() {
+  local root physical logdir big size archived_id status=0
+  root="$(mktemp -d)"
+  physical="$(mktemp -d)"
+  ln -s "$physical" "$root/logs"
+  logdir="$physical"
+
+  big="$(printf 'p%.0s' $(seq 3000))"
+  printf '{"id":"phys","summary":"%s"}\n' "$big" >"$logdir/physical.log"
+
+  # Run from / so rotation cannot depend on the caller's working directory.
+  (cd / && NUCLEUS_LOG_DIR="$logdir" bash "$LOGS_SH" rotate --max-size 1024 --max-files 4 --compress true) || status=$?
+  if [ "$status" -eq 0 ]; then
+    assert_pass "rotate succeeds when NUCLEUS_LOG_DIR is the physical logs directory"
+  else
+    assert_fail "rotate-physical-status" "rotate failed with status $status"
+  fi
+
+  if [ -f "$physical/physical.1.log.gz" ]; then
+    assert_pass "rotate creates the archive in the physical logs directory"
+  else
+    assert_fail "rotate-physical-archive" "archive missing in physical logs directory"
+  fi
+
+  if [ -f "$physical/physical.log" ]; then
+    assert_pass "rotate keeps the live log file present in the physical logs directory"
+  else
+    assert_fail "rotate-physical-live-missing" "live log file was removed"
+  fi
+
+  size="$(wc -c <"$physical/physical.log" | tr -d ' ')"
+  if [ "$size" -eq 0 ]; then
+    assert_pass "rotate truncates the live log in place in the physical logs directory"
+  else
+    assert_fail "rotate-physical-truncate" "live log still $size bytes"
+  fi
+
+  archived_id="$(gzip -dc "$physical/physical.1.log.gz" | jq -r '.id' 2>/dev/null || true)"
+  if [ "$archived_id" = "phys" ]; then
+    assert_pass "the rotated archive is readable in the physical logs directory"
+  else
+    assert_fail "rotate-physical-readable" "archive content unreadable or unexpected: $archived_id"
+  fi
+
+  rm -rf "$root" "$physical"
+}
+
 # ---- Run tests ----
 
 section 1 "nucleus-logs"
@@ -423,5 +519,7 @@ test_rotate_twice_does_not_nest_archives
 test_stats_skips_plain_archives
 test_expire_removes_old_archives
 test_show_filters_by_kind
+test_rotate_with_symlinked_nucleus_log_dir
+test_rotate_with_physical_nucleus_log_dir
 
 finish_tests
