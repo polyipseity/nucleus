@@ -452,6 +452,7 @@ run_nix_gc_with_wait_progress() {
   # check-suppress:suppression_doc: drain buffered output after gc process exit
   while IFS= read -r _rngc_line <&3 || { [ -n "${_rngc_line:-}" ] && printf '%s\n' "$_rngc_line"; false; }; do
     printf '%s\n' "$_rngc_line"
+  # check-suppress:suppression_doc: read returns non-zero at EOF after the last buffered line is drained
   done || true
   exec 3<&-
   rm -f "$_rngc_fifo"
