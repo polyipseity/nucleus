@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import {
+	accessSync,
+	chmodSync,
+	constants,
+	mkdtempSync,
+	mkdirSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import createSafeDeleteExtension, {
 	buildPayload,
 	createSafeDeleteExtension as createExtension,
@@ -105,15 +116,52 @@ function realRunnerOptions(): RunnerOptions {
 	return { runnerCommand: RUNNER_PATH, runnerArgs: ["pi"], timeoutMs: 30_000 };
 }
 
-function spawnWithRepoRoot(): SpawnFn {
+function preferredBash(): string | undefined {
+	for (const candidate of [
+		"/run/current-system/sw/bin/bash",
+		"/nix/var/nix/profiles/default/bin/bash",
+		"/opt/homebrew/bin/bash",
+		"/usr/local/bin/bash",
+	]) {
+		try {
+			accessSync(candidate, constants.X_OK);
+			return candidate;
+		} catch {
+			// try next candidate
+		}
+	}
+	return undefined;
+}
+
+function spawnWithRepoRoot(extraEnv: NodeJS.ProcessEnv = {}): SpawnFn {
 	return async (command, args, stdin, timeoutMs): Promise<SpawnResult> => {
 		return await new Promise<SpawnResult>((resolve) => {
 			let settled = false;
 			let timedOut = false;
 			let timer: ReturnType<typeof setTimeout> | undefined;
-			const child = spawn(command, [...args], {
+			const env = { ...process.env, NUCLEUS_REPO_ROOT: REPO_ROOT, ...extraEnv };
+			if (typeof env.PATH === "string") {
+				env.PATH = [
+					env.PATH,
+					dirname(process.execPath),
+					"/run/current-system/sw/bin",
+					"/nix/var/nix/profiles/default/bin",
+					"/opt/homebrew/bin",
+					"/usr/local/bin",
+				].join(":");
+			}
+			let spawnCommand = command;
+			let spawnArgs = [...args];
+			if (command.endsWith(".sh")) {
+				const bash = preferredBash();
+				if (bash !== undefined) {
+					spawnCommand = bash;
+					spawnArgs = [command, ...args];
+				}
+			}
+			const child = spawn(spawnCommand, spawnArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
-				env: { ...process.env, NUCLEUS_REPO_ROOT: REPO_ROOT },
+				env,
 			});
 			const stdoutChunks: string[] = [];
 			const stderrChunks: string[] = [];
@@ -400,10 +448,29 @@ describe("safe-delete real policy path regressions", () => {
 	});
 
 	test("a proven plain rm redirect is allowed by the shared policy path", async () => {
-		const verdict = await runHarnessFilter("rm /tmp/safe-delete-proven", {
-			...realRunnerOptions(),
-			spawnFn: spawnWithRepoRoot(),
-		});
-		expect(verdict.decision).toBe("allow");
+		const root = mkdtempSync(join(tmpdir(), "safe-delete-proven-"));
+		try {
+			const home = join(root, "home");
+			const wrapperDir = join(home, ".local", "bin");
+			const targetDir = join(root, "home-manager-files", ".local", "bin");
+			mkdirSync(wrapperDir, { recursive: true });
+			mkdirSync(targetDir, { recursive: true });
+
+			const target = join(targetDir, "rm");
+			writeFileSync(target, "#!/bin/sh\nexit 0\n");
+			chmodSync(target, 0o755);
+			symlinkSync(target, join(wrapperDir, "rm"));
+
+			const verdict = await runHarnessFilter("rm /tmp/safe-delete-proven", {
+				...realRunnerOptions(),
+				spawnFn: spawnWithRepoRoot({
+					HOME: home,
+					PATH: `${wrapperDir}:${process.env.PATH ?? ""}`,
+				}),
+			});
+			expect(verdict.decision).toBe("allow");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });
