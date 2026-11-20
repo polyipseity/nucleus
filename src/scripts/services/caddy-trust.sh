@@ -85,6 +85,7 @@ if [ "$_ct_mode" = "sudo" ]; then
       sleep 1
     done
   else
+    # WHY: activation-time recovery path above owns the bootout/bootstrap; this only names the unload step in the failure reason.
     _ct_reload_reason="${_ct_reload_out:-launchctl bootout did not unload $_ct_proxy_target}"
     # check-suppress:suppression_doc: the trust attempt is best-effort by design; the final warning below reports the failed apply step.
     error -l caddy-trust "HTTPS proxy service could not be reloaded: $_ct_reload_reason" || true
