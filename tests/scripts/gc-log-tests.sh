@@ -252,6 +252,56 @@ test_log_gc_dies_without_root() {
   rm -rf "$work"
 }
 
+# ---- Test F: gc_logs resolves logs.sh after cleanup fragment clobbers SCRIPT_DIR ----
+
+test_gc_logs_resolves_logs_after_cleanup_fragment_sourced() {
+  local work fixture gc_func record rc real_repo log_expiry_sh
+  work="$(mktemp -d)"
+  fixture="$work/repo"
+  real_repo="$SCRIPT_DIR/../.."
+  log_expiry_sh="$real_repo/src/scripts/lib/log-expiry.sh"
+  mkdir -p "$fixture/scripts" "$fixture/src/scripts/lib" "$fixture/src/modules" "$work/log-user"
+  cat >"$fixture/scripts/logs.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$GC_LOG_RECORD"
+EOF
+  chmod +x "$fixture/scripts/logs.sh"
+  cp "$real_repo/src/scripts/cleanup-nix-build-artifacts.sh" "$fixture/src/scripts/cleanup-nix-build-artifacts.sh"
+  cp "$real_repo/src/scripts/lib/bash-guard.sh" "$fixture/src/scripts/lib/bash-guard.sh"
+  cp "$real_repo/src/modules/services.json" "$fixture/src/modules/services.json"
+  cp "$real_repo/src/modules/services.schema.json" "$fixture/src/modules/services.schema.json"
+  export GC_LOG_RECORD="$work/record.txt"
+  : >"$GC_LOG_RECORD"
+
+  gc_func="$(extract_func gc_logs "$GC_SH")"
+
+  rc=0
+  (
+    unset NUCLEUS_LOGS_BIN
+    REPO_ROOT="$fixture" GC_LOG_RECORD="$GC_LOG_RECORD" bash -c '
+      SCRIPT_DIR="$1/scripts"
+      REPO_ROOT="$1"
+      . "$2"
+      . "$3"
+      . "$SCRIPT_DIR/../src/scripts/cleanup-nix-build-artifacts.sh"
+      nucleus_log_dir() { printf "%s\n" "'"$work"'/log-user"; }
+      nucleus_system_log_dir() { printf "%s\n" "'"$work"'/log-user"; }
+      '"$gc_func"'
+      gc_logs
+    ' nucleus-gc-test "$fixture" "$LIB_SH" "$log_expiry_sh"
+  ) >/dev/null 2>&1 || rc=$?
+
+  record="$(cat "$GC_LOG_RECORD")"
+  if [ "$rc" -eq 0 ] && [ "$(grep -c '^rotate --scope user' "$GC_LOG_RECORD")" -eq 1 ] &&
+    [ "$(grep -c '^expire --scope user' "$GC_LOG_RECORD")" -eq 1 ]; then
+    assert_pass "gc_logs resolves logs.sh from repo root after cleanup fragment sourced"
+  else
+    assert_fail "gc-logs-after-cleanup-fragment" "rc=$rc record: $record"
+  fi
+  unset GC_LOG_RECORD
+  rm -rf "$work"
+}
+
 # ---- Run tests ----
 
 section 1 "gc log tests"
@@ -263,5 +313,6 @@ test_gc_logs_escalates_when_system_dir_not_writable
 test_gc_logs_inline_when_system_dir_writable
 test_log_gc_uses_root_scripts_when_bin_unset
 test_log_gc_dies_without_root
+test_gc_logs_resolves_logs_after_cleanup_fragment_sourced
 
 finish_tests

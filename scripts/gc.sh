@@ -817,7 +817,7 @@ gc_logs() {
   _gl_log_dir="$(nucleus_log_dir)"
   _gl_system_log_dir="$(nucleus_system_log_dir)"
   _gl_expiry="$(resolve_log_expiry)"
-  _gl_logs="${NUCLEUS_LOGS_BIN:-"$SCRIPT_DIR/logs.sh"}"
+  _gl_logs="${NUCLEUS_LOGS_BIN:-"$REPO_ROOT/scripts/logs.sh"}"
 
   "$_gl_logs" rotate --scope user --max-size "$_gl_maxsize" --max-files "$_gl_maxfiles" --compress "$_gl_compress"
   "$_gl_logs" expire --scope user --expiry "$_gl_expiry"

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
-# shellcheck source=lib/bash-guard.sh
-. "$SCRIPT_DIR/lib/bash-guard.sh"
-bash_guard_require 5 1 cleanup-nix-build-artifacts
 # shellcheck shell=bash
 # Remove stale `result` and `result-*` symlinks from `nix build`,
 # `nix run ... -o result`, or `nixos-generators`. Real files and directories

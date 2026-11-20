@@ -272,6 +272,7 @@ _t_guard_sweep() {
     "src/scripts/safe-delete-shim.sh"
     "src/scripts/vms/android-fake-wifi-guest-revert.sh"
     "src/scripts/vms/android-fake-wifi-guest-setup.sh"
+    "src/scripts/cleanup-nix-build-artifacts.sh"
   )
   _is_exempt() {
     local _x
