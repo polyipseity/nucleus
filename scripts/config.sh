@@ -59,6 +59,9 @@ DEFAULTS='{
     "enable": true,
     "channels": ["telegram", "ntfy", "discord"],
     "max-chars": 1200
+  },
+  "sandbox-context": {
+    "inject-on-change": true
   }
 }'
 

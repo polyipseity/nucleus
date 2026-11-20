@@ -5,8 +5,9 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { statusText } from "./shared/status-style.ts";
 
@@ -31,12 +32,30 @@ export interface SandboxStatusContext {
 	readonly ui?: SandboxStatusUi;
 }
 
+export interface RedirectVerdict {
+	readonly kind: "verdict";
+	readonly decision: string;
+	readonly rule: string;
+	readonly reason: string;
+}
+
+export interface RedirectUnavailable {
+	readonly kind: "unavailable";
+	readonly reason: string;
+}
+
+export type RedirectProbeResult = RedirectVerdict | RedirectUnavailable;
+
 export interface SandboxDependencies {
 	readonly env?: NodeJS.ProcessEnv;
 	readonly cwd?: string;
 	readonly commandPath?: (command: string) => string;
-	readonly commandExists?: (command: string) => boolean;
 	readonly readRegistryUnproven?: (env: NodeJS.ProcessEnv, cwd: string) => string;
+	readonly readInjectOnChange?: (env: NodeJS.ProcessEnv, cwd: string) => boolean;
+	readonly probeRedirect?: (
+		env: NodeJS.ProcessEnv,
+		cwd: string,
+	) => Promise<RedirectProbeResult> | RedirectProbeResult;
 }
 
 let warnedUnsandboxed = false;
@@ -76,8 +95,8 @@ function defaultCommandPath(command: string): string {
 	}
 }
 
-function defaultCommandExists(command: string): boolean {
-	return defaultCommandPath(command) !== "not found";
+function presentPath(path: string): string {
+	return path === "not found" ? "absent" : path;
 }
 
 export function readSafeDeleteUnproven(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): string {
@@ -122,6 +141,107 @@ export function readSafeDeleteUnproven(env: NodeJS.ProcessEnv = process.env, cwd
 	return "unavailable";
 }
 
+export function readSandboxContextInjectOnChange(
+	env: NodeJS.ProcessEnv = process.env,
+	_cwd: string = process.cwd(),
+): boolean {
+	const home = env.HOME ?? homedir();
+	const configPath = join(home, ".local", "state", "nucleus", "config.json");
+	try {
+		const raw = readFileSync(configPath, "utf8");
+		const parsed = JSON.parse(raw) as unknown;
+		if (typeof parsed !== "object" || parsed === null) {
+			return true;
+		}
+		const section = (parsed as Record<string, unknown>)["sandbox-context"];
+		if (typeof section !== "object" || section === null) {
+			return true;
+		}
+		const value = (section as Record<string, unknown>)["inject-on-change"];
+		return typeof value === "boolean" ? value : true;
+	} catch {
+		return true;
+	}
+}
+
+function parseRedirectVerdictLine(line: string): RedirectProbeResult | null {
+	const trimmed = line.trim();
+	if (trimmed.length === 0) {
+		return null;
+	}
+	const parts = trimmed.split("\t");
+	if (parts.length < 3) {
+		return null;
+	}
+	const [decision, rule, ...reasonParts] = parts;
+	if (!decision || !rule) {
+		return null;
+	}
+	return { kind: "verdict", decision, rule, reason: reasonParts.join("\t") };
+}
+
+export function defaultProbeRedirect(
+	env: NodeJS.ProcessEnv = process.env,
+	_cwd: string = process.cwd(),
+): RedirectProbeResult {
+	const result = spawnSync(
+		"nucleus-utils",
+		["safe-delete-guard", "--command", "rm -rf __nucleus_status_probe__"],
+		{ encoding: "utf8", env, timeout: 10_000 },
+	);
+
+	if (result.error) {
+		const err = result.error as NodeJS.ErrnoException;
+		if (err.code === "ENOENT") {
+			return { kind: "unavailable", reason: "safe-delete-guard not on PATH" };
+		}
+		return { kind: "unavailable", reason: `safe-delete-guard error: ${err.message}` };
+	}
+
+	if (result.status !== 0 || result.signal !== null) {
+		const detail = [result.stderr?.trim(), result.status !== null ? `exit ${String(result.status)}` : null, result.signal]
+			.filter((part): part is string => typeof part === "string" && part.length > 0)
+			.join(", ");
+		return { kind: "unavailable", reason: `safe-delete-guard error: ${detail || "unknown error"}` };
+	}
+
+	const stdout = result.stdout ?? "";
+	const lines = stdout
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
+	const verdict = parseRedirectVerdictLine(lines[lines.length - 1] ?? "");
+	if (verdict === null) {
+		const detail = result.stderr?.trim() || "no verdict";
+		return { kind: "unavailable", reason: `safe-delete-guard error: ${detail}` };
+	}
+	return verdict;
+}
+
+export function formatRedirectVerdict(probe: RedirectProbeResult): string {
+	if (probe.kind === "unavailable") {
+		return `rm redirected: unavailable (${probe.reason})`;
+	}
+
+	const { rule, reason } = probe;
+	if (rule === "proven-redirect") {
+		return `rm redirected: yes (proven-redirect: ${reason})`;
+	}
+	if (
+		rule === "unproven-redirect" ||
+		rule === "native-path" ||
+		rule === "cmd-shell" ||
+		rule === "find-primitive" ||
+		rule === "no-match"
+	) {
+		return `rm redirected: no (${rule}: ${reason})`;
+	}
+	if (rule === "filter-error") {
+		return `rm redirected: unavailable (filter-error: ${reason})`;
+	}
+	return `rm redirected: unavailable (${rule}: ${reason})`;
+}
+
 function getContext(value: unknown): SandboxStatusContext {
 	if (typeof value === "object" && value !== null) {
 		return value as SandboxStatusContext;
@@ -148,35 +268,41 @@ function applySandboxState(ctx: SandboxStatusContext, env: NodeJS.ProcessEnv): v
 	}
 }
 
-export function buildSandboxStatusReport(
+export async function buildSandboxStatusReport(
 	ctx: SandboxStatusContext,
 	deps: SandboxDependencies = {},
-): string {
+): Promise<string> {
 	const env = deps.env ?? process.env;
 	const cwd = deps.cwd ?? process.cwd();
 	const detection = detectSandbox(env);
 	const commandPath = deps.commandPath ?? defaultCommandPath;
-	const commandExists = deps.commandExists ?? defaultCommandExists;
 	const readUnproven = deps.readRegistryUnproven ?? readSafeDeleteUnproven;
+	const readInject = deps.readInjectOnChange ?? readSandboxContextInjectOnChange;
+	const probeRedirect = deps.probeRedirect ?? defaultProbeRedirect;
 
 	const state = detection.sandboxed ? "sandboxed" : "unsandboxed";
 	const mode = typeof ctx.mode === "string" ? ctx.mode : "unknown";
 	const rmPath = commandPath("rm");
+	const safeRmPath = commandPath("safe-rm");
+	const ripPath = commandPath("rip");
 	const utilsPath = commandPath("nucleus-utils");
 	const utilsDisplay = utilsPath === "not found" ? "missing" : utilsPath;
-	const safeRmPresent = commandExists("shell-safe-rm");
-	const ripPresent = commandExists("rip");
 	const unproven = readUnproven(env, cwd);
+	const injectOnChange = readInject(env, cwd);
+	const redirectProbe = await probeRedirect(env, cwd);
+	const redirectLine = formatRedirectVerdict(redirectProbe);
 
 	return [
 		`state: ${state}`,
 		`evidence: ${detection.evidence}`,
 		`ctx.mode: ${mode}`,
 		`rm: ${rmPath}`,
-		`shell-safe-rm present: ${safeRmPresent}`,
-		`rip present: ${ripPresent}`,
+		`safe-rm present: ${presentPath(safeRmPath)}`,
+		`rip present: ${presentPath(ripPath)}`,
+		redirectLine,
 		`nucleus-utils: ${utilsDisplay}`,
 		`safe-delete.settings.unproven: ${unproven}`,
+		`sandbox-context.inject-on-change: ${String(injectOnChange)}`,
 	].join("\n");
 }
 
@@ -204,7 +330,7 @@ export function createSandboxIndicatorExtension(
 			description: "Show sandbox state and deletion-safety tooling status",
 			handler: async (_args: string, ctx: unknown) => {
 				const context = getContext(ctx);
-				const report = buildSandboxStatusReport(context, deps);
+				const report = await buildSandboxStatusReport(context, deps);
 				if (context.ui && typeof context.ui.notify === "function") {
 					context.ui.notify(report, "info");
 				}

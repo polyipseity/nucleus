@@ -62,7 +62,7 @@ Each tool below is installed on this machine. Links go to official documentation
 ### Deletion and recovery
 
 - [`rip2`](https://github.com/nivekuil/rip#readme) (`rip`): recoverable deletion to a graveyard.
-- [`safe-rm`](https://github.com/kaelzhang/shell-safe-rm#readme): recoverable `rm` wrapper. Follow `file-deletion-safety.instructions.md` and never invoke raw deletion commands directly.
+- [`safe-rm`](https://www.npmjs.com/package/safe-rm): recoverable `rm` wrapper. Follow `file-deletion-safety.instructions.md` and never invoke raw deletion commands directly.
 
 ### Shell, files, and archives
 

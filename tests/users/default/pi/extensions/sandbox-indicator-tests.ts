@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sandboxIndicator, {
@@ -8,8 +8,11 @@ import sandboxIndicator, {
 	UNSANDBOXED_LABEL,
 	buildSandboxStatusReport,
 	createSandboxIndicatorExtension,
+	defaultProbeRedirect,
 	detectSandbox,
+	formatRedirectVerdict,
 	readSafeDeleteUnproven,
+	readSandboxContextInjectOnChange,
 	resetSandboxWarningForTests,
 	type SandboxStatusContext,
 } from "../../../../../src/users/default/pi/extensions/sandbox-indicator.ts";
@@ -262,25 +265,95 @@ describe("readSafeDeleteUnproven", () => {
 	});
 });
 
+describe("readSandboxContextInjectOnChange", () => {
+	test("defaults to true when config is absent or unconfigured", () => {
+		const home = mkdtempSync(join(tmpdir(), "sandbox-indicator-home-"));
+		expect(readSandboxContextInjectOnChange({ HOME: home }, "/tmp")).toBe(true);
+	});
+
+	test("reads configured boolean value", () => {
+		const home = mkdtempSync(join(tmpdir(), "sandbox-indicator-home-"));
+		const configDir = join(home, ".local", "state", "nucleus");
+		Bun.spawnSync(["mkdir", "-p", configDir]);
+		writeFileSync(
+			join(configDir, "config.json"),
+			JSON.stringify({ "sandbox-context": { "inject-on-change": false } }),
+		);
+		expect(readSandboxContextInjectOnChange({ HOME: home }, "/tmp")).toBe(false);
+	});
+});
+
+describe("formatRedirectVerdict", () => {
+	test("renders proven redirect as yes", () => {
+		expect(
+			formatRedirectVerdict({
+				kind: "verdict",
+				decision: "allow",
+				rule: "proven-redirect",
+				reason: "deletion command: rm resolves to the home-manager safe-delete wrapper at /x",
+			}),
+		).toBe(
+			"rm redirected: yes (proven-redirect: deletion command: rm resolves to the home-manager safe-delete wrapper at /x)",
+		);
+	});
+
+	test("renders unproven and native-path as no", () => {
+		expect(
+			formatRedirectVerdict({
+				kind: "verdict",
+				decision: "ask",
+				rule: "unproven-redirect",
+				reason: "rm does not resolve on PATH",
+			}),
+		).toBe("rm redirected: no (unproven-redirect: rm does not resolve on PATH)");
+		expect(
+			formatRedirectVerdict({
+				kind: "verdict",
+				decision: "deny",
+				rule: "native-path",
+				reason: "native rm bypasses safe-delete protection. Use safe-rm or rip2 instead.",
+			}),
+		).toBe("rm redirected: no (native-path: native rm bypasses safe-delete protection. Use safe-rm or rip2 instead.)");
+	});
+
+	test("renders filter errors as unavailable", () => {
+		expect(
+			formatRedirectVerdict({
+				kind: "verdict",
+				decision: "ask",
+				rule: "filter-error",
+				reason: "settings are not valid JSON",
+			}),
+		).toBe("rm redirected: unavailable (filter-error: settings are not valid JSON)");
+	});
+});
+
 describe("buildSandboxStatusReport and /sandbox-status", () => {
 	beforeEach(() => {
 		resetSandboxWarningForTests();
 	});
 
-	test("includes state, evidence, mode, rm, tools, and registry value when sandboxed", () => {
-		const report = buildSandboxStatusReport(
+	test("reports resolved paths, proven redirect, and config values when sandboxed", async () => {
+		const report = await buildSandboxStatusReport(
 			{ mode: "interactive" },
 			{
 				env: { SANDBOX_RUNTIME: "1" },
 				cwd: "/tmp",
 				commandPath: (command) => {
-					if (command === "rm") {
-						return "/usr/bin/rm";
-					}
-					return command === "nucleus-utils" ? "/opt/nucleus/bin/nucleus-utils" : "not found";
+					if (command === "rm") return "/usr/bin/rm";
+					if (command === "safe-rm") return "not found";
+					if (command === "rip") return "/opt/homebrew/bin/rip";
+					if (command === "nucleus-utils") return "/opt/nucleus/bin/nucleus-utils";
+					return "not found";
 				},
-				commandExists: (command) => command === "shell-safe-rm",
 				readRegistryUnproven: () => "ask",
+				readInjectOnChange: () => false,
+				probeRedirect: () => ({
+					kind: "verdict",
+					decision: "allow",
+					rule: "proven-redirect",
+					reason: "deletion command: rm resolves to the deployed rip shim at /usr/bin/rm",
+				}),
 			},
 		);
 
@@ -288,98 +361,136 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("evidence: SANDBOX_RUNTIME=1");
 		expect(report).toContain("ctx.mode: interactive");
 		expect(report).toContain("rm: /usr/bin/rm");
-		expect(report).toContain("shell-safe-rm present: true");
-		expect(report).toContain("rip present: false");
+		expect(report).toContain("safe-rm present: absent");
+		expect(report).toContain("rip present: /opt/homebrew/bin/rip");
+		expect(report).toContain(
+			"rm redirected: yes (proven-redirect: deletion command: rm resolves to the deployed rip shim at /usr/bin/rm)",
+		);
 		expect(report).toContain("nucleus-utils: /opt/nucleus/bin/nucleus-utils");
 		expect(report).toContain("safe-delete.settings.unproven: ask");
+		expect(report).toContain("sandbox-context.inject-on-change: false");
 	});
 
-	test("includes state, evidence, mode, rm, tools, and registry value when unsandboxed", () => {
-		const report = buildSandboxStatusReport(
-			{ mode: "print" },
+	test("reports safe-rm absent with a proven redirect", async () => {
+		const report = await buildSandboxStatusReport(
+			{ mode: "interactive" },
+			{
+				env: { SANDBOX_RUNTIME: "1" },
+				cwd: "/tmp",
+				commandPath: (command) => {
+					if (command === "safe-rm") return "not found";
+					if (command === "rip") return "not found";
+					if (command === "rm") return "/usr/bin/rm";
+					return "/usr/bin/nucleus-utils";
+				},
+				readRegistryUnproven: () => "ask",
+				readInjectOnChange: () => true,
+				probeRedirect: () => ({
+					kind: "verdict",
+					decision: "allow",
+					rule: "proven-redirect",
+					reason: "deletion command: rm resolves to the deployed rip shim at /usr/bin/rm, whose hash matches the shim manifest",
+				}),
+			},
+		);
+
+		expect(report).toContain("safe-rm present: absent");
+		expect(report).toContain("rip present: absent");
+		expect(report).toContain("rm redirected: yes (proven-redirect:");
+	});
+
+	test("reports both present with an unproven redirect", async () => {
+		const report = await buildSandboxStatusReport(
+			{ mode: "interactive" },
 			{
 				env: {},
 				cwd: "/tmp",
-				commandPath: (command) => (command === "rm" ? "not found" : "not found"),
-				commandExists: (command) => command === "rip",
-				readRegistryUnproven: () => "unavailable",
+				commandPath: (command) => {
+					if (command === "safe-rm") return "/home/user/.bun/bin/safe-rm";
+					if (command === "rip") return "/nix/store/abc/bin/rip";
+					if (command === "rm") return "/usr/bin/rm";
+					if (command === "nucleus-utils") return "/usr/bin/nucleus-utils";
+					return "not found";
+				},
+				readRegistryUnproven: () => "deny",
+				readInjectOnChange: () => true,
+				probeRedirect: () => ({
+					kind: "verdict",
+					decision: "ask",
+					rule: "unproven-redirect",
+					reason: "rm does not resolve on PATH, so it is treated as not redirected and the harness prompts",
+				}),
 			},
 		);
 
 		expect(report).toContain("state: unsandboxed");
 		expect(report).toContain("evidence: SANDBOX_RUNTIME unset");
-		expect(report).toContain("ctx.mode: print");
-		expect(report).toContain("rm: not found");
-		expect(report).toContain("shell-safe-rm present: false");
-		expect(report).toContain("rip present: true");
-		expect(report).toContain("nucleus-utils: missing");
-		expect(report).toContain("safe-delete.settings.unproven: unavailable");
+		expect(report).toContain("safe-rm present: /home/user/.bun/bin/safe-rm");
+		expect(report).toContain("rip present: /nix/store/abc/bin/rip");
+		expect(report).toContain("rm redirected: no (unproven-redirect:");
+		expect(report).toContain("safe-delete.settings.unproven: deny");
+		expect(report).toContain("sandbox-context.inject-on-change: true");
 	});
 
-	test("/sandbox-status command prints report via notify in both sandboxed and unsandboxed cases", async () => {
-		const sandboxed = registerExtension({ SANDBOX_RUNTIME: "1" });
-		const sandboxedCtx = makeContext({ hasUI: true, mode: "interactive" });
-		const sandboxedExt = createSandboxIndicatorExtension({
+	test("reports unavailable when safe-delete-guard cannot be run because command is missing", async () => {
+		const report = await buildSandboxStatusReport(
+			{ mode: "print" },
+			{
+				env: {},
+				cwd: "/tmp",
+				commandPath: () => "not found",
+				readRegistryUnproven: () => "unavailable",
+				readInjectOnChange: () => true,
+				probeRedirect: () => ({ kind: "unavailable", reason: "safe-delete-guard not on PATH" }),
+			},
+		);
+
+		expect(report).toContain("rm redirected: unavailable (safe-delete-guard not on PATH)");
+		expect(report).toContain("nucleus-utils: missing");
+	});
+
+	test("/sandbox-status command prints report via notify", async () => {
+		const registered = registerExtension({ SANDBOX_RUNTIME: "1" });
+		expect(registered.command?.description).toBe("Show sandbox state and deletion-safety tooling status");
+
+		const context = makeContext({ hasUI: true, mode: "interactive" });
+		const ext = createSandboxIndicatorExtension({
 			env: { SANDBOX_RUNTIME: "1" },
 			cwd: "/tmp",
-			commandPath: (command) =>
-				command === "nucleus-utils" ? "/nucleus/bin/nucleus-utils" : "/bin/rm",
-			commandExists: (command) => command === "shell-safe-rm",
-			readRegistryUnproven: () => "ask",
-		});
-		const events: Record<string, Handler> = {};
-		let command: CommandHandler | undefined;
-		sandboxedExt({
-			on: (name: string, handler: Handler) => {
-				events[name] = handler;
-				return () => {};
+			commandPath: (command) => {
+				if (command === "nucleus-utils") return "/nucleus/bin/nucleus-utils";
+				if (command === "safe-rm") return "/bin/safe-rm";
+				if (command === "rip") return "not found";
+				return "/bin/rm";
 			},
+			readRegistryUnproven: () => "ask",
+			readInjectOnChange: () => true,
+			probeRedirect: () => ({
+				kind: "verdict",
+				decision: "allow",
+				rule: "proven-redirect",
+				reason: "deletion command: rm resolves to the home-manager safe-delete wrapper at /bin/rm",
+			}),
+		});
+
+		let command: CommandHandler | undefined;
+		ext({
+			on: (_name: string, _handler: Handler) => () => {},
 			registerCommand: (_name: string, options: { handler: CommandHandler }) => {
 				command = options.handler;
 			},
 		} as unknown as Parameters<typeof sandboxIndicator>[0]);
 
-		await command?.("", sandboxedCtx.ctx);
-		expect(sandboxedCtx.notifications).toHaveLength(1);
-		expect(sandboxedCtx.notifications[0][1]).toBe("info");
-		expect(sandboxedCtx.notifications[0][0]).toContain("state: sandboxed");
-		expect(sandboxedCtx.notifications[0][0]).toContain("evidence: SANDBOX_RUNTIME=1");
-		expect(sandboxedCtx.notifications[0][0]).toContain("ctx.mode: interactive");
-		expect(sandboxedCtx.notifications[0][0]).toContain("rm: /bin/rm");
-		expect(sandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: true");
-		expect(sandboxedCtx.notifications[0][0]).toContain("rip present: false");
-		expect(sandboxedCtx.notifications[0][0]).toContain("nucleus-utils: /nucleus/bin/nucleus-utils");
-		expect(sandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: ask");
-
-		resetSandboxWarningForTests();
-		const unsandboxedCtx = makeContext({ hasUI: true, mode: "json" });
-		const unsandboxedExt = createSandboxIndicatorExtension({
-			env: {},
-			cwd: "/tmp",
-			commandPath: () => "not found",
-			commandExists: (command) => command === "rip",
-			readRegistryUnproven: () => "deny",
-		});
-		let unsandboxedCommand: CommandHandler | undefined;
-		unsandboxedExt({
-			on: (_name: string, _handler: Handler) => () => {},
-			registerCommand: (_name: string, options: { handler: CommandHandler }) => {
-				unsandboxedCommand = options.handler;
-			},
-		} as unknown as Parameters<typeof sandboxIndicator>[0]);
-
-		await unsandboxedCommand?.("", unsandboxedCtx.ctx);
-		expect(unsandboxedCtx.notifications).toHaveLength(1);
-		expect(unsandboxedCtx.notifications[0][1]).toBe("info");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("state: unsandboxed");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("evidence: SANDBOX_RUNTIME unset");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("ctx.mode: json");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("rm: not found");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: false");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("rip present: true");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("nucleus-utils: missing");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: deny");
-		expect(sandboxed.command?.description).toBe("Show sandbox state and deletion-safety tooling status");
+		await command?.("", context.ctx);
+		expect(context.notifications).toHaveLength(1);
+		expect(context.notifications[0][1]).toBe("info");
+		const report = context.notifications[0][0];
+		expect(report).toContain("state: sandboxed");
+		expect(report).toContain("safe-rm present: /bin/safe-rm");
+		expect(report).toContain("rip present: absent");
+		expect(report).toContain("rm redirected: yes (proven-redirect:");
+		expect(report).toContain("safe-delete.settings.unproven: ask");
+		expect(report).toContain("sandbox-context.inject-on-change: true");
 	});
 });
 
@@ -387,8 +498,44 @@ describe("readSafeDeleteUnproven real registry", () => {
 	test("reads the repo harness-filters.json safe-delete unproven value", () => {
 		const repoRoot = process.env.NUCLEUS_REPO_ROOT ?? process.cwd();
 		const registryPath = join(repoRoot, "src/modules/configs/harness-filters.json");
-		const parsed = JSON.parse(readFileSync(registryPath, "utf8")) as { filters?: Array<{ id?: string; settings?: { unproven?: string } }> };
-		const expected = parsed.filters?.find((entry) => entry.id === "safe-delete")?.settings?.unproven ?? "unavailable";
+		const parsed = JSON.parse(readFileSync(registryPath, "utf8")) as {
+			filters?: Array<{ id?: string; settings?: { unproven?: string } }>;
+		};
+		const expected =
+			parsed.filters?.find((entry) => entry.id === "safe-delete")?.settings?.unproven ?? "unavailable";
 		expect(readSafeDeleteUnproven({ NUCLEUS_REPO_ROOT: repoRoot }, repoRoot)).toBe(expected);
+	});
+});
+
+describe("defaultProbeRedirect spawn path", () => {
+	test("runs a fake nucleus-utils safe-delete-guard CLI without settings.json", () => {
+		const binDir = mkdtempSync(join(tmpdir(), "sandbox-indicator-cli-"));
+		const scriptPath = join(binDir, "nucleus-utils");
+		writeFileSync(
+			scriptPath,
+			[
+				"#!/bin/sh",
+				'if [ "$1" = "safe-delete-guard" ] && [ "$2" = "--command" ]; then',
+				"  printf 'allow\\tproven-redirect\\tdeletion command: rm resolves to the fake safe-delete wrapper at /fake/bin/rm\\n'",
+				"  exit 0",
+				"fi",
+				"echo unexpected args >&2",
+				"exit 1",
+				"",
+			].join("\n"),
+		);
+		chmodSync(scriptPath, 0o755);
+
+		const result = defaultProbeRedirect(
+			{ PATH: `${binDir}:${process.env.PATH ?? ""}` },
+			process.cwd(),
+		);
+
+		expect(result).toEqual({
+			kind: "verdict",
+			decision: "allow",
+			rule: "proven-redirect",
+			reason: "deletion command: rm resolves to the fake safe-delete wrapper at /fake/bin/rm",
+		});
 	});
 });

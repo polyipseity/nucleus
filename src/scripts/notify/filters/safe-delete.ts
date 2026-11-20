@@ -711,7 +711,7 @@ function nativeVerdict(): Verdict {
   return {
     decision: "deny",
     rule: "native-path",
-    reason: "native rm bypasses safe-delete protection. Use shell-safe-rm or rip2 instead.",
+    reason: "native rm bypasses safe-delete protection. Use safe-rm or rip2 instead.",
   };
 }
 
@@ -723,7 +723,7 @@ function findPrimitiveVerdict(): Verdict {
   return {
     decision: "deny",
     rule: "find-primitive",
-    reason: "find -delete runs a deletion without the safe-delete wrapper. Use shell-safe-rm or rip2 instead.",
+    reason: "find -delete runs a deletion without the safe-delete wrapper. Use safe-rm or rip2 instead.",
   };
 }
 
@@ -758,13 +758,13 @@ function unprovenVerdict(why: string, unproven: string): Verdict {
       return {
         decision: "deny",
         rule: "unproven-redirect",
-        reason: `deletion command: ${why}, so it is treated as not redirected. Use shell-safe-rm or rip2 instead, or set harness-filters.json safe-delete.settings.unproven to ask or allow.`,
+        reason: `deletion command: ${why}, so it is treated as not redirected. Use safe-rm or rip2 instead, or set harness-filters.json safe-delete.settings.unproven to ask or allow.`,
       };
     default:
       return {
         decision: "deny",
         rule: "unproven-redirect",
-        reason: `deletion command: ${why}, and settings.unproven is '${unproven}' rather than deny, ask, or allow, so the unproven redirect is denied. Use shell-safe-rm or rip2 instead.`,
+        reason: `deletion command: ${why}, and settings.unproven is '${unproven}' rather than deny, ask, or allow, so the unproven redirect is denied. Use safe-rm or rip2 instead.`,
       };
   }
 }

@@ -12,13 +12,13 @@ Never use `rm`, `del`, `rd`, `rmdir`, `erase`, `ri`, `unlink`, `shred`, or `Remo
 ## Alternatives
 
 **POSIX (macOS, Linux):**
-- `shell-safe-rm` (moves to OS Trash, supports rm flags, recoverable via OS GUI)
+- `safe-rm` (moves to OS Trash, supports rm flags, recoverable via OS GUI)
 - `rip2` / `rip` (moves to graveyard, recoverable via `rip -u`)
 
 Inside the srt sandbox, safe-rm takes its `mv` path because the managed config sets `SAFE_RM_USE_APPLESCRIPT=no` when srt's `SANDBOX_RUNTIME` marker is present, and `~/.Trash` is a write-allowed path in the srt policy. Apple Events stay denied there, and the cost is that Finder "Put Back" is not guaranteed; the item is in the Trash and can be dragged out. Outside the sandbox the Finder route stays available, so a delete there still gets Put Back, and a refused Apple Events grant there aborts the delete instead of falling back.
 
 **PowerShell (all hosts):**
-- pwsh safe-delete applies on every host (pwsh is installable on macOS, NixOS, Windows). On Windows it recycles to the Recycle Bin; on POSIX it delegates to `shell-safe-rm`. The aliases `rm`, `del`, `rd`, `erase`, `ri`, `rmdir`, `unlink`, `shred`, `Remove-Item` all route through `Invoke-SafeDelete`.
+- pwsh safe-delete applies on every host (pwsh is installable on macOS, NixOS, Windows). On Windows it recycles to the Recycle Bin; on POSIX it delegates to `safe-rm`. The aliases `rm`, `del`, `rd`, `erase`, `ri`, `rmdir`, `unlink`, `shred`, `Remove-Item` all route through `Invoke-SafeDelete`.
 - The built-in aliases are safe: they recycle to the Recycle Bin on Windows. Use them.
 
 **Windows cmd.exe / Git Bash:**
@@ -30,7 +30,7 @@ Inside the srt sandbox, safe-rm takes its `mv` path because the managed config s
 - Interactive blocking covers the union on all hosts (POSIX zsh functions, pwsh aliases).
 - PATH shims: POSIX `~/.local/bin/<cmd>` (rm, del, rd, erase, ri, rmdir, unlink, shred) and Windows `%USERPROFILE%\.local\bin\<cmd>.exe` (rm, del, rd, rmdir, erase, ri) delegate to the safe alternative.
 - Windows git bash aliases the union to `rip`; cmd intercepts the Windows subset via clink/doskey/PATH shims.
-- POSIX pwsh delegates to `shell-safe-rm` (not rip).
+- POSIX pwsh delegates to `safe-rm` (not rip).
 
 ## Rules
 

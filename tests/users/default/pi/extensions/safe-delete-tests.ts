@@ -197,7 +197,7 @@ describe("safe-delete verdict mapping", () => {
 
 		expect(result).toEqual({
 			block: true,
-			reason: "Blocked by the safe-delete filter (deny). Use shell-safe-rm or rip2 instead.",
+			reason: "Blocked by the safe-delete filter (deny). Use safe-rm or rip2 instead.",
 		});
 		expect(status).toEqual([
 			["safe-delete", "safe-delete: blocked"],
@@ -269,7 +269,7 @@ describe("safe-delete verdict mapping", () => {
 		expect(result).toEqual({
 			block: true,
 			reason:
-				"Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.",
+				"Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use safe-rm or rip2 instead.",
 		});
 		expect(status).toEqual([
 			["safe-delete", "safe-delete: confirmation required"],

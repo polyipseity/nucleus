@@ -8,7 +8,7 @@
 __NUCLEUS_PREPEND_PATH__
 __NUCLEUS_APPEND_PATH__
 
-# File deletion safety: recycle on Windows, delegate to rip/shell-safe-rm on POSIX.
+# File deletion safety: recycle on Windows, delegate to rip/safe-rm on POSIX.
 # Applies on every host because pwsh is installable on all three (macOS, NixOS, Windows).
 if (-not (Test-Path Variable:Script:OriginalRemoveItem)) {
   # check-suppress:suppression_doc: cmdlet may not exist in constrained environments.
@@ -43,8 +43,8 @@ function Invoke-SafeDelete {
     if (-not $IsWindows) {
       # POSIX backend: delegate to the platform safe alternative.
       $safeBin = $null
-      foreach ($candidate in @('shell-safe-rm')) {
-        # check-suppress:suppression_doc: shell-safe-rm is optional; an absent candidate falls through to the original cmdlet
+      foreach ($candidate in @('safe-rm')) {
+        # check-suppress:suppression_doc: safe-rm is optional; an absent candidate falls through to the original cmdlet
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if ($cmd) { $safeBin = $cmd.Source; break }
       }

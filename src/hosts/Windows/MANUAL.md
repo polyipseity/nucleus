@@ -4,7 +4,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 ## system
 
-1. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
+1. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
 
 ## apps
 

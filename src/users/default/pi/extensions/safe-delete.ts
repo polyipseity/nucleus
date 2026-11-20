@@ -218,8 +218,8 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 				try {
 					const detail = verdictDetail(verdict);
 					return block(detail.length > 0
-						? `Blocked by the safe-delete filter (deny). ${detail} Use shell-safe-rm or rip2 instead.`
-						: "Blocked by the safe-delete filter (deny). Use shell-safe-rm or rip2 instead.");
+						? `Blocked by the safe-delete filter (deny). ${detail} Use safe-rm or rip2 instead.`
+						: "Blocked by the safe-delete filter (deny). Use safe-rm or rip2 instead.");
 				} finally {
 					setStatus(ui, undefined);
 				}
@@ -230,8 +230,8 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 				if (!ctx.hasUI) {
 					const detail = verdictDetail(verdict);
 					return block(detail.length > 0
-						? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use shell-safe-rm or rip2 instead.`
-						: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.");
+						? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use safe-rm or rip2 instead.`
+						: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use safe-rm or rip2 instead.");
 				}
 				if (typeof ui.confirm === "function") {
 					const detail = verdictDetail(verdict);
@@ -254,8 +254,8 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 				}
 				const detail = verdictDetail(verdict);
 				return block(detail.length > 0
-					? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use shell-safe-rm or rip2 instead.`
-					: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.");
+					? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use safe-rm or rip2 instead.`
+					: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use safe-rm or rip2 instead.");
 			} finally {
 				setStatus(ui, undefined);
 			}

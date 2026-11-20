@@ -475,10 +475,10 @@ EOF
 }
 
 # rm is disabled in interactive shells: permanent deletion is unrecoverable.
-# Use shell-safe-rm (moves to OS Trash) or rip2/rip (graveyard with undo).
+# Use safe-rm (moves to OS Trash) or rip2/rip (graveyard with undo).
 rm() {
   cat >&2 << 'EOF'
-shell: error: rm is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: rm is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
@@ -486,49 +486,49 @@ EOF
 
 del() {
   cat >&2 << 'EOF'
-shell: error: del is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: del is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 rd() {
   cat >&2 << 'EOF'
-shell: error: rd is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: rd is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 rmdir() {
   cat >&2 << 'EOF'
-shell: error: rmdir is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: rmdir is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 erase() {
   cat >&2 << 'EOF'
-shell: error: erase is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: erase is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 ri() {
   cat >&2 << 'EOF'
-shell: error: ri is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: ri is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 unlink() {
   cat >&2 << 'EOF'
-shell: error: unlink is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: unlink is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
 
 shred() {
   cat >&2 << 'EOF'
-shell: error: shred is disabled. Use shell-safe-rm or rip2 instead.
+shell: error: shred is disabled. Use safe-rm or rip2 instead.
 EOF
   return 1
 }
