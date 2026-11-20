@@ -183,6 +183,14 @@ BeforeAll {
   # unrelated tests order-independent (per-context Mocks replace it).
   Mock Get-NucleusConfiguredInstanceList { return @() }
 
+  # Clear-HealthRecord is defined in ServiceHealth.ps1 (dot-sourced by svc.ps1 at
+  # runtime). Stub it here so action-dispatch tests can mock and assert calls.
+  function Clear-HealthRecord {
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- param binds Pester -ParameterFilter assertions
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    param([Parameter(Mandatory)][string]$Instance)
+  }
+
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
 }
@@ -1286,5 +1294,162 @@ Describe 'Get-ServiceLogDirList with instances' {
 
     @(Get-ServiceLogFile -ServiceKey 'cloud-drive' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work').Count | Should -Be 1
     @(Get-ServiceLogFile -ServiceKey 'cloud-drive').Count | Should -Be 0
+  }
+}
+# ---------------------------------------------------------------------------
+# Unblock action and --Unblock flag (Task 5 coverage; unverified on this host)
+# ---------------------------------------------------------------------------
+
+Describe 'svc unblock CLI surface' {
+  It 'includes unblock in the Action ValidateSet' {
+    $paramAst = $ast.Find({
+      $args[0] -is [System.Management.Automation.Language.ParameterAst] -and
+      $args[0].Name.VariablePath.UserPath -eq 'Action'
+    }, $true)
+    $paramAst | Should -Not -BeNullOrEmpty
+    $validateSet = $paramAst.Attributes | Where-Object {
+      $_ -is [System.Management.Automation.Language.AttributeAst] -and
+      $_.TypeName.Name -eq 'ValidateSet'
+    }
+    $validateSet | Should -Not -BeNullOrEmpty
+    $values = @($validateSet.PositionalArguments | ForEach-Object { $_.Value })
+    $values | Should -Contain 'unblock'
+  }
+
+  It 'declares the Unblock switch parameter' {
+    $paramAst = $ast.Find({
+      $args[0] -is [System.Management.Automation.Language.ParameterAst] -and
+      $args[0].Name.VariablePath.UserPath -eq 'Unblock'
+    }, $true)
+    $paramAst | Should -Not -BeNullOrEmpty
+    ($paramAst.Attributes.TypeName.Name -contains 'switch') | Should -Be $true
+  }
+
+  It 'rejects -Unblock outside start and restart' {
+    # Top-level validation in svc.ps1 rejects -Unblock for actions other than
+    # start/restart before any elevation or service-manager call.
+    $svcPs1Content | Should -Match '\$Unblock -and \$Action -notin @\(''start'', ''restart''\)'
+    $svcPs1Content | Should -Match 'Write-NucleusError "-Unblock is only valid with start and restart"'
+  }
+}
+
+Describe 'svc unblock action dispatch' {
+  BeforeEach {
+    Mock Clear-HealthRecord { }
+    Mock Write-NucleusError { param([string]$Message) }
+    Mock Write-NucleusWarning { param([string]$Message) }
+    Mock Write-NucleusInfo { param([string]$CommandName, [string]$Message) }
+    Mock Invoke-ServiceAction { return $true }
+    $Script:Json = $false
+    $Script:SkipSystemScope = $false
+    $Script:Enable = $false
+    $Script:Disable = $false
+    $Script:Unblock = $false
+  }
+
+  # Extract the service-action switch arm (start/stop/restart/enable/disable/unblock)
+  # so ordering and configured-target behavior can be exercised in isolation.
+  # AST extraction follows the file's existing style.
+  BeforeAll {
+    $actionArm = $ast.FindAll({
+      $args[0] -is [System.Management.Automation.Language.SwitchStatementAst] -and
+      $args[0].Condition.Extent.Text -eq '$Action'
+    }, $true) | ForEach-Object {
+      $_.Clauses | Where-Object {
+        $_.Item.Extent.Text -match "'unblock'"
+      }
+    } | Select-Object -First 1
+    if ($null -eq $actionArm) {
+      throw 'could not locate the service-action switch arm containing unblock'
+    }
+    $Script:UnblockActionArm = $actionArm.Pipeline.Extent.Text
+  }
+
+  It 'clears and reports a configured but not loaded target for unblock action' {
+    $Action = 'unblock'
+    $ServiceName = @('cloud-drive\NucleusCloudMount-work')
+    $resolved = @([pscustomobject]@{
+      class       = 'configured'
+      instanceId  = 'cloud-drive\NucleusCloudMount-work'
+      registryKey = 'cloud-drive'
+      displayName = 'Cloud Drive Mounts'
+      hostEntry   = @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }
+    })
+    $overallExit = 0
+
+    $output = & ([scriptblock]::Create($Script:UnblockActionArm))
+
+    ($output -join "`n") | Should -Match 'unblocked cloud-drive\\NucleusCloudMount-work'
+    $overallExit | Should -Be 0
+    Should -Invoke Clear-HealthRecord -Exactly 1 -ParameterFilter { $Instance -eq 'cloud-drive\NucleusCloudMount-work' }
+    Should -Invoke Invoke-ServiceAction -Exactly 0
+    Should -Invoke Write-NucleusError -Exactly 0
+  }
+
+  It 'clears blocked state before start when -Unblock is set' {
+    $Action = 'start'
+    $ServiceName = @('ollama')
+    $Unblock = $true
+    $Enable = $false
+    $Disable = $false
+    $resolved = @([pscustomobject]@{
+      class       = 'live'
+      instanceId  = 'ollama'
+      registryKey = 'ollama'
+      displayName = 'Ollama'
+      hostEntry   = @{ type = 'windows-native'; service = 'ollama' }
+    })
+    $overallExit = 0
+    $Script:callOrder = [System.Collections.Generic.List[string]]::new()
+    Mock Clear-HealthRecord {
+      param([string]$Instance)
+      $Script:callOrder.Add("clear:$Instance")
+    }
+    Mock Invoke-ServiceAction {
+      param([string]$Action, [hashtable]$HostEntry)
+      $Script:callOrder.Add("action:$Action")
+      return $true
+    }
+    Mock Get-ServiceActionWarning { return $null }
+
+    $null = & ([scriptblock]::Create($Script:UnblockActionArm))
+
+    $overallExit | Should -Be 0
+    $Script:callOrder.Count | Should -Be 2
+    $Script:callOrder[0] | Should -Be 'clear:ollama'
+    $Script:callOrder[1] | Should -Be 'action:start'
+  }
+
+  It 'clears blocked state before restart when -Unblock is set' {
+    $Action = 'restart'
+    $ServiceName = @('ollama')
+    $Unblock = $true
+    $Enable = $false
+    $Disable = $false
+    $resolved = @([pscustomobject]@{
+      class       = 'live'
+      instanceId  = 'ollama'
+      registryKey = 'ollama'
+      displayName = 'Ollama'
+      hostEntry   = @{ type = 'windows-native'; service = 'ollama' }
+    })
+    $overallExit = 0
+    $Script:callOrder = [System.Collections.Generic.List[string]]::new()
+    Mock Clear-HealthRecord {
+      param([string]$Instance)
+      $Script:callOrder.Add("clear:$Instance")
+    }
+    Mock Invoke-ServiceAction {
+      param([string]$Action, [hashtable]$HostEntry)
+      $Script:callOrder.Add("action:$Action")
+      return $true
+    }
+
+    $null = & ([scriptblock]::Create($Script:UnblockActionArm))
+
+    $overallExit | Should -Be 0
+    $Script:callOrder.Count | Should -Be 2
+    $Script:callOrder[0] | Should -Be 'clear:ollama'
+    $Script:callOrder[1] | Should -Be 'action:restart'
   }
 }
