@@ -22,11 +22,14 @@
       "~/.gnupg",
       "~/.hermes",
       "~/.local",
+      "~/.local/state/nucleus/log",
       "~/.npm",
       "~/.pi",
       "~/.rustup",
       "~/Library/Application Support/nucleus",
       "~/Library/Caches",
+      "~/Library/Logs/nucleus",
+      "~/Library/State/nucleus",
       "~/dev"
     ],
     "denyRead": [

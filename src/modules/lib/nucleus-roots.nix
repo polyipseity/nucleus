@@ -25,6 +25,21 @@ let
 
   nucleusHubDirFor = userHome: "${userHome}/.nucleus";
 
+  # Physical user link targets: the canonical directories that root symlinks
+  # point at for the current host platform. Single source of truth used by
+  # activation setup and sandbox write grants.
+  userLinkTargetsFor =
+    userHome:
+    if isDarwin then
+      {
+        logs = "${userHome}/Library/Logs/nucleus";
+        state = "${userHome}/Library/State/nucleus";
+      }
+    else
+      {
+        logs = "${userHome}/.local/state/nucleus/log";
+      };
+
   # The root owns the symlink and the conventional directory is its target. The
   # physical conventional dirs are created here because activation is the only
   # place that should.
@@ -39,18 +54,17 @@ let
     let
       userRoot = nucleusUserRootFor userHome;
       systemRoot = nucleusSystemRoot;
-      userLinks =
-        if isDarwin then
-          ''
-            mkdir -p "${userHome}/Library/Logs/nucleus" "${userHome}/Library/State/nucleus"
-            ln -sfn "${userHome}/Library/Logs/nucleus" "${userRoot}/logs"
-            ln -sfn "${userHome}/Library/State/nucleus" "${userRoot}/state"
-          ''
-        else
-          ''
-            mkdir -p "${userHome}/.local/state/nucleus/log"
-            ln -sfn "${userHome}/.local/state/nucleus/log" "${userRoot}/logs"
-          '';
+      userLinkTargets = userLinkTargetsFor userHome;
+      sortedTargetNames = builtins.sort builtins.lessThan (builtins.attrNames userLinkTargets);
+      sortedTargets = map (name: userLinkTargets.${name}) sortedTargetNames;
+      userMkdirTargets = lib.concatStringsSep " " (map (target: "\"${target}\"") sortedTargets);
+      userLinkLines = lib.concatMapStringsSep "\n" (
+        name: "ln -sfn \"${userLinkTargets.${name}}\" \"${userRoot}/${name}\""
+      ) sortedTargetNames;
+      userLinks = ''
+        mkdir -p ${userMkdirTargets}
+        ${userLinkLines}
+      '';
       systemLinks =
         if isDarwin then
           ''
@@ -63,12 +77,11 @@ let
             ln -sfn "/var/log/nucleus" "${systemRoot}/logs"
             ln -sfn "/run/nucleus" "${systemRoot}/run"
           '';
-      chownUser = lib.optionalString (userName != null) (
-        if isDarwin then
-          "chown -R \"${userName}:\" \"${userRoot}\" \"${userHome}/Library/Logs/nucleus\" \"${userHome}/Library/State/nucleus\""
-        else
-          "chown -R \"${userName}:\" \"${userRoot}\" \"${userHome}/.local/state/nucleus\""
+      userChownDirs = if isDarwin then sortedTargets else lib.unique (map dirOf sortedTargets);
+      userChownArgs = lib.concatStringsSep " " (
+        [ "\"${userRoot}\"" ] ++ map (dir: "\"${dir}\"") userChownDirs
       );
+      chownUser = lib.optionalString (userName != null) "chown -R \"${userName}:\" ${userChownArgs}";
     in
     ''
       mkdir -p "${userRoot}" "${systemRoot}"
@@ -103,6 +116,7 @@ in
     nucleusUserRootFor
     nucleusSystemRoot
     nucleusHubDirFor
+    userLinkTargetsFor
     mkNucleusRootSymlinks
     mkNucleusHub
     ;
