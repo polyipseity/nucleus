@@ -77,18 +77,48 @@ fi
 section 5 "svc --list-services and endpoint --list-endpoints"
 
 svc_services="$("$SVC_SH" --list-services 2>/dev/null)"
-if printf '%s\n' "$svc_services" | grep -qx 'caddy'; then
-  assert_pass "svc --list-services prints host-filtered instance IDs"
-else
-  assert_fail "svc --list-services prints host-filtered instance IDs" "got: $(printf '%s' "$svc_services" | head -c 120 | tr '\n' '|')"
+host="${NUCLEUS_HOST:-}"
+if [ -z "$host" ]; then
+  case "$(uname -s)" in
+  Darwin) host="MacBook" ;;
+  Linux) host="NixOS" ;;
+  *) host="Unknown" ;;
+  esac
 fi
 
-ep1="$("$SVC_SH" endpoint caddy --list-endpoints 2>/dev/null || true)"
-ep2="$("$SVC_SH" endpoint --list-endpoints caddy 2>/dev/null || true)"
-if [ "$ep1" = "admin" ] && [ "$ep2" = "admin" ]; then
-  assert_pass "svc endpoint --list-endpoints prints endpoint names (both arg orders)"
+svc_with_ep=""
+while IFS= read -r svc; do
+  [ -n "$svc" ] || continue
+  case "$svc" in
+  *\\*) continue ;;
+  esac
+  if jq -e --arg svc "$svc" --arg host "$host" '
+    .[$svc].hosts[$host] != null
+    and .[$svc].hosts[$host].type != "omitted"
+    and ((.[$svc].network // {}) | length) > 0
+  ' "$REPO_ROOT/src/modules/services.json" >/dev/null 2>&1; then
+    svc_with_ep="$svc"
+    break
+  fi
+done <<<"$svc_services"
+
+if [ -n "$svc_with_ep" ] && printf '%s\n' "$svc_services" | grep -Fqx "$svc_with_ep"; then
+  assert_pass "svc --list-services prints host-filtered instance IDs"
 else
-  assert_fail "svc endpoint --list-endpoints prints endpoint names (both arg orders)" "ep1=$(printf '%s' "$ep1" | tr '\n' '|') ep2=$(printf '%s' "$ep2" | tr '\n' '|')"
+  assert_fail "svc --list-services prints host-filtered instance IDs" "got: $(printf '%s' "$svc_services" | tr '\n' '|')"
+fi
+
+if [ -z "$svc_with_ep" ]; then
+  assert_fail "svc endpoint --list-endpoints prints endpoint names (both arg orders)" "no host-declared service with network endpoints found; got: $(printf '%s' "$svc_services" | tr '\n' '|')"
+else
+  expected_eps="$(jq -r --arg svc "$svc_with_ep" '.[$svc].network | keys[]' "$REPO_ROOT/src/modules/services.json")"
+  ep1="$("$SVC_SH" endpoint "$svc_with_ep" --list-endpoints 2>/dev/null || true)"
+  ep2="$("$SVC_SH" endpoint --list-endpoints "$svc_with_ep" 2>/dev/null || true)"
+  if [ "$ep1" = "$expected_eps" ] && [ "$ep2" = "$expected_eps" ]; then
+    assert_pass "svc endpoint --list-endpoints prints endpoint names (both arg orders)"
+  else
+    assert_fail "svc endpoint --list-endpoints prints endpoint names (both arg orders)" "svc=$svc_with_ep expected=$(printf '%s' "$expected_eps" | tr '\n' '|') ep1=$(printf '%s' "$ep1" | tr '\n' '|') ep2=$(printf '%s' "$ep2" | tr '\n' '|')"
+  fi
 fi
 
 section 6 "help documents new list surfaces"
