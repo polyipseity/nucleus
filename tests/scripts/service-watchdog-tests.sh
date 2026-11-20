@@ -134,8 +134,12 @@ print)
   for _label in ${FAKE_LIVE:-}; do
     case "${2:-}" in
     *"$_label")
-      printf 'state = %s\n\tpid = 4242\n\truns = %s\n\tlast exit code = %s\n' \
-        "${FAKE_STATE:-running}" "${FAKE_RUNS:-1}" "${FAKE_EXIT_CODE:-0}"
+      printf 'state = %s\n\tpid = 4242\n\truns = %s\n' \
+        "${FAKE_STATE:-running}" "${FAKE_RUNS:-1}"
+      if [ -n "${FAKE_JOB_STATE:-}" ]; then
+        printf '\tjob state = %s\n' "${FAKE_JOB_STATE}"
+      fi
+      printf '\tlast exit code = %s\n' "${FAKE_EXIT_CODE:-0}"
       exit 0
       ;;
     esac
@@ -1515,8 +1519,76 @@ else
 fi
 assert_eq "a live idle job does not stamp lastLive" "0" "$(_ll_live)"
 rm -f "$_ll_record"
-unset FAKE_LIST FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS
+unset FAKE_LIST FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_JOB_STATE
 FAKE_LIVE=""
 export FAKE_LIVE
+
+# ── Section 26: loaded-but-not-running jobs are repaired, not started ──────
+section 26 "A loaded-but-not-running job is repaired once"
+
+redis_entry='{"type":"macos-launchctl","scope":"system","service":"local.redis","unitPath":"/Library/LaunchDaemons/local.redis.plist"}'
+redis_record="$state_dir/redis.json"
+rm -f "$redis_record"
+FAKE_LIVE="local.redis"
+FAKE_LIST=""
+FAKE_STATE="spawn scheduled"
+FAKE_JOB_STATE="spawn failed"
+FAKE_EXIT_CODE=78
+FAKE_RUNS=21620
+FAKE_DISABLED=""
+FAKE_ABSENT=""
+export FAKE_LIVE FAKE_LIST FAKE_STATE FAKE_JOB_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_DISABLED FAKE_ABSENT
+: >"$_tmp/launchctl.log"
+
+run_check_instance "redis" "macos-launchctl" "$redis_entry" "redis" "local.redis"
+assert_eq "spawn-failed loaded job exits 0" 0 "$captured_status"
+assert_contains "spawn-failed loaded job is repaired" "$captured_output" "loaded but cannot spawn"
+assert_contains "spawn-failed loaded job takes repair path" "$(cat "$_tmp/launchctl.log")" "bootout"
+assert_contains "spawn-failed repair bootstraps the job" "$(cat "$_tmp/launchctl.log")" "bootstrap"
+assert_eq "spawn-failed loaded job records generation" "21620" "$(jq -r '.generation' "$redis_record")"
+assert_eq "spawn-failed loaded job records last exit" "78" "$(jq -r '.lastExit' "$redis_record")"
+assert_eq "spawn-failed loaded job records repair signature" "loaded-repair:78:21620" "$(jq -r '.reportedState' "$redis_record")"
+
+# Same known condition: no repeated notice or repair action.
+: >"$_tmp/launchctl.log"
+run_check_instance "redis" "macos-launchctl" "$redis_entry" "redis" "local.redis"
+assert_eq "known spawn-failed job is silent on repeat" "" "$captured_output"
+assert_eq "known spawn-failed job is not repaired again" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+# A genuinely absent job still takes the start path.
+rm -f "$redis_record"
+FAKE_LIVE=""
+FAKE_JOB_STATE=""
+FAKE_EXIT_CODE=0
+FAKE_RUNS=1
+FAKE_STATE="spawn scheduled"
+export FAKE_LIVE FAKE_JOB_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_STATE
+: >"$_tmp/launchctl.log"
+run_check_instance "redis" "macos-launchctl" "$redis_entry" "redis" "local.redis"
+assert_contains "absent job takes start path" "$captured_output" "not running; starting"
+assert_contains "absent job is started" "$(cat "$_tmp/launchctl.log")" "bootstrap"
+assert_not_contains "absent job is not repaired" "$(cat "$_tmp/launchctl.log")" "bootout"
+
+# A healthy job takes neither repair nor start.
+rm -f "$redis_record"
+FAKE_LIVE="local.redis"
+FAKE_STATE="running"
+FAKE_EXIT_CODE=0
+FAKE_RUNS=1
+FAKE_JOB_STATE=""
+export FAKE_LIVE FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_JOB_STATE
+: >"$_tmp/launchctl.log"
+run_check_instance "redis" "macos-launchctl" "$redis_entry" "redis" "local.redis"
+assert_eq "healthy job prints nothing" "" "$captured_output"
+assert_eq "healthy job is untouched" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+rm -f "$redis_record"
+unset FAKE_JOB_STATE
+FAKE_LIVE=""
+FAKE_LIST=""
+FAKE_STATE=""
+FAKE_EXIT_CODE=0
+FAKE_RUNS=0
+export FAKE_LIVE FAKE_LIST FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS
 
 finish_tests

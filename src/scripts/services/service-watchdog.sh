@@ -425,6 +425,49 @@ _watchdog_check_instance() {
     return 0
   fi
 
+  # A job launchd still holds but cannot spawn is loaded, not absent: repair it
+  # instead of starting a job that is already loaded.
+  local _needs_loaded_repair=false _repair_signature=""
+  if [ -n "$print_out" ]; then
+    case "$svc_type" in
+    macos-launchctl)
+      case "$print_out" in
+      *"job state = spawn failed"*)
+        _needs_loaded_repair=true
+        ;;
+      *"state = spawn scheduled"*)
+        if [ "$last_exit" = "78" ]; then
+          _needs_loaded_repair=true
+        fi
+        ;;
+      esac
+      ;;
+    esac
+  fi
+  if [ "$_needs_loaded_repair" = true ]; then
+    _repair_signature="loaded-repair:${last_exit}:${generation}"
+    if ! svc_health_set "$instance" "generation" "$generation"; then
+      warn "watchdog: could not record the generation for $instance"
+    fi
+    if ! svc_health_set_last_exit "$instance" "$last_exit"; then
+      warn "watchdog: could not record the last exit for $instance"
+    fi
+    if ! svc_health_is_reported "$instance" "$_repair_signature"; then
+      notice "watchdog: $instance is loaded but cannot spawn (last_exit=$last_exit); repairing"
+      repair_timeout="$_WATCHDOG_REPAIR_TIMEOUT_SECONDS"
+      svc_run_bounded "$repair_timeout" supervisor_repair "$target" "$declared_unit_path" "$scope" || repair_rc=$?
+      if [ "$repair_rc" -eq 124 ]; then
+        warn "watchdog: repair of $instance timed out after ${repair_timeout}s"
+      elif [ "$repair_rc" -ne 0 ]; then
+        warn "watchdog: could not repair $instance (status $repair_rc)"
+      fi
+      if ! svc_health_mark_reported "$instance" "$_repair_signature"; then
+        warn "watchdog: could not record the repair for $instance"
+      fi
+    fi
+    return 0
+  fi
+
   notice "watchdog: $instance is not running; starting"
   if ! supervisor_start "$target" "$declared_unit_path" "$scope"; then
     warn "watchdog: could not start $instance"
