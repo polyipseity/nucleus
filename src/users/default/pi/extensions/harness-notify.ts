@@ -22,7 +22,7 @@ import { readdirSync, readFileSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-const NOTIFY_COMMAND = "harness-notify";
+const NOTIFY_COMMAND = "nucleus-utils";
 // Bounds the wait at agent settle; any longer and a wedged network call would
 // visibly delay the next prompt.
 const NOTIFY_TIMEOUT_MS = 15_000;
@@ -103,7 +103,7 @@ export default function (pi: ExtensionAPI) {
   ): Promise<void> => {
     if (failures >= FAILED_NOTIFICATION_CAP) return;
     try {
-      const result = await pi.exec(NOTIFY_COMMAND, ["pi", event, text], {
+      const result = await pi.exec(NOTIFY_COMMAND, ["harness-notify", "pi", event, text], {
         timeout: NOTIFY_TIMEOUT_MS,
       });
       if (result.code !== 0) failures += 1;

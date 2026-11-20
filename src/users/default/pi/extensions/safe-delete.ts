@@ -15,7 +15,7 @@ import { statusText } from "./shared/status-style.ts";
 // CLI-subcommand cases (`git rm`, `brew rm`, and friends) to the shared policy.
 const DELETION_WORD_RE = /\b(?:rm|del|rd|rmdir|erase|ri|unlink|shred|remove-item)\b/i;
 
-export const DEFAULT_RUNNER_COMMAND = "harness-filter";
+export const DEFAULT_RUNNER_COMMAND = "nucleus-utils";
 export const DEFAULT_TIMEOUT_MS = 10_000;
 const STATUS_KEY = "safe-delete";
 
@@ -131,7 +131,7 @@ export async function runHarnessFilter(
 	options: RunnerOptions = {},
 ): Promise<Verdict> {
 	const runnerCommand = options.runnerCommand ?? DEFAULT_RUNNER_COMMAND;
-	const runnerArgs = options.runnerArgs ?? ["pi"];
+	const runnerArgs = options.runnerArgs ?? ["harness-filter", "pi"];
 	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	const spawnFn = options.spawnFn ?? spawnHarnessFilter;
 	const result = await spawnFn(runnerCommand, runnerArgs, buildPayload(command), timeoutMs);

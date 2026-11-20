@@ -14,13 +14,13 @@
     <USER root>\bin\rm.exe, del.exe, rd.exe, rmdir.exe, erase.exe, ri.exe
       deployed copies of rip.exe (from Scoop shims dir)
     %USERPROFILE%\.local\bin\rm.exe, del.exe, ...  PATH shims (copies)
-    %USERPROFILE%\.local\bin\safe-delete-guard.cmd   launcher for the shared
-      deletion policy, which Sync-HarnessBridge deploys into
-      <USER root>\bin\filters
     <USER root>\state\safe-delete\shims.json   every deployed shim path and
       the rip.exe hash the deletion filter proves it against
     <USER root>\state\rip\graveyard   the rip graveyard, the path RIP_GRAVEYARD
       names (src\modules\lib\env-secrets.nix)
+
+  Deletion-guard command surface is provided by `nucleus-utils` (and hook
+  filter dispatch), not by a standalone `safe-delete-guard.cmd` shim.
 
 .PARAMETER Enabled
   Whether safe-delete shims should be enforced.
@@ -301,15 +301,6 @@ function Sync-SafeDelete {
     $newVal = if ($current) { "$current & `"$doskeyCmd`"" } else { "`"$doskeyCmd`"" }
     Set-ItemProperty -Path $autoRunKey -Name AutoRun -Value $newVal -Type String
   }
-
-  # Agent guard: a PATH shim around the one deletion policy, run in its --hook
-  # mode. The policy file is the copy Sync-HarnessBridge deploys, so the shim, the
-  # harness filters, and the POSIX safe-delete-guard command all execute the same
-  # bytes instead of a per-platform pattern set that can drift.
-  $guardPolicy = Join-Path -Path $binDir -ChildPath "filters\safe-delete.ts"
-  $guardDest = Join-Path -Path $shimDir -ChildPath "safe-delete-guard.cmd"
-  $guardContent = "@echo off`r`nbun run `"$guardPolicy`" --hook %*`r`n"
-  Set-Content -Path $guardDest -Value $guardContent -Force
 
   # Git Bash: rm alias to rip
   $bashrc = Join-Path -Path $UserProfile -ChildPath ".bashrc"

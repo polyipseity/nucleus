@@ -49,37 +49,6 @@ let
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
-  # Every harness calls this one command from its hook configuration. Deployed to
-  # ~/.local/bin because that configuration is a symlink into this repository:
-  # embedding the store path there would dirty the repo on every rebuild.
-  harnessNotify = pkgs.writeNucleusShellApplication {
-    name = "harness-notify";
-    scriptName = "src/scripts/notify/harness-notify";
-    runtimeInputs = [ pkgs.jq ];
-  };
-
-  harnessApproval = pkgs.writeNucleusShellApplication {
-    name = "harness-approval";
-    scriptName = "src/scripts/notify/harness-approval";
-    runtimeInputs = [ pkgs.jq ];
-  };
-
-  # The decision runner every harness hook calls. Its filters live beside it in the
-  # script tree ($out/src/scripts/notify/filters), so the store copy is complete
-  # and nothing under filters/ needs deploying on its own.
-  harnessFilter = pkgs.writeNucleusShellApplication {
-    name = "harness-filter";
-    scriptName = "src/scripts/notify/harness-filter";
-    runtimeInputs = [ pkgs.jq ];
-  };
-
-  # Stop hooks call this instead of harness-notify so the notification half
-  # still has a single implementation.
-  harnessDrive = pkgs.writeNucleusShellApplication {
-    name = "harness-drive";
-    scriptName = "src/scripts/notify/harness-drive";
-    runtimeInputs = [ pkgs.jq ];
-  };
 in
 {
   # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
@@ -91,10 +60,6 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
     ".config/opencode/commands".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
-    ".local/bin/harness-notify".source = "${harnessNotify}/bin/nucleus-harness-notify";
-    ".local/bin/harness-approval".source = "${harnessApproval}/bin/nucleus-harness-approval";
-    ".local/bin/harness-filter".source = "${harnessFilter}/bin/nucleus-harness-filter";
-    ".local/bin/harness-drive".source = "${harnessDrive}/bin/nucleus-harness-drive";
   };
 
   home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''

@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const APPROVAL_COMMAND = "harness-approval";
+const APPROVAL_COMMAND = "nucleus-utils";
 const CONFIG_PATH = join(homedir(), ".local", "state", "nucleus", "config.json");
 // The sources wait until answered by default (harness-approval.timeout-seconds
 // is 0), so this is the ceiling for the whole wait rather than a limit under the
@@ -110,7 +110,7 @@ export default function (pi: ExtensionAPI) {
     try {
       const result = await pi.exec(
         APPROVAL_COMMAND,
-        ["pi", event.toolName, summary],
+        ["harness-approval", "pi", event.toolName, summary],
         { timeout: EXEC_TIMEOUT_MS },
       );
       if (result.code === 0) {

@@ -13,12 +13,12 @@
   bot tokens of its own for notifications and no gateway process needs to be
   running for bot-token platforms.
 
-  Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-notify.cmd shim, together with the sibling
-  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
-  shared Format-NucleusOutput module would bake a repository path into the
-  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
-  stderr.
+  Invoked as `nucleus-utils harness-notify ...` via scripts/utils.{sh,ps1}.
+  Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
+  shim deployed by Sync-NucleusApps.ps1). The sibling harness-bridge-common.ps1
+  is dot-sourced for shared helpers so this script does not import repository
+  modules by absolute path at runtime. Warning output keeps the F1 shape
+  (`<cmd>: warning: <msg>`) on stderr.
 
 .PARAMETER EventName
   Lifecycle event: done, needs-input, approval, or error. Named EventName because

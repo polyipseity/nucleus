@@ -25,10 +25,10 @@
   timeout is the ceiling: the hook files declare 3600 s, which outlasts any human
   answer and still ends a session that nobody is watching.
 
-  Deployed verbatim to <USER root>\bin and reached through the
-  %USERPROFILE%\.local\bin\harness-approval.cmd shim, together with the sibling
-  harness-bridge-common.ps1 it dot-sources for the shared helpers (see
-  harness-notify.ps1 for the same reasoning).
+  Invoked as `nucleus-utils harness-approval ...` via scripts/utils.{sh,ps1}.
+  Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
+  shim deployed by Sync-NucleusApps.ps1). The sibling harness-bridge-common.ps1
+  is dot-sourced for shared helpers.
 
   `ask` means "no source decided": the harness must fall back to its own local
   prompt.  Every path prints a decision and exits 0: a harness hook that fails is

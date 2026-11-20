@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "harness-filter claude",
+            "command": "nucleus-utils harness-filter claude",
             "timeout": 3600
           }
         ]

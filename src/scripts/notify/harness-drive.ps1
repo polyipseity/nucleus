@@ -24,12 +24,11 @@
   works on macOS and NixOS only. Nothing here compensates for that: a workaround
   would have to fake user input into the harness.
 
-  Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-drive.cmd shim, together with the sibling
-  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
-  shared Format-NucleusOutput module would bake a repository path into the
-  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
-  stderr.
+  Invoked as `nucleus-utils harness-drive ...` via scripts/utils.{sh,ps1}.
+  Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
+  shim deployed by Sync-NucleusApps.ps1). The sibling harness-bridge-common.ps1
+  is dot-sourced for shared helpers. Warning output keeps the F1 shape
+  (`<cmd>: warning: <msg>`) on stderr.
 
 .PARAMETER Harness
   Harness name: pi, opencode, cursor, or copilot.

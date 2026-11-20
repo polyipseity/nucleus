@@ -244,13 +244,6 @@ in
     executable = true;
   };
 
-  # Agent guard: the same deletion policy the filter runner dispatches, in its
-  # --hook mode, so one program decides for agents and for every harness.
-  home.file.".local/bin/safe-delete-guard" = {
-    source = "${activationBundle}/src/scripts/notify/filters/safe-delete.ts";
-    executable = true;
-  };
-
   # Claude Code settings and nucleus plugin marketplace: deploy via writable symlinks (method 1).
   # settings.json carries extraKnownMarketplaces/enabledPlugins for nucleus-prompt-tools;
   # the marketplace and plugin directories must exist after activation so Claude can load them.

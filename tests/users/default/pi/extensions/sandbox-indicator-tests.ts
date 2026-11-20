@@ -277,7 +277,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 					if (command === "rm") {
 						return "/usr/bin/rm";
 					}
-					return command === "harness-filter" ? "/opt/nucleus/bin/harness-filter" : "not found";
+					return command === "nucleus-utils" ? "/opt/nucleus/bin/nucleus-utils" : "not found";
 				},
 				commandExists: (command) => command === "shell-safe-rm",
 				readRegistryUnproven: () => "ask",
@@ -290,7 +290,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("rm: /usr/bin/rm");
 		expect(report).toContain("shell-safe-rm present: true");
 		expect(report).toContain("rip present: false");
-		expect(report).toContain("harness-filter: /opt/nucleus/bin/harness-filter");
+		expect(report).toContain("nucleus-utils: /opt/nucleus/bin/nucleus-utils");
 		expect(report).toContain("safe-delete.settings.unproven: ask");
 	});
 
@@ -312,7 +312,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("rm: not found");
 		expect(report).toContain("shell-safe-rm present: false");
 		expect(report).toContain("rip present: true");
-		expect(report).toContain("harness-filter: missing");
+		expect(report).toContain("nucleus-utils: missing");
 		expect(report).toContain("safe-delete.settings.unproven: unavailable");
 	});
 
@@ -323,7 +323,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 			env: { SANDBOX_RUNTIME: "1" },
 			cwd: "/tmp",
 			commandPath: (command) =>
-				command === "harness-filter" ? "/nucleus/bin/harness-filter" : "/bin/rm",
+				command === "nucleus-utils" ? "/nucleus/bin/nucleus-utils" : "/bin/rm",
 			commandExists: (command) => command === "shell-safe-rm",
 			readRegistryUnproven: () => "ask",
 		});
@@ -348,7 +348,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(sandboxedCtx.notifications[0][0]).toContain("rm: /bin/rm");
 		expect(sandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: true");
 		expect(sandboxedCtx.notifications[0][0]).toContain("rip present: false");
-		expect(sandboxedCtx.notifications[0][0]).toContain("harness-filter: /nucleus/bin/harness-filter");
+		expect(sandboxedCtx.notifications[0][0]).toContain("nucleus-utils: /nucleus/bin/nucleus-utils");
 		expect(sandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: ask");
 
 		resetSandboxWarningForTests();
@@ -377,7 +377,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(unsandboxedCtx.notifications[0][0]).toContain("rm: not found");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: false");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("rip present: true");
-		expect(unsandboxedCtx.notifications[0][0]).toContain("harness-filter: missing");
+		expect(unsandboxedCtx.notifications[0][0]).toContain("nucleus-utils: missing");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: deny");
 		expect(sandboxed.command?.description).toBe("Show sandbox state and deletion-safety tooling status");
 	});

@@ -7,13 +7,11 @@
   this file, so the warning line, the nucleus root, and the runtime config path
   have one definition.
 
-  The entry points are deployed verbatim to <USER root>\bin and reached from
-  harness hooks through the %USERPROFILE%\.local\bin\*.cmd shims, and this file
-  is copied beside them by Sync-HarnessBridge.  That is also why no helper here
-  imports Format-NucleusOutput.psm1 from $PSScriptRoot: a repository-relative path
-  would not exist in the deployed copy.  Data that only the live checkout owns is
-  reached through $env:NUCLEUS_REPO_ROOT instead, exactly as harness-filter.ps1
-  reads its registry.  This file is never invoked as a command, so it gets no shim.
+  The harness bridge entry points are invoked via `nucleus-utils` subcommands
+  (scripts/utils.{sh,ps1}) from the live checkout, so helpers here avoid importing
+  repository modules by fixed repository-relative paths when they may run from a
+  copied context. Data that only the live checkout owns is reached through
+  $env:NUCLEUS_REPO_ROOT where needed, as harness-filter.ps1 reads its registry.
 
   Warning output keeps the F1 shape (`<cmd>: warning: <msg>`) on stderr minus
   console color, which a hook never sees anyway.

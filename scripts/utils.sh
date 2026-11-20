@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# nucleus-utils: optimize-pdf (Ghostscript) and strip-metadata (mat2/exiftool).
+# nucleus-utils: optimize-pdf (Ghostscript), strip-metadata (mat2/exiftool),
+# harness notify/approval/filter/drive, and safe-delete-guard.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -22,8 +23,9 @@ bash_guard_require 5 1 utils
 # WHY: the help text is the executable contract, so it enumerates every
 # subcommand, flag, and preset the parsers accept.
 usage() {
-  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>..." \
-    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
+  usage_std "$(basename "$0")" \
+    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | safe-delete-guard [args]..." \
+    "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations."
   cat <<'EOF'
 
   -h|--help  Show usage.
@@ -38,6 +40,26 @@ Subcommands:
               ICC color profiles are preserved for correct color rendering.
               Legacy OLE2 files (.doc/.xls/.ppt) and PDF files are skipped
               with a warning.
+
+  harness-notify <harness> <event> [text]
+              Normalize a harness lifecycle event into a Hermes notification.
+              Dispatches to src/scripts/notify/harness-notify.sh.
+
+  harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds]
+              Request an approval decision for a harness tool call.
+              Dispatches to src/scripts/notify/harness-approval.sh.
+
+  harness-filter <harness>
+              Read a harness hook payload on stdin and print a decision document.
+              Dispatches to src/scripts/notify/harness-filter.sh.
+
+  harness-drive <harness>
+              End a harness turn: notify and inject one queued remote prompt.
+              Dispatches to src/scripts/notify/harness-drive.sh.
+
+  safe-delete-guard [args]...
+              Evaluate deletion commands against the safe-delete policy.
+              Dispatches to src/scripts/notify/filters/safe-delete.ts.
 
   optimize-pdf presets (default: default):
     default   - high quality
@@ -374,6 +396,21 @@ main() {
     ;;
   strip-metadata)
     do_strip_metadata "$@"
+    ;;
+  harness-notify)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-notify.sh" "$@"
+    ;;
+  harness-approval)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-approval.sh" "$@"
+    ;;
+  harness-filter)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-filter.sh" "$@"
+    ;;
+  harness-drive)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-drive.sh" "$@"
+    ;;
+  safe-delete-guard)
+    exec "$SCRIPT_DIR/../src/scripts/notify/filters/safe-delete.ts" "$@"
     ;;
   *)
     error "unknown subcommand: $subcommand"

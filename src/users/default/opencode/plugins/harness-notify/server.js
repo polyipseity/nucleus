@@ -37,8 +37,8 @@ import { promisify } from "node:util";
 
 const runFile = promisify(execFile);
 
-const NOTIFY_COMMAND = "harness-notify";
-const APPROVAL_COMMAND = "harness-approval";
+const NOTIFY_COMMAND = "nucleus-utils";
+const APPROVAL_COMMAND = "nucleus-utils";
 // The approval sources wait until answered by default, so this is the ceiling for
 // the whole wait rather than a limit under the gate: 3600 s matches the hook
 // budget the shared hook files declare, and the harness falls back to its own
@@ -119,7 +119,7 @@ function takeQueuedPrompt() {
  * @param {string} text  Notification body.
  */
 function notify(event, text) {
-  const child = spawn(NOTIFY_COMMAND, ["opencode", event, text], {
+  const child = spawn(NOTIFY_COMMAND, ["harness-notify", "opencode", event, text], {
     detached: true,
     stdio: "ignore",
   });
@@ -141,7 +141,7 @@ function asId(value) {
  */
 async function decideRemotely(tool, summary) {
   try {
-    const { stdout } = await runFile(APPROVAL_COMMAND, ["opencode", tool, summary], {
+    const { stdout } = await runFile(APPROVAL_COMMAND, ["harness-approval", "opencode", tool, summary], {
       timeout: APPROVAL_TIMEOUT_MS,
     });
     const lines = stdout.trim().split("\n");

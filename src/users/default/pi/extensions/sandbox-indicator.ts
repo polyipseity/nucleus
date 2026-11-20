@@ -162,8 +162,8 @@ export function buildSandboxStatusReport(
 	const state = detection.sandboxed ? "sandboxed" : "unsandboxed";
 	const mode = typeof ctx.mode === "string" ? ctx.mode : "unknown";
 	const rmPath = commandPath("rm");
-	const filterPath = commandPath("harness-filter");
-	const filterDisplay = filterPath === "not found" ? "missing" : filterPath;
+	const utilsPath = commandPath("nucleus-utils");
+	const utilsDisplay = utilsPath === "not found" ? "missing" : utilsPath;
 	const safeRmPresent = commandExists("shell-safe-rm");
 	const ripPresent = commandExists("rip");
 	const unproven = readUnproven(env, cwd);
@@ -175,7 +175,7 @@ export function buildSandboxStatusReport(
 		`rm: ${rmPath}`,
 		`shell-safe-rm present: ${safeRmPresent}`,
 		`rip present: ${ripPresent}`,
-		`harness-filter: ${filterDisplay}`,
+		`nucleus-utils: ${utilsDisplay}`,
 		`safe-delete.settings.unproven: ${unproven}`,
 	].join("\n");
 }

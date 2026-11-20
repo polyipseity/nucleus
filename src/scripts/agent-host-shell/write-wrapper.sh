@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Write the VS Code agent-host wrapper to the SYSTEM root bin.
+# Renamed to nucleus-agent-host-shell: documented exception (path-only consumer,
+# not a nucleus app) because the VS Code setting takes a path, not arguments.
 # Args: $1 = wrapper path (may contain spaces), $2 = absolute shell exe.
 set -euo pipefail
 

@@ -938,10 +938,14 @@ $nucleusUpdateFlags = @(
 )
 
 $nucleusUtilsFlags = @(
+  '--command',
   '--dialog',
   '--help',
+  '--hook',
+  '--plain',
   '--preset',
-  '--rm-bak'
+  '--rm-bak',
+  '--settings'
 )
 
 $nucleusVmFlags = @(

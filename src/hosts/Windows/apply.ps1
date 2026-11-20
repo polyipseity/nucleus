@@ -325,7 +325,7 @@ try {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-HarnessBridge.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-NucleusApps.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SafeDelete.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ClaudeConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
@@ -712,9 +712,9 @@ Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repo
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
-# Hook entry points must resolve by bare name from harness-spawned processes,
-# so they are deployed to the USER root with .cmd shims on the managed PATH.
-Sync-HarnessBridge -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
+# Nucleus command shims on the managed PATH so `nucleus-*` commands resolve by
+# bare name from user processes and harness hooks.
+Sync-NucleusApps -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 Sync-SafeDelete -Enabled:$true -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 Sync-ClaudeConfig -Enabled:$true -RepoRoot $repoRoot -UserProfile $HOME
 if ($EnableCloudDrivesParity) {

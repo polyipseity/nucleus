@@ -1,5 +1,9 @@
 # Wrapper for VS Code agent-host terminals (sets agent env vars).
 #
+# Renamed to nucleus-agent-host-shell for command-surface clarity. It remains a
+# wrapper file (documented exception, not a nucleus app) because the consumer
+# takes a path and cannot pass command arguments.
+#
 # It lives at the SYSTEM root bin, so a root-context system activation script
 # writes it. nix-darwin only honors hardcoded fragment names, hence
 # postActivation there; NixOS takes a custom kebab-case name.
@@ -21,9 +25,9 @@ let
   # Stable path the agentHostProfile VS Code setting points at.
   wrapperPath =
     if pkgs.stdenv.hostPlatform.isDarwin then
-      "/Library/Application Support/nucleus/bin/agent-host-shell"
+      "/Library/Application Support/nucleus/bin/nucleus-agent-host-shell"
     else
-      "/var/lib/nucleus/bin/agent-host-shell";
+      "/var/lib/nucleus/bin/nucleus-agent-host-shell";
 
   activationBundle = pkgs.callPackage ../lib/script-tree.nix { };
 in
@@ -32,7 +36,7 @@ in
     enable = mkOption {
       type = types.bool;
       default = true;
-      description = "Whether to create the VS Code agent-host wrapper script at the SYSTEM root bin (macOS /Library/Application Support/nucleus/bin, NixOS /var/lib/nucleus/bin).";
+      description = "Whether to create the VS Code agent-host wrapper script (nucleus-agent-host-shell) at the SYSTEM root bin (macOS /Library/Application Support/nucleus/bin, NixOS /var/lib/nucleus/bin). Documented exception: a path-only consumer, not a nucleus app.";
     };
   };
 

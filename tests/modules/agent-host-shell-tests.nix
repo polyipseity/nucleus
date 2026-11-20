@@ -7,6 +7,10 @@
 # activation fragment to the path VS Code is configured to launch, so the two
 # cannot drift apart again.
 #
+# The wrapper is renamed to nucleus-agent-host-shell for command-surface clarity
+# but remains a path-only wrapper (documented exception, not a nucleus app):
+# the VS Code setting consumes a path and cannot pass command arguments.
+#
 # The previous version of this file was deleted in 5ded7fda because it hand-wrote
 # a wrapper string and then asserted that its own string contained it: a
 # tautology that exercised nothing in the module. Every value below is read from
@@ -86,7 +90,7 @@ let
     linux = "/var/lib/nucleus";
   };
 
-  wrapperPathFor = platform: "${documentedSystemRoots.${platform}}/bin/agent-host-shell";
+  wrapperPathFor = platform: "${documentedSystemRoots.${platform}}/bin/nucleus-agent-host-shell";
 
   test_option_is_declared = assert' (
     darwinEval.options ? nucleus.agentHostShell.enable
@@ -120,15 +124,15 @@ let
       "VS Code's linux agentHostProfile (${agentProfiles.linux.path}) must be the path the linux module installs (${wrapperPathFor "linux"})";
 
   test_both_posix_profiles_match_system_roots = assert' (
-    agentProfiles.osx.path == "${documentedSystemRoots.osx}/bin/agent-host-shell"
-    && agentProfiles.linux.path == "${documentedSystemRoots.linux}/bin/agent-host-shell"
+    agentProfiles.osx.path == "${documentedSystemRoots.osx}/bin/nucleus-agent-host-shell"
+    && agentProfiles.linux.path == "${documentedSystemRoots.linux}/bin/nucleus-agent-host-shell"
   ) "both POSIX agentHostProfile paths must be the documented SYSTEM root bin";
 
   # The Windows twin is served by the PowerShell module, out of scope here; this
-  # only asserts the parity entry exists rather than that its content is right.
+  # asserts the parity entry points at the renamed wrapper.
   test_windows_profile_is_present = assert' (
-    agentProfiles.windows.path != ""
-  ) "the Windows agentHostProfile entry must still exist for cross-host parity";
+    agentProfiles.windows.path == "C:\\ProgramData\\nucleus\\bin\\nucleus-agent-host-shell.ps1"
+  ) "the Windows agentHostProfile must point at the renamed nucleus-agent-host-shell wrapper";
 
   allTests = [
     test_option_is_declared
@@ -146,5 +150,5 @@ in
 builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
-  message = "All ${toString (builtins.length allTests)} agent-host-shell tests passed";
+  message = "All ${toString (builtins.length allTests)} nucleus-agent-host-shell tests passed";
 }

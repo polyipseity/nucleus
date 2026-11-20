@@ -40,4 +40,4 @@ Every POSIX `scripts/<name>.sh` with subcommands needs a `scripts/<name>.ps1` tw
 
 ## Agent host wrapper
 
-The VS Code agent host wrapper is system-level, never per-user and never symlinked from `src/users/`. POSIX installs it into the SYSTEM root bin (`/Library/Application Support/nucleus/bin/agent-host-shell` on macOS, `/var/lib/nucleus/bin/agent-host-shell` on NixOS) from `src/modules/posix/agent-host-shell.nix`; Windows uses `%ProgramData%\nucleus\bin\agent-host-shell.ps1` from `Invoke-AgentHostShellSetup.ps1`.
+The VS Code agent host wrapper is system-level, never per-user and never symlinked from `src/users/`. POSIX installs it into the SYSTEM root bin (`/Library/Application Support/nucleus/bin/nucleus-agent-host-shell` on macOS, `/var/lib/nucleus/bin/nucleus-agent-host-shell` on NixOS) from `src/modules/posix/agent-host-shell.nix`; Windows uses `%ProgramData%\nucleus\bin\nucleus-agent-host-shell.ps1` from `Invoke-AgentHostShellSetup.ps1`. It remains a wrapper file (documented exception, not a nucleus app) because the VS Code setting consumes a path and cannot pass command arguments.

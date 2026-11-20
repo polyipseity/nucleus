@@ -7,24 +7,36 @@
   - strip-metadata: strip file metadata with mat2/exiftool. PDF and legacy OLE2
     files are skipped with a warning; inputs that could not be processed are
     listed at the end of the run.
+  - harness-notify: normalize a harness lifecycle event into a Hermes notification.
+  - harness-approval: request an approval decision for a harness tool call.
+  - harness-filter: read a harness hook payload on stdin and print a decision document.
+  - harness-drive: end a harness turn: notify and inject one queued remote prompt.
+  - safe-delete-guard: evaluate deletion commands against the safe-delete policy.
 .PARAMETER Action
-  The subcommand to run: optimize-pdf, strip-metadata.
+  The subcommand to run: optimize-pdf, strip-metadata, harness-notify,
+  harness-approval, harness-filter, harness-drive, safe-delete-guard.
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
 .PARAMETER Dialog
   Switch (strip-metadata only). Show one modal popup listing every input that was
   not processed. Needed by GUI callers: the context-menu verb runs with
   -WindowStyle Hidden, which discards stdout and stderr.
+.PARAMETER Plain
+  Switch (harness-approval only). Print the decision word alone instead of the
+  harness's document.
 .PARAMETER File
-  One or more file paths to process.
+  One or more file paths to process, or positional arguments forwarded to
+  harness and safe-delete-guard subcommands.
 .NOTES
   Maps to the optimize-pdf --preset and --rm-bak and strip-metadata --rm-bak options.
+  Harness and safe-delete-guard subcommands dispatch to implementations in
+  src/scripts/notify/.
 #>
 
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('optimize-pdf', 'strip-metadata')]
+  [ValidateSet('optimize-pdf', 'strip-metadata', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'safe-delete-guard')]
   [string]$Action,
 
   [Parameter()]
@@ -35,6 +47,9 @@ param(
 
   [Parameter()]
   [switch]$Dialog,
+
+  [Parameter()]
+  [switch]$Plain,
 
   [Parameter(Position = 1, ValueFromRemainingArguments)]
   [string[]]$File,
@@ -123,12 +138,17 @@ if ($Help) {
 # asking which subcommand to run is not a failure.
 if (-not $Action) {
   $scriptName = Split-Path -Leaf $PSCommandPath
-  Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>..."
-  Write-NucleusInfo "  Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
+  Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>... | harness-notify <harness> <event> [text] | harness-approval [-Plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | safe-delete-guard [args]..."
+  Write-NucleusInfo "  Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations."
   Write-NucleusInfo ""
   Write-NucleusInfo "Subcommands:"
-  Write-NucleusInfo "  optimize-pdf     Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
-  Write-NucleusInfo "  strip-metadata   Strip personal metadata from files (mat2 for OOXML, exiftool otherwise); PDF and legacy OLE2 inputs are skipped."
+  Write-NucleusInfo "  optimize-pdf       Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
+  Write-NucleusInfo "  strip-metadata     Strip personal metadata from files (mat2 for OOXML, exiftool otherwise); PDF and legacy OLE2 inputs are skipped."
+  Write-NucleusInfo "  harness-notify     Normalize a harness lifecycle event into a Hermes notification."
+  Write-NucleusInfo "  harness-approval   Request an approval decision for a harness tool call."
+  Write-NucleusInfo "  harness-filter     Read a harness hook payload on stdin and print a decision document."
+  Write-NucleusInfo "  harness-drive      End a harness turn: notify and inject one queued remote prompt."
+  Write-NucleusInfo "  safe-delete-guard  Evaluate deletion commands against the safe-delete policy."
   Write-NucleusInfo ""
   Write-NucleusInfo "Run $scriptName -Help for the full help text."
   exit 0
@@ -309,5 +329,38 @@ switch ($Action) {
     }
 
     if ($failed -gt 0) { exit 1 }
+  }
+
+  'harness-notify' {
+    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-notify.ps1'
+    & $scriptPath @File
+    exit $LASTEXITCODE
+  }
+
+  'harness-approval' {
+    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-approval.ps1'
+    $forwardArgs = @()
+    if ($Plain) { $forwardArgs += '-Plain' }
+    if ($File) { $forwardArgs += $File }
+    & $scriptPath @forwardArgs
+    exit $LASTEXITCODE
+  }
+
+  'harness-filter' {
+    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-filter.ps1'
+    & $scriptPath @File
+    exit $LASTEXITCODE
+  }
+
+  'harness-drive' {
+    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-drive.ps1'
+    & $scriptPath @File
+    exit $LASTEXITCODE
+  }
+
+  'safe-delete-guard' {
+    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\filters\safe-delete.ts'
+    & bun $scriptPath @File
+    exit $LASTEXITCODE
   }
 }

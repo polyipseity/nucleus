@@ -81,4 +81,29 @@ else
   assert_fail "store layout audit event" "lines=$_lines event: $(cat "$AUDIT" 2>/dev/null)"
 fi
 
+section 2 "notify manifest/deployment surface"
+
+# Task 2 command-surface cleanup: harness bridge implementations stay in
+# src/scripts/notify and are dispatched via nucleus-utils, not deployed as
+# standalone ~/.local/bin harness executables.
+if ! grep -Eq 'home\.file\."\.(local)/bin/harness-' "$REPO_ROOT/src/modules/agents.nix" "$REPO_ROOT/src/modules/shell/default.nix"; then
+  assert_pass "agents.nix and shell/default.nix deploy no harness-* ~/.local/bin executables"
+else
+  assert_fail "agents.nix and shell/default.nix deploy no harness-* ~/.local/bin executables" "found harness-* home.file .local/bin entry"
+fi
+
+if ! grep -Eq 'home\.file\."\.(local)/bin/safe-delete-guard"' "$REPO_ROOT/src/modules/shell/default.nix"; then
+  assert_pass "shell/default.nix deploys no safe-delete-guard ~/.local/bin executable"
+else
+  assert_fail "shell/default.nix deploys no safe-delete-guard ~/.local/bin executable" "found safe-delete-guard home.file entry"
+fi
+
+# Implementation scripts remain in src/scripts/notify; filter files and shared
+# policy stay under filters/. No standalone deployed wrapper files belong here.
+if [ -f "$REPO_ROOT/src/scripts/notify/harness-filter.sh" ] && [ -f "$REPO_ROOT/src/scripts/notify/harness-filter.ps1" ] && [ -d "$REPO_ROOT/src/scripts/notify/filters" ]; then
+  assert_pass "notify implementations and filter directory remain in src/scripts/notify"
+else
+  assert_fail "notify implementations and filter directory remain in src/scripts/notify" "expected harness-filter scripts and filters/ directory"
+fi
+
 finish_tests
