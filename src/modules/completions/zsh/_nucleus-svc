@@ -17,6 +17,7 @@ _arguments -C \
   '--verbose[Show action result summaries]' \
   '--disable[With stop: disable auto-start after stopping]' \
   '--enable[With start: enable auto-start before starting]' \
+  '--unblock[With start/restart: clear blocked state before the action]' \
   '--list-services[Print host-filtered service instance IDs, one per line]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
@@ -32,6 +33,7 @@ case $state in
       'restart:Restart a service, repairing a blocked cloud mount first if needed.'
       'enable:Enable auto-start.'
       'disable:Disable auto-start.'
+      'unblock:Clear blocked/restart health state for services.'
       'verify:Check all (or specified) services, warn if inactive.'
       'endpoint:Show network endpoint(s) for a service.'
       'logs:Show service logs (list available if no service).'
@@ -69,6 +71,10 @@ case $state in
       disable)
         _arguments \
           '1:service:_nucleus_svc_services'
+        ;;
+      unblock)
+        _arguments \
+          '*:service:_nucleus_svc_services'
         ;;
       verify)
         _arguments \

@@ -908,6 +908,7 @@ $nucleusSvcFlags = @(
   '--raw',
   '--since',
   '--system',
+  '--unblock',
   '--user',
   '--verbose'
 )

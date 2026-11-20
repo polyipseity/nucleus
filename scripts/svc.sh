@@ -34,7 +34,7 @@ bash_guard_require 5 1 svc
 # WHY: the help text is the executable contract, so it must enumerate every
 # subcommand, flag and domain option the parsers accept.
 usage() {
-  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config [service...] [options]"
+  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|unblock|verify|endpoint|logs|log-paths|log-config [service...] [options]"
   cat <<'EOF'
   list [service...]                 List services with status (instance ids included).
   status [service...]               Show status of specified services (all if omitted).
@@ -45,6 +45,7 @@ usage() {
   restart <service>                 Restart a service, repairing a blocked cloud mount first if needed.
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
+  unblock <service...>              Clear blocked/restart health state for services.
   verify [service...]               Check all (or specified) services, warn if inactive.
   --list-services                   Print host-filtered service instance IDs, one per line.
   endpoint <service> [<name>]       Show network endpoint(s) for a service.
@@ -59,11 +60,13 @@ usage() {
   --verbose                         Show action result summaries (start/restart).
   --disable                         With stop: disable auto-start after stopping.
   --enable                          With start: enable auto-start before starting.
+  --unblock                         With start/restart: clear blocked state before the action.
   -h|--help                         Show usage.
 
   stop warns when the platform will bring the service back: a persistent
   launchd job, or an enabled scheduled task. start warns when the service is not
-  enabled. Pass --disable or --enable to apply the remedy in the same run.
+  enabled. Pass --disable or --enable to apply the remedy in the same run. Pass
+  --unblock with start or restart to clear blocked health state first.
 
   Services are registry keys from src/modules/services.json. Entries flagged
   prefixMatch stand in for one runtime service per instance: list and status
@@ -1030,16 +1033,6 @@ do_action() {
       continue
     fi
 
-    if [ "$row_class" = "configured" ]; then
-      if row_is_named "$instance"; then
-        error "$instance — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
-        overall_exit=1
-      else
-        warn "$instance — configured but not loaded"
-      fi
-      continue
-    fi
-
     local _d_domain
     _d_domain=$(printf '%s' "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -1053,6 +1046,30 @@ do_action() {
     local _d_prefix_entry=""
     if [ "$(printf '%s' "$registry" | jq -r --arg k "$key" '.[$k].hostEntry.prefixMatch // false')" = "true" ]; then
       _d_prefix_entry="$(printf '%s' "$registry" | jq -c --arg k "$key" '.[$k].hostEntry')"
+    fi
+
+    if [ "$action" = "unblock" ]; then
+      if [ "$row_class" = "live" ] || [ "$row_class" = "configured" ]; then
+        svc_health_clear "$instance" || true # check-suppress:suppression_doc: clearing an absent or malformed record is not a fatal action failure.
+        say "unblocked $instance"
+      fi
+      continue
+    fi
+
+    if [ "$row_class" = "configured" ]; then
+      if row_is_named "$instance"; then
+        error "$instance — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+        overall_exit=1
+      else
+        warn "$instance — configured but not loaded"
+      fi
+      continue
+    fi
+
+    # WHY: --unblock clears blocked/restart state before the service action so a
+    # crash-looped instance can start cleanly.
+    if { [ "$action" = "start" ] || [ "$action" = "restart" ]; } && [ "$action_unblock" = true ]; then
+      svc_health_clear "$instance" || true # check-suppress:suppression_doc: clearing an absent or malformed record must not block start/restart.
     fi
 
     # WHY: --enable runs before the start because a disabled macOS job cannot be
@@ -1080,7 +1097,7 @@ do_action() {
         overall_exit=1
       fi
     fi
-    if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+    if "$verbose_mode" && { [ "$action" = "start" ] || [ "$action" = "restart" ]; }; then
       local _v_status
       _v_status=$(svc_status "$instance" "$svc_json")
       local _v_running _v_pid
@@ -1533,6 +1550,7 @@ list_services=false
 verbose_mode=false
 stop_disable=false
 start_enable=false
+action_unblock=false
 domain_filter=""
 action=""
 service_names=()
@@ -1572,7 +1590,7 @@ while [ "$#" -gt 0 ]; do
     service_names=("$@")
     break
     ;;
-  list | status | start | stop | restart | enable | disable)
+  list | status | start | stop | restart | enable | disable | unblock)
     action="$1"
     shift
     service_names=("$@")
@@ -1600,6 +1618,8 @@ for arg in "${service_names[@]}"; do
     stop_disable=true
   elif [ "$arg" = "--enable" ]; then
     start_enable=true
+  elif [ "$arg" = "--unblock" ]; then
+    action_unblock=true
   else
     filtered_service_names+=("$arg")
   fi
@@ -1615,6 +1635,10 @@ if [ "$stop_disable" = true ] && [ "$action" != "stop" ]; then
 fi
 if [ "$start_enable" = true ] && [ "$action" != "start" ]; then
   error "--enable is only valid with start"
+  exit 1
+fi
+if [ "$action_unblock" = true ] && [ "$action" != "start" ] && [ "$action" != "restart" ]; then
+  error "--unblock is only valid with start and restart"
   exit 1
 fi
 
@@ -1660,7 +1684,7 @@ fi
     done <<<"$entries"
     exit 0
   fi
-  error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
+  error "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"
   usage >&2
   exit 1
 }
@@ -1674,5 +1698,5 @@ list | status | logs) "do_$action" ;;
 log-paths) do_log_paths ;;
 log-config) do_log_config ;;
 verify | endpoint) "do_$action" ;;
-start | stop | restart | enable | disable) do_action ;;
+start | stop | restart | enable | disable | unblock) do_action ;;
 esac

@@ -1365,6 +1365,11 @@
           "description": "With start: enable auto-start before starting"
         },
         {
+          "long": "--unblock",
+          "takesValue": false,
+          "description": "With start/restart: clear blocked state before the action"
+        },
+        {
           "long": "--list-services",
           "takesValue": false,
           "description": "Print host-filtered service instance IDs, one per line"
@@ -1454,6 +1459,19 @@
             }
           ],
           "description": "Disable auto-start."
+        },
+        {
+          "name": "unblock",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Clear blocked/restart health state for services."
         },
         {
           "name": "verify",

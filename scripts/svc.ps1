@@ -11,12 +11,13 @@
   keeps the exit status of the instances that did run. Nothing is loaded automatically.
 
 .PARAMETER Action
-  The operation to perform: list, status, start, stop, restart, enable, disable,
+  The operation to perform: list, status, start, stop, restart, enable, disable, unblock,
   endpoint, logs, log-paths, log-config.
 
   stop warns when the platform will undo it: a scheduled task stays enabled and fires
   again at its next trigger. start warns when the service is not enabled. Pass -Disable
-  with stop, or -Enable with start, to apply the remedy in the same run.
+  with stop, or -Enable with start, to apply the remedy in the same run. Pass -Unblock
+  with start or restart to clear blocked health state first.
 
 .PARAMETER ServiceName
   Service names to target. For endpoint, first is the service name and the optional second
@@ -30,6 +31,10 @@
   With start: enable auto-start before starting, so the service also starts at the next
   boot. Rejected on any other action.
 
+.PARAMETER Unblock
+  With start or restart: clear blocked/restart health state before the action. Rejected
+  on any other action.
+
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
@@ -38,7 +43,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')]
+  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'unblock', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -51,6 +56,9 @@ param(
 
   # With start: enable auto-start before starting.
   [switch]$Enable,
+
+  # With start or restart: clear blocked/restart health state before the action.
+  [switch]$Unblock,
 
   [switch]$ListServices,
   [switch]$ListEndpoints,
@@ -85,7 +93,7 @@ if ($ListServices) {
 }
 
 if (-not $Action) {
-  Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
+  Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"
   exit 1
 }
 
@@ -98,6 +106,10 @@ if ($Disable -and $Action -ne 'stop') {
 }
 if ($Enable -and $Action -ne 'start') {
   Write-NucleusError "-Enable is only valid with start"
+  exit 1
+}
+if ($Unblock -and $Action -notin @('start', 'restart')) {
+  Write-NucleusError "-Unblock is only valid with start and restart"
   exit 1
 }
 
@@ -115,6 +127,9 @@ if (-not $Elevated -and -not $isAdmin) {
     Action      = $Action
     ServiceName = $ServiceName
     Json        = $Json.IsPresent
+    Disable     = $Disable.IsPresent
+    Enable      = $Enable.IsPresent
+    Unblock     = $Unblock.IsPresent
     Elevated    = $true
   }
   $paramsJsonPath = [System.IO.Path]::GetTempFileName() + ".json"
@@ -165,6 +180,7 @@ foreach ($svc in $RegistryRaw.Keys) {
 # Load log management helpers
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\ServiceHealth.ps1")
 
 function New-ResolvedRow {
   <#
@@ -794,7 +810,7 @@ switch ($Action) {
     if ($hasError -and -not $Json) { exit 1 }
   }
 
-  { @('start', 'stop', 'restart', 'enable', 'disable') -contains $_ } {
+  { @('start', 'stop', 'restart', 'enable', 'disable', 'unblock') -contains $_ } {
     if ($ServiceName.Count -eq 0) {
       throw "missing service name for '$Action'"
     }
@@ -815,6 +831,14 @@ switch ($Action) {
         continue
       }
 
+      if ($Action -eq 'unblock') {
+        if ($entry.class -eq 'configured' -or $entry.class -eq 'live') {
+          Clear-HealthRecord -Instance $entry.instanceId
+          Write-Output "unblocked $($entry.instanceId)"
+        }
+        continue
+      }
+
       if ($entry.class -eq 'configured') {
         # A named not-loaded id is a failed request; the registry key is an aggregate, so
         # a warning keeps the exit status of the instances that did run.
@@ -830,6 +854,12 @@ switch ($Action) {
       if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
         Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
         continue
+      }
+
+      # WHY: -Unblock clears blocked/restart state before the service action so a
+      # crash-looped instance can start cleanly.
+      if ($Unblock -and $Action -in @('start', 'restart')) {
+        Clear-HealthRecord -Instance $entry.instanceId
       }
 
       # WHY: -Enable runs before the start, because a disabled service fails to start and a
