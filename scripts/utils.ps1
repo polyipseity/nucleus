@@ -297,7 +297,8 @@ function Invoke-NucleusSandboxContext {
     exit 1
   }
   if ($argv[0] -eq '-h' -or $argv[0] -eq '--help') {
-    return
+    Write-NucleusInfo 'usage: nucleus-utils sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]'
+    exit 0
   }
   $harness = [string]$argv[0]
   $i = 1
