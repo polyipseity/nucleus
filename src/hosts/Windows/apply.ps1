@@ -325,7 +325,7 @@ try {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-NucleusApps.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-NucleusAppShim.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SafeDelete.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ClaudeConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
@@ -714,7 +714,7 @@ Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 # Nucleus command shims on the managed PATH so `nucleus-*` commands resolve by
 # bare name from user processes and harness hooks.
-Sync-NucleusApps -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
+Sync-NucleusAppShim -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot
 Sync-SafeDelete -Enabled:$true -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 Sync-ClaudeConfig -Enabled:$true -RepoRoot $repoRoot -UserProfile $HOME
 if ($EnableCloudDrivesParity) {

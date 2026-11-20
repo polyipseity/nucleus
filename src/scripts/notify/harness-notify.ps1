@@ -15,7 +15,7 @@
 
   Invoked as `nucleus-utils harness-notify ...` via scripts/utils.{sh,ps1}.
   Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
-  shim deployed by Sync-NucleusApps.ps1). The sibling harness-bridge-common.ps1
+  shim deployed by Sync-NucleusAppShim.ps1). The sibling harness-bridge-common.ps1
   is dot-sourced for shared helpers so this script does not import repository
   modules by absolute path at runtime. Warning output keeps the F1 shape
   (`<cmd>: warning: <msg>`) on stderr.

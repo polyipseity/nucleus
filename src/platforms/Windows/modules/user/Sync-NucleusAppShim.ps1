@@ -18,12 +18,6 @@
 .PARAMETER RepoRoot
   Absolute path to the live repository root.
 
-.PARAMETER UserRoot
-  Absolute path to the nucleus Windows USER root (%LOCALAPPDATA%\nucleus).
-
-.PARAMETER UserProfile
-  Absolute path to the user profile (%USERPROFILE%).
-
 .NOTES
   Required preload: ManagedPaths.ps1 (Get-NucleusManagedBinDir) and
   Format-NucleusOutput.psm1 (Write-Nucleus*), both dot-sourced by apply.ps1.
@@ -32,20 +26,14 @@
   warnings.
 #>
 
-function Sync-NucleusApps {
+function Sync-NucleusAppShim {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
     [bool]$Enabled,
 
     [Parameter(Mandatory)]
-    [string]$RepoRoot,
-
-    [Parameter(Mandatory)]
-    [string]$UserRoot,
-
-    [Parameter(Mandatory)]
-    [string]$UserProfile
+    [string]$RepoRoot
   )
 
   $label = 'nucleus-apps'

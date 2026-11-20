@@ -27,7 +27,7 @@
 
   Invoked as `nucleus-utils harness-approval ...` via scripts/utils.{sh,ps1}.
   Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
-  shim deployed by Sync-NucleusApps.ps1). The sibling harness-bridge-common.ps1
+  shim deployed by Sync-NucleusAppShim.ps1). The sibling harness-bridge-common.ps1
   is dot-sourced for shared helpers.
 
   `ask` means "no source decided": the harness must fall back to its own local

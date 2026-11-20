@@ -1336,9 +1336,9 @@ Describe 'svc unblock CLI surface' {
 Describe 'svc unblock action dispatch' {
   BeforeEach {
     Mock Clear-HealthRecord { }
-    Mock Write-NucleusError { param([string]$Message) }
-    Mock Write-NucleusWarning { param([string]$Message) }
-    Mock Write-NucleusInfo { param([string]$CommandName, [string]$Message) }
+    Mock Write-NucleusError { param([string]$Message) $null = $Message }
+    Mock Write-NucleusWarning { param([string]$Message) $null = $Message }
+    Mock Write-NucleusInfo { param([string]$CommandName, [string]$Message) $null = $CommandName, $Message }
     Mock Invoke-ServiceAction { return $true }
     $Script:Json = $false
     $Script:SkipSystemScope = $false
@@ -1375,6 +1375,7 @@ Describe 'svc unblock action dispatch' {
       displayName = 'Cloud Drive Mounts'
       hostEntry   = @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }
     })
+    $null = $Action, $ServiceName, $resolved
     $overallExit = 0
 
     $output = & ([scriptblock]::Create($Script:UnblockActionArm))
@@ -1399,6 +1400,7 @@ Describe 'svc unblock action dispatch' {
       displayName = 'Ollama'
       hostEntry   = @{ type = 'windows-native'; service = 'ollama' }
     })
+    $null = $ServiceName, $Unblock, $Enable, $Disable, $resolved
     $overallExit = 0
     $Script:callOrder = [System.Collections.Generic.List[string]]::new()
     Mock Clear-HealthRecord {
@@ -1407,6 +1409,7 @@ Describe 'svc unblock action dispatch' {
     }
     Mock Invoke-ServiceAction {
       param([string]$Action, [hashtable]$HostEntry)
+      $null = $HostEntry
       $Script:callOrder.Add("action:$Action")
       return $true
     }
@@ -1433,6 +1436,7 @@ Describe 'svc unblock action dispatch' {
       displayName = 'Ollama'
       hostEntry   = @{ type = 'windows-native'; service = 'ollama' }
     })
+    $null = $ServiceName, $Unblock, $Enable, $Disable, $resolved
     $overallExit = 0
     $Script:callOrder = [System.Collections.Generic.List[string]]::new()
     Mock Clear-HealthRecord {
@@ -1441,6 +1445,7 @@ Describe 'svc unblock action dispatch' {
     }
     Mock Invoke-ServiceAction {
       param([string]$Action, [hashtable]$HostEntry)
+      $null = $HostEntry
       $Script:callOrder.Add("action:$Action")
       return $true
     }

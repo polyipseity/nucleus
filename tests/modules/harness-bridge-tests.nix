@@ -29,7 +29,9 @@ let
   guardPolicy = "/src/scripts/notify/filters/safe-delete.ts";
   flatAgentsNix = flatten (read "/src/modules/agents.nix");
   flatShellDefaultNix = flatten (read "/src/modules/shell/default.nix");
-  flatSyncNucleusApps = flatten (read "/src/platforms/Windows/modules/user/Sync-NucleusApps.ps1");
+  flatSyncNucleusAppShim = flatten (
+    read "/src/platforms/Windows/modules/user/Sync-NucleusAppShim.ps1"
+  );
 
   copilotHooks =
     (builtins.fromJSON (read "/src/users/default/agents/hooks/harness-notify.json")).hooks;
@@ -120,8 +122,8 @@ in
       ) == null
     ) "agents.nix and shell/default.nix must not deploy any harness-* ~/.local/bin executable")
     (assert' (
-      builtins.match ".*nucleus-apps[.]json.*" flatSyncNucleusApps != null
-    ) "Sync-NucleusApps must derive Windows nucleus-* shims from nucleus-apps.json")
+      builtins.match ".*nucleus-apps[.]json.*" flatSyncNucleusAppShim != null
+    ) "Sync-NucleusAppShim must derive Windows nucleus-* shims from nucleus-apps.json")
 
     # --- Timeout budget covers the approval wait ---
     (assert' (all (entry: entry ? timeout) allEntries) "every hook entry must declare a timeout")
