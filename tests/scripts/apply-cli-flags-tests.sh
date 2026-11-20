@@ -126,7 +126,12 @@ fi
 # 5) Standalone health-check accepts --min-free-bytes (accepted/forwarded) without network.
 # Stub curl to avoid network; disable secret checks; use a low threshold so disk check passes.
 _hc_tmp="$(mktemp -d)"
-trap 'rm -rf "$_hc_tmp"' EXIT
+_reexec_tmp=""
+# shellcheck disable=SC2329 # reason: invoked indirectly via EXIT trap
+_cleanup_tmps() {
+  rm -rf "$_hc_tmp" ${_reexec_tmp:+"$_reexec_tmp"}
+}
+trap '_cleanup_tmps' EXIT
 cat >"$_hc_tmp/curl" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -145,6 +150,65 @@ else
   else
     assert_pass "health-check --min-free-bytes 8000000000 accepted (parse/forward wired); completion environment-dependent (rc=$_hc_run_rc)"
   fi
+fi
+
+# 6) Behavioural re-exec forwarding: bundled copy must exec the live checkout's
+# apply.sh with the untouched original argument vector.
+_reexec_tmp="$(mktemp -d)"
+mkdir -p "$_reexec_tmp/src/scripts"
+cat >"$_reexec_tmp/src/scripts/apply.sh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@"
+exit 0
+STUB
+chmod +x "$_reexec_tmp/src/scripts/apply.sh"
+
+_reexec_out="$(NUCLEUS_REPO_ROOT="$_reexec_tmp" bash "$APPLY_SH" --no-health-check --min-free-bytes 8000000000 --target-user admin 2>&1)"
+_reexec_rc=$?
+_expected_reexec=$'--no-health-check\n--min-free-bytes\n8000000000\n--target-user\nadmin'
+if [ "$_reexec_rc" -eq 0 ] && [ "$_reexec_out" = "$_expected_reexec" ]; then
+  assert_pass "live re-exec forwards full apply flag vector in order"
+else
+  assert_fail "live re-exec forwards full apply flag vector in order" "rc=$_reexec_rc out=$(printf '%s' "$_reexec_out" | tr '\n' ' ')"
+fi
+
+_reexec_eq_out="$(NUCLEUS_REPO_ROOT="$_reexec_tmp" bash "$APPLY_SH" --min-free-bytes=8000000000 2>&1)"
+_reexec_eq_rc=$?
+if [ "$_reexec_eq_rc" -eq 0 ] && [ "$_reexec_eq_out" = "--min-free-bytes=8000000000" ]; then
+  assert_pass "live re-exec forwards --min-free-bytes=<value> form"
+else
+  assert_fail "live re-exec forwards --min-free-bytes=<value> form" "rc=$_reexec_eq_rc out=$(printf '%s' "$_reexec_eq_out" | tr '\n' ' ')"
+fi
+
+# 7) --min-free-bytes validation rejects non-positive/non-numeric values before --help/work.
+_reject_min_free_bytes_case() {
+  _rmfb_label="$1"
+  shift
+  set +e
+  _rmfb_out="$(bash "$APPLY_SH" "$@" 2>&1)"
+  _rmfb_rc=$?
+  set -e
+  if [ "$_rmfb_rc" -ne 0 ] && printf '%s\n' "$_rmfb_out" | grep -Fq -- '--min-free-bytes'; then
+    assert_pass "--min-free-bytes rejects invalid value ($_rmfb_label) and names the flag"
+  else
+    assert_fail "--min-free-bytes rejects invalid value ($_rmfb_label) and names the flag" "rc=$_rmfb_rc out=$_rmfb_out"
+  fi
+}
+
+_reject_min_free_bytes_case "abc" --min-free-bytes abc --help
+_reject_min_free_bytes_case "0" --min-free-bytes 0 --help
+_reject_min_free_bytes_case "0=" --min-free-bytes=0 --help
+_reject_min_free_bytes_case "abc=" --min-free-bytes=abc --help
+
+# 8) health-check subcommand validates --min-free-bytes and names the flag.
+set +e
+_hc_bad_out="$(bash "$APPLY_SH" health-check --min-free-bytes abc 2>&1)"
+_hc_bad_rc=$?
+set -e
+if [ "$_hc_bad_rc" -ne 0 ] && printf '%s\n' "$_hc_bad_out" | grep -Fq -- '--min-free-bytes'; then
+  assert_pass "health-check subcommand rejects invalid --min-free-bytes and names the flag"
+else
+  assert_fail "health-check subcommand rejects invalid --min-free-bytes and names the flag" "rc=$_hc_bad_rc out=$_hc_bad_out"
 fi
 
 finish_tests

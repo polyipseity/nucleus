@@ -138,7 +138,22 @@ do_health_check() {
         exit 1
       fi
       min_free_bytes="$2"
+      if ! [[ "$min_free_bytes" =~ ^[1-9][0-9]*$ ]]; then
+        error "--min-free-bytes requires a positive integer value in bytes"
+        exit 1
+      fi
       shift
+      ;;
+    --min-free-bytes=*)
+      min_free_bytes="${1#--min-free-bytes=}"
+      if [ -z "$min_free_bytes" ]; then
+        error "--min-free-bytes requires a non-empty value"
+        exit 1
+      fi
+      if ! [[ "$min_free_bytes" =~ ^[1-9][0-9]*$ ]]; then
+        error "--min-free-bytes requires a positive integer value in bytes"
+        exit 1
+      fi
       ;;
     --secret-health)
       secret_health=true
@@ -314,6 +329,21 @@ do_audit_store() {
   nuc_done "$@"
 }
 
+REPO_ROOT="$(derive_repo_root)"
+export NUCLEUS_REPO_ROOT="$REPO_ROOT"
+
+# WHY the live checkout: a store-bundled apply.sh lags behind git pull until the
+# next rebuild.
+_aar_self="$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
+_aar_live="$REPO_ROOT/src/scripts/apply.sh"
+if [ -f "$_aar_live" ]; then
+  _aar_live_resolved="$(CDPATH='' cd -P -- "$(dirname -- "$_aar_live")" && pwd)/$(basename -- "$_aar_live")"
+  if [ "$_aar_self" != "$_aar_live_resolved" ]; then
+    exec "$_aar_live" "$@"
+  fi
+fi
+unset _aar_self _aar_live _aar_live_resolved
+
 action="${1:-apply}"
 case "$action" in
 health-check)
@@ -372,12 +402,20 @@ while [ "$#" -gt 0 ]; do
       exit 1
     fi
     health_check_min_free_bytes="$2"
+    if ! [[ "$health_check_min_free_bytes" =~ ^[1-9][0-9]*$ ]]; then
+      error -l apply "--min-free-bytes requires a positive integer value in bytes"
+      exit 1
+    fi
     shift
     ;;
   --min-free-bytes=*)
     health_check_min_free_bytes="${1#--min-free-bytes=}"
     if [ -z "$health_check_min_free_bytes" ]; then
       error -l apply "--min-free-bytes requires a non-empty value"
+      exit 1
+    fi
+    if ! [[ "$health_check_min_free_bytes" =~ ^[1-9][0-9]*$ ]]; then
+      error -l apply "--min-free-bytes requires a positive integer value in bytes"
       exit 1
     fi
     ;;
@@ -414,21 +452,6 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-
-REPO_ROOT="$(derive_repo_root)"
-export NUCLEUS_REPO_ROOT="$REPO_ROOT"
-
-# WHY the live checkout: a store-bundled apply.sh lags behind git pull until the
-# next rebuild.
-_aar_self="$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
-_aar_live="$REPO_ROOT/src/scripts/apply.sh"
-if [ -f "$_aar_live" ]; then
-  _aar_live_resolved="$(CDPATH='' cd -P -- "$(dirname -- "$_aar_live")" && pwd)/$(basename -- "$_aar_live")"
-  if [ "$_aar_self" != "$_aar_live_resolved" ]; then
-    exec "$_aar_live" "$@"
-  fi
-fi
-unset _aar_self _aar_live _aar_live_resolved
 
 # WHY the profile bin: ssh-to-age and sops must resolve when the script is invoked
 # directly, not through `nix run .#apply` (which sets runtimeInputs).
