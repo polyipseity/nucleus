@@ -183,6 +183,29 @@ function projectLabel(directory) {
 }
 
 /**
+ * Best-effort sandbox-state recording so a transition seen by one agent is
+ * reported to the next. Failures are discarded: recording must never affect
+ * notification, permission, or prompt-injection behavior.
+ */
+function recordSandboxContext(sessionID) {
+  try {
+    const args = ["sandbox-context", "opencode", "--format", "check"];
+    if (typeof sessionID === "string" && sessionID !== "") {
+      args.push("--session-id", sessionID);
+    }
+    const child = spawn(NOTIFY_COMMAND, args, {
+      stdio: "ignore",
+      detached: false,
+    });
+    child.on("error", () => {
+      // Recording is best-effort.
+    });
+  } catch {
+    // Recording is best-effort.
+  }
+}
+
+/**
  * Handle one v2 bus event. All failures are discarded: the bridge is best-effort
  * and must never turn a session event into a failure.
  */
@@ -190,6 +213,7 @@ async function handleEvent(event, context, project) {
   try {
     const type = event?.type;
     const data = event?.data ?? {};
+    recordSandboxContext(asId(data.sessionID));
 
     if (type === "session.idle") {
       notify("done", `${project} — session idle`);

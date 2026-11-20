@@ -265,8 +265,25 @@ def _cmd_prompts(args: List[str]) -> str:
     return f"Clipboard unavailable. Prompt:\n{choice['text']}"
 
 
+def _record_sandbox_context_best_effort() -> None:
+    """Best-effort sandbox-state recording so transitions seen by other harnesses
+    are reported when Hermes is next used. Never raises and never affects command
+    handling."""
+    try:
+        subprocess.run(
+            ["nucleus-utils", "sandbox-context", "hermes", "--format", "check"],
+            check=False,
+            timeout=5,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 def _handle_command(raw_args: str) -> str:
     """Dispatch one /harness invocation. Never raises: the gateway shows the text."""
+    _record_sandbox_context_best_effort()
     args = (raw_args or "").split()
     if not args:
         return _HELP_TEXT

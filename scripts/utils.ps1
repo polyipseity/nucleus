@@ -296,6 +296,9 @@ function Invoke-NucleusSandboxContext {
     Write-NucleusError 'sandbox-context requires a harness name'
     exit 1
   }
+  if ($argv[0] -eq '-h' -or $argv[0] -eq '--help') {
+    return
+  }
   $harness = [string]$argv[0]
   $i = 1
   while ($i -lt $argv.Count) {
