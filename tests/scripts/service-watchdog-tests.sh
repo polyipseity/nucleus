@@ -1280,6 +1280,19 @@ section 23 "A repair call is bounded by the watchdog repair constant"
 _repair_marker="$_tmp/repair-invoked.txt"
 _repair_work_seconds="${NUCLEUS_TEST_REPAIR_WORK_SECONDS:-3}"
 _orig_repair="$(declare -f supervisor_repair)"
+# WHY an executable mock too: svc_run_bounded runs the repair under setsid when
+# setsid is available, and setsid execs the command so it cannot run a shell
+# function. The shell function remains for direct-call cases in this shell.
+cat >"$_tmp/bin/supervisor_repair" <<REPAIR_MOCK
+#!/usr/bin/env bash
+printf 'started\n' >>"$_repair_marker"
+# WHY the redirect: this sleep is deliberately longer than the bound set in the
+# timeout case, and a background process still holding the captured stdout pipe
+# would keep the command substitution open until it exited.
+sleep "$_repair_work_seconds" >/dev/null 2>&1
+printf 'completed\n' >>"$_repair_marker"
+REPAIR_MOCK
+chmod +x "$_tmp/bin/supervisor_repair"
 # shellcheck disable=SC2329 # reason: invoked by eval'd watchdog code through svc_run_bounded in a subshell
 supervisor_repair() {
   printf 'started\n' >>"$_repair_marker"
@@ -1364,6 +1377,7 @@ fi
 assert_not_contains "a completed repair is not reported as a timeout" "$captured_output" "timed out"
 
 eval "$_orig_repair"
+rm -f "$_tmp/bin/supervisor_repair"
 unset FAKE_EXIT_CODE
 FAKE_LIVE=""
 FAKE_STATE=""
