@@ -6,6 +6,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 init_test_state
+require_command rg "capability truth checks need ripgrep to inspect implementation files"
 matrix="$REPO_ROOT/src/modules/configs/harness-capabilities.json"
 
 # Rule 1: no prompt-file surface can exist, by construction.

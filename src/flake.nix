@@ -857,6 +857,7 @@
               pkgs.findutils
               pkgs.git
               pkgs.powershell
+              pkgs.ripgrep
               # WHY: the runner image ships no zsh, and two suites need it.
               pkgs.zsh
               # WHY: android-config-tests needs zip, which Ubuntu does not ship.
