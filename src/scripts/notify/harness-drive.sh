@@ -126,6 +126,16 @@ else
   _hd_payload="$(cat)"
 fi
 
+# Record sandbox state for this harness so a transition seen by one agent is
+# reported to the next. Best-effort: recording must never affect driving.
+if [ -n "$_hd_harness" ]; then
+  if [ -f "$SCRIPT_DIR/../../../scripts/utils.sh" ]; then
+    printf '%s' "$_hd_payload" | bash "$SCRIPT_DIR/../../../scripts/utils.sh" sandbox-context "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+  elif command -v nucleus-utils >/dev/null 2>&1; then
+    printf '%s' "$_hd_payload" | nucleus-utils sandbox-context "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+  fi
+fi
+
 # The notification half shares one implementation; an empty payload still means
 # "the turn finished", which is what harness-notify turns into its default body.
 if ! printf '%s' "$_hd_payload" | "$SCRIPT_DIR/harness-notify.sh" "$_hd_harness" "done"; then

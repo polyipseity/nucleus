@@ -353,6 +353,21 @@ try {
   if ([Console]::IsInputRedirected) { $payload = [Console]::In.ReadToEnd() }
   $script:auditDigest = Get-HarnessBridgeDigest -Text $payload
 
+  # Record sandbox state for this harness so a transition seen by one agent is
+  # reported to the next. Best-effort: recording must never affect driving.
+  try {
+    $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../scripts/utils.ps1'
+    if (Test-Path -LiteralPath $utilsPath -PathType Leaf) {
+      $pwshPath = [Environment]::ProcessPath
+      $null = $payload | & $pwshPath -NoProfile -File $utilsPath sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+    } elseif (Get-Command -Name 'nucleus-utils' -ErrorAction SilentlyContinue) {
+      $null = $payload | & nucleus-utils sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+    }
+  } catch {
+    # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+    $null = $_
+  }
+
   # The notification half shares one implementation; an empty payload still means
   # "the turn finished", which is what harness-notify turns into its default body.
   Send-HarnessDriveNotification -Harness $Harness -Payload $payload

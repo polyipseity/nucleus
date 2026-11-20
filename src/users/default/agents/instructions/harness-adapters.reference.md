@@ -55,3 +55,16 @@ Commands and modes, where implemented: `/continue`, `/copy-user-prompt [sent|que
 ## Prompt invocation names
 
 Pi derives the command name from the filename, so `commit-staged.prompt.md` is invoked as `/commit-staged.prompt`. The suffix is load-bearing: Cursor's sync maps `*.prompt.md` to `*.md` commands. Quote the full command name when telling the owner how to invoke a workflow.
+
+## Sandbox context change notice (`nucleus-utils sandbox-context`)
+
+`nucleus-utils sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]` records per-harness, per-session sandbox state under `<USER root>/state/harness-bridge/sandbox/<harness>.json` and emits context on the first observation or a sandboxed/unsandboxed transition. Injection is gated by `sandbox-context.inject-on-change` (default `true`); when off, the record still advances but nothing is emitted.
+
+| Harness | Injection hook | Recording | Notes |
+| --- | --- | --- | --- |
+| Pi | `context` event in `src/users/default/pi/extensions/sandbox-context.ts` when the last message is a user message (`--format text`) | Yes | Session id defaults to `default` when unavailable. |
+| Claude Code | `UserPromptSubmit` hook in `src/users/default/claude/settings.json` (`--format claude`, `hookSpecificOutput.additionalContext`) | Yes | Wired per the specified Claude Code UserPromptSubmit hook output format; external protocol documentation could not be fetched in this environment. |
+| Cursor | None wired | Yes, via `harness-filter`/`harness-drive` side effects (`--format check`) | `beforeSubmitPrompt` prompt-visible context injection protocol was not verified, so no prompt-injection hook is wired and `--format cursor` records without emitting. Missing prompt-injection hook: a verified `beforeSubmitPrompt` (or equivalent) context-injection protocol. |
+| VS Code Copilot | None | Yes, via `harness-filter`/`harness-drive` side effects (`--format check`) | No prompt-submission context-injection hook is available in the configured hook set (`PreToolUse`/`Stop` only). Missing hook: a prompt-submission context-injection hook. |
+| OpenCode | None wired | Yes, via `harness-filter`/`harness-drive` side effects where applicable (`--format check`) | Prompt-visible context injection hook not verified for the v2 plugin contract in this environment; record-only. |
+| Hermes | None | Record-only gap documented | No prompt-submission hook for injecting prompt-visible context into Hermes conversations. Missing hook: a prompt-submission context-injection hook. |

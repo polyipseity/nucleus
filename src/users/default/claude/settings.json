@@ -23,6 +23,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nucleus-utils sandbox-context claude --format claude",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

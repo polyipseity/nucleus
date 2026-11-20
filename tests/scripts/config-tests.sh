@@ -147,7 +147,7 @@ _t_get_list_and_section_outputs_are_unchanged() {
   dump="$(_cfg "$home" get | jq -c 'keys' 2>/dev/null)" || rc=$?
   if [ "$max" = "800" ] && [ "$chars" = '["ntfy"]' ] && [ -n "$beat" ] &&
     [ "$section" = '{"sources":["prompt"],"timeout-seconds":{"hermes":0,"prompt":0}}' ] &&
-    [ "$dump" = '["applyHistoryLimit","camilladsp","harness-approval","harness-drive","harness-notify"]' ] && [ "$rc" -eq 0 ]; then
+    [ "$dump" = '["applyHistoryLimit","camilladsp","harness-approval","harness-drive","harness-notify","sandbox-context"]' ] && [ "$rc" -eq 0 ]; then
     assert_pass "number, array, bare-string, section and full-dump outputs are unchanged"
   else
     assert_fail "unchanged outputs" "max=[$max] channels=[$chars] heartbeat=[$beat] section=[$section] dump=[$dump] rc=$rc"

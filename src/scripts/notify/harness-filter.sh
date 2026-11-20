@@ -60,6 +60,17 @@ if [ ! -t 0 ]; then
   _hf_payload="$(cat)"
 fi
 
+# Record sandbox state for this harness so a transition seen by one agent is
+# reported to the next. Best-effort: recording must never affect the filter
+# decision.
+if [ -n "$_hf_harness" ]; then
+  if [ -f "$SCRIPT_DIR/../../../scripts/utils.sh" ]; then
+    printf '%s' "$_hf_payload" | bash "$SCRIPT_DIR/../../../scripts/utils.sh" sandbox-context "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+  elif command -v nucleus-utils >/dev/null 2>&1; then
+    printf '%s' "$_hf_payload" | nucleus-utils sandbox-context "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+  fi
+fi
+
 # What the approval gate shows the user when no filter decides: the tool the
 # harness named and the command it asked about.
 # WHY best-effort: a payload this cannot parse still has to reach the gate,

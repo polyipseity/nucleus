@@ -24,8 +24,8 @@ bash_guard_require 5 1 utils
 # subcommand, flag, and preset the parsers accept.
 usage() {
   usage_std "$(basename "$0")" \
-    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | safe-delete-guard [args]..." \
-    "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations."
+    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [args]..." \
+    "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations; sandbox-context records and reports sandbox state changes."
   cat <<'EOF'
 
   -h|--help  Show usage.
@@ -56,6 +56,12 @@ Subcommands:
   harness-drive <harness>
               End a harness turn: notify and inject one queued remote prompt.
               Dispatches to src/scripts/notify/harness-drive.sh.
+
+  sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]
+              Detect the current sandbox state, compare it with the recorded
+              state for the harness session, emit context on a change or first
+              observation, and update the record. Reads a hook payload from
+              stdin when available to extract the session id.
 
   safe-delete-guard [args]...
               Evaluate deletion commands against the safe-delete policy.
@@ -379,6 +385,284 @@ do_strip_metadata() {
   [[ "$failed" -eq 0 ]]
 }
 
+_sc_sandboxed_context_block="You are inside the srt sandbox. The repo and the granted scratch paths work normally, but the fence is real: network destinations and Unix sockets are allowlisted, some paths are read-only, git config hooks and secrets are protected, and deletions land in the Trash through the safe wrapper (Finder 'Put Back' is unavailable because Apple Events are denied). If a command fails with a permission or socket error, assume the fence before assuming a bug, say what you need, and use \`pi-unrestricted\` only when the task genuinely needs the unsandboxed host."
+_sc_unsandboxed_context_block="You are outside the srt sandbox, so the full host is reachable. That is more power than the sandboxed default, so treat deletions, secrets, and network calls with extra care; the safe-delete rules still apply, and a command that worked here may be blocked in the sandbox when you switch back."
+
+_sc_detect_sandbox() {
+  local raw="${SANDBOX_RUNTIME-}"
+  if [ "${SANDBOX_RUNTIME+set}" != "set" ]; then
+    printf 'unsandboxed\tSANDBOX_RUNTIME unset\n'
+    return 0
+  fi
+  if [ -z "$raw" ]; then
+    printf 'unsandboxed\tSANDBOX_RUNTIME empty string\n'
+    return 0
+  fi
+  case "$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')" in
+  0 | false)
+    printf 'unsandboxed\tSANDBOX_RUNTIME=%s (false-like)\n' "$raw"
+    ;;
+  *)
+    printf 'sandboxed\tSANDBOX_RUNTIME=%s\n' "$raw"
+    ;;
+  esac
+}
+
+_sc_iso_now() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
+_sc_iso_days_ago() {
+  local days="$1"
+  if date -u -v-"${days}"d +%Y-%m-%dT%H:%M:%SZ >/dev/null 2>&1; then
+    date -u -v-"${days}"d +%Y-%m-%dT%H:%M:%SZ
+    return 0
+  fi
+  if date -u -d "${days} days ago" +%Y-%m-%dT%H:%M:%SZ >/dev/null 2>&1; then
+    date -u -d "${days} days ago" +%Y-%m-%dT%H:%M:%SZ
+    return 0
+  fi
+  python3 - "$days" <<'PY'
+import sys
+from datetime import datetime, timedelta, timezone
+print((datetime.now(timezone.utc) - timedelta(days=int(sys.argv[1]))).strftime('%Y-%m-%dT%H:%M:%SZ'))
+PY
+}
+
+_sc_read_inject_on_change() {
+  local config_file="$HOME/.local/state/nucleus/config.json"
+  if [ ! -f "$config_file" ]; then
+    printf 'true\n'
+    return 0
+  fi
+  local value
+  if ! value="$(jq -r '
+    if (.["sandbox-context"] | type) == "object" and (.["sandbox-context"]["inject-on-change"] | type) == "boolean"
+    then .["sandbox-context"]["inject-on-change"]
+    else true
+    end
+  ' "$config_file" 2>/dev/null)"; then
+    printf 'true\n'
+    return 0
+  fi
+  case "$value" in
+  false) printf 'false\n' ;;
+  *) printf 'true\n' ;;
+  esac
+}
+
+_sc_extract_session_id() {
+  local payload="$1" explicit="$2"
+  if [ -n "$explicit" ]; then
+    printf '%s\n' "$explicit"
+    return 0
+  fi
+  if [ -z "$payload" ]; then
+    printf 'default\n'
+    return 0
+  fi
+  local sid
+  sid="$(printf '%s' "$payload" | jq -r '
+    if type != "object" then empty
+    else (.session_id // .sessionId // .sessionID // .conversation_id // .conversationId // empty)
+    end
+    | select(type == "string" and length > 0)
+  ' 2>/dev/null || true)" # check-suppress:suppression_doc: a malformed or non-object payload yields no session id; default is used.
+  if [ -z "$sid" ]; then
+    printf 'default\n'
+  else
+    printf '%s\n' "$sid"
+  fi
+}
+
+_sc_change_notice() {
+  local from="$1" to="$2"
+  if [ "$from" = "sandboxed" ] && [ "$to" = "unsandboxed" ]; then
+    printf 'Sandbox state changed: sandboxed -> unsandboxed. %s\n' "$_sc_unsandboxed_context_block"
+  elif [ "$from" = "unsandboxed" ] && [ "$to" = "sandboxed" ]; then
+    printf 'Sandbox state changed: unsandboxed -> sandboxed. %s\n' "$_sc_sandboxed_context_block"
+  else
+    printf 'Sandbox state changed: %s -> %s.\n' "$from" "$to"
+  fi
+}
+
+_sc_full_status_block() {
+  local state="$1"
+  if [ "$state" = "sandboxed" ]; then
+    printf '%s\n' "$_sc_sandboxed_context_block"
+  else
+    printf '%s\n' "$_sc_unsandboxed_context_block"
+  fi
+}
+
+_sc_emit_message() {
+  local format="$1" message="$2"
+  case "$format" in
+  text)
+    printf '%s' "$message"
+    ;;
+  claude)
+    jq -cn --arg ctx "$message" \
+      '{hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:$ctx}}'
+    ;;
+  cursor | check)
+    # Cursor prompt-visible injection protocol is unverified in this
+    # repository, so cursor format records without emitting. check always
+    # records without emitting.
+    ;;
+  *)
+    printf '%s' "$message"
+    ;;
+  esac
+}
+
+do_sandbox_context() {
+  require_command jq
+
+  local harness="" format="text" session_id_arg=""
+  if [ "${1-}" = "-h" ] || [ "${1-}" = "--help" ]; then
+    usage
+    return 0
+  fi
+  if [ $# -eq 0 ]; then
+    error "sandbox-context requires a harness name"
+    return 1
+  fi
+  harness="$1"
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --format)
+      format="${2-}"
+      shift 2
+      ;;
+    --format=*)
+      format="${1#*=}"
+      shift
+      ;;
+    --session-id)
+      session_id_arg="${2-}"
+      shift 2
+      ;;
+    --session-id=*)
+      session_id_arg="${1#*=}"
+      shift
+      ;;
+    -h | --help)
+      usage
+      return 0
+      ;;
+    *)
+      error "unknown sandbox-context option: $1"
+      return 1
+      ;;
+    esac
+  done
+
+  case "$format" in
+  text | claude | cursor | check) ;;
+  *)
+    error "unknown sandbox-context format: $format"
+    return 1
+    ;;
+  esac
+
+  local payload=""
+  if [ ! -t 0 ]; then
+    payload="$(cat 2>/dev/null || true)" # check-suppress:suppression_doc: stdin may be empty or unreadable in hook contexts; no payload means default session id.
+  fi
+
+  local session_id
+  session_id="$(_sc_extract_session_id "$payload" "$session_id_arg")"
+
+  local detected state evidence
+  detected="$(_sc_detect_sandbox)"
+  state="${detected%%$'\t'*}"
+  evidence="${detected#*$'\t'}"
+
+  local inject_on_change
+  inject_on_change="$(_sc_read_inject_on_change)"
+
+  local root record_dir record_file
+  root="$(derive_nucleus_user_root)"
+  record_dir="$root/state/harness-bridge/sandbox"
+  record_file="$record_dir/${harness}.json"
+
+  local prior_state="unknown" corrupt=0 existing_json=""
+  if [ -f "$record_file" ]; then
+    if existing_json="$(cat "$record_file" 2>/dev/null)" &&
+      printf '%s' "$existing_json" | jq -e 'type == "object" and .version == 1 and (.sessions | type) == "object"' >/dev/null 2>&1; then
+      prior_state="$(printf '%s' "$existing_json" | jq -r --arg sid "$session_id" '
+        .sessions[$sid].state // "unknown"
+        | if . == "sandboxed" or . == "unsandboxed" then . else "unknown" end
+      ' 2>/dev/null || printf 'unknown')"
+    else
+      corrupt=1
+      warn "sandbox-context: corrupt or unreadable record '$record_file'; treating prior state as unknown"
+    fi
+  fi
+
+  local message="" should_emit=0 should_record=0
+  if [ "$prior_state" = "unknown" ]; then
+    message="$(_sc_full_status_block "$state")"
+    should_emit=1
+    should_record=1
+  elif [ "$prior_state" = "$state" ]; then
+    # Unchanged: emit nothing and do not rewrite the file.
+    return 0
+  else
+    message="$(_sc_change_notice "$prior_state" "$state")"
+    should_emit=1
+    should_record=1
+  fi
+
+  if [ "$should_record" -eq 1 ]; then
+    local now cutoff base_json
+    now="$(_sc_iso_now)"
+    cutoff="$(_sc_iso_days_ago 30)"
+
+    if [ "$corrupt" -eq 1 ] || [ ! -f "$record_file" ]; then
+      base_json='{"version":1,"sessions":{}}'
+    else
+      base_json="$existing_json"
+    fi
+
+    mkdir -p "$record_dir"
+    local tmp_file
+    tmp_file="$record_file.tmp.$$"
+    if ! printf '%s' "$base_json" | jq --arg sid "$session_id" --arg st "$state" --arg ev "$evidence" --arg at "$now" --arg cutoff "$cutoff" '
+      .version = 1
+      | .sessions = ((.sessions // {}) | if type == "object" then . else {} end)
+      | .sessions[$sid] = {state: $st, evidence: $ev, observedAt: $at}
+      | .sessions = (
+          .sessions
+          | to_entries
+          | map(select((.value.observedAt // "") >= $cutoff))
+          | sort_by(.value.observedAt // "")
+          | if length > 50 then .[-50:] else . end
+          | from_entries
+        )
+    ' >"$tmp_file" 2>/dev/null; then
+      rm -f "$tmp_file"
+      warn "sandbox-context: could not write record '$record_file'"
+      # Do not emit on write failure? The decision was made; better to still emit
+      # if we were going to, but record is lost. Brief states "record..." as part
+      # of behavior; write failure is an operational issue. I'll warn and continue
+      # to emit if appropriate.
+    else
+      if ! mv -f "$tmp_file" "$record_file"; then
+        rm -f "$tmp_file"
+        warn "sandbox-context: could not publish record '$record_file'"
+      fi
+    fi
+  fi
+
+  if [ "$should_emit" -eq 1 ] && [ "$inject_on_change" = "true" ]; then
+    _sc_emit_message "$format" "$message"
+  fi
+  return 0
+}
+
 # WHY: a bare invocation or -h/--help shows help with exit 0, so the first run
 # is discoverable and harmless.
 main() {
@@ -408,6 +692,9 @@ main() {
     ;;
   harness-drive)
     exec "$SCRIPT_DIR/../src/scripts/notify/harness-drive.sh" "$@"
+    ;;
+  sandbox-context)
+    do_sandbox_context "$@"
     ;;
   safe-delete-guard)
     exec "$SCRIPT_DIR/../src/scripts/notify/filters/safe-delete.ts" "$@"
