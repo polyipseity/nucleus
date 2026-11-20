@@ -263,64 +263,10 @@ _t_bash_guard_floor_policy
 _t_guard_sweep() {
   local unguarded=0
   local f rel
-  # Explicit exception list (commented): sourced libs/loaders/steps and non-bash
-  # fragments that must not carry a bash 5.1 guard.
+  # Explicit exception list (commented): non-bash fragments that must not carry
+  # a bash 5.1 guard. Sourced libs, loaders, and step definitions are exempted
+  # structurally in the sweep loop below.
   local -a _exempt=(
-    # sourced libs
-    "src/scripts/lib/apply-history.sh"
-    "src/scripts/lib/argparse.sh"
-    "src/scripts/lib/audit-store.sh"
-    "src/scripts/lib/bash-guard.sh"
-    "src/scripts/lib/deny-list.sh"
-    "src/scripts/lib/dev-repos-provision.sh"
-    "src/scripts/lib/discord-tray.sh"
-    "src/scripts/lib/expire-profile-generations.sh"
-    "src/scripts/lib/harness-audit.sh"
-    "src/scripts/lib/lib.sh"
-    "src/scripts/lib/load-user-registry.sh"
-    "src/scripts/lib/log-expiry.sh"
-    "src/scripts/lib/logs.sh"
-    "src/scripts/lib/macos-console-user.sh"
-    "src/scripts/lib/macos-fda-warning.sh"
-    "src/scripts/lib/macos-finder-sidebar.sh"
-    "src/scripts/lib/macos-fskit.sh"
-    "src/scripts/lib/macos-fuse-provider.sh"
-    "src/scripts/lib/macos-icloud-exclusions.sh"
-    "src/scripts/lib/macos-launch-services.sh"
-    "src/scripts/lib/nix-test-eval.sh"
-    "src/scripts/lib/require-command.sh"
-    "src/scripts/lib/resolve-user-config.sh"
-    "src/scripts/lib/resolve-user-homedir.sh"
-    "src/scripts/lib/service-health.sh"
-    "src/scripts/lib/size.sh"
-    "src/scripts/lib/step-runner.sh"
-    "src/scripts/lib/supervisor-launchd.sh"
-    "src/scripts/lib/supervisor-systemd.sh"
-    "src/scripts/lib/svc-instances.sh"
-    "src/scripts/lib/symlink-convergence.sh"
-    "src/scripts/lib/symlink-hardening.sh"
-    "src/scripts/lib/vm.sh"
-    "src/scripts/checks/check-lib.sh"
-    "src/scripts/checks/check-steps.sh"
-    "src/scripts/checks/lockfile-enforcement-lib.sh"
-    "src/scripts/tests/test-lib.sh"
-    "src/scripts/tests/test-steps.sh"
-    # sourced step definitions
-    "src/scripts/checks/check-steps/01-code-formatting.sh"
-    "src/scripts/checks/check-steps/02-powershell-lint.sh"
-    "src/scripts/checks/check-steps/03-nix-flake-eval.sh"
-    "src/scripts/checks/check-steps/05-lockfile-validation.sh"
-    "src/scripts/checks/check-steps/07-schema-validation.sh"
-    "src/scripts/checks/check-steps/08-service-registry.sh"
-    "src/scripts/checks/check-steps/10-completions-fresh.sh"
-    "src/scripts/checks/check-steps/11-repo-policy-grep.sh"
-    "src/scripts/checks/check-steps/12-repo-policy-pattern.sh"
-    "src/scripts/checks/check-steps/13-repo-policy-data.sh"
-    "src/scripts/checks/check-steps/15-app-registry.sh"
-    "src/scripts/tests/test-steps/01-nix-tests.sh"
-    "src/scripts/tests/test-steps/02-powershell-lint.sh"
-    "src/scripts/tests/test-steps/04-system-config-build.sh"
-    "src/scripts/tests/test-steps/05-script-and-framework-tests.sh"
     # non-bash fragments (POSIX sh / guest scripts), not standalone bash entrypoints
     "src/scripts/safe-delete-rm.sh"
     "src/scripts/safe-delete-shim.sh"
@@ -336,6 +282,9 @@ _t_guard_sweep() {
   }
   while IFS= read -r f; do
     rel="${f#"$REPO_ROOT"/}"
+    case "$rel" in
+    src/scripts/lib/* | src/scripts/checks/check-steps/* | src/scripts/tests/test-steps/* | src/scripts/checks/*-lib.sh | src/scripts/tests/test-lib.sh) continue ;;
+    esac
     _is_exempt "$rel" && continue
     # bootstrap 3.2 is an allowed guard variant, not unguarded
     if ! grep -q 'bash_guard_require' "$f"; then
