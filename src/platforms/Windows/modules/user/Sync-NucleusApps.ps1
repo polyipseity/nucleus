@@ -49,7 +49,7 @@ function Sync-NucleusApps {
   )
 
   $label = 'nucleus-apps'
-  $shimDir = Get-NucleusManagedBinDir -UserProfile $UserProfile
+  $shimDir = Get-NucleusManagedBinDir 'local'
   $manifestPath = Join-Path -Path $RepoRoot -ChildPath 'src\modules\completions\nucleus-apps.json'
   $ownedPrefix = 'nucleus-'
 
