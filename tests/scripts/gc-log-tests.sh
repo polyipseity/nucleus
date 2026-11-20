@@ -302,6 +302,82 @@ EOF
   rm -rf "$work"
 }
 
+# ---- Test G: nix GC wait reports progress while lock wait is observed ----
+
+test_nix_gc_wait_reports_progress() {
+  local work fake_gc gc_func out rc
+  work="$(mktemp -d)"
+  fake_gc="$work/fake-nix-collect-garbage.sh"
+  cat >"$fake_gc" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'waiting for the big garbage collector lock...'
+sleep 3
+EOF
+  chmod +x "$fake_gc"
+
+  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_SH")"
+
+  rc=0
+  out="$(
+    NUCLEUS_NIX_COLLECT_GARBAGE_BIN="$fake_gc" \
+    NUCLEUS_GC_LOCK_WAIT_DEADLINE=10 \
+    NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
+    bash -c '
+      . "$1"
+      nix_expiry="7d"
+      '"$gc_func"'
+      run_nix_gc_with_wait_progress
+    ' nucleus-gc-test "$LIB_SH" 2>&1
+  )" || rc=$?
+
+  if [ "$rc" -eq 0 ] &&
+    grep -q 'waiting for the big garbage collector lock...' <<<"$out" &&
+    grep -q 'waiting for the Nix garbage collector lock (elapsed ' <<<"$out"; then
+    assert_pass "nix GC lock wait emits bounded progress while waiting"
+  else
+    assert_fail "nix-gc-wait-progress" "rc=$rc output: $out"
+  fi
+  rm -rf "$work"
+}
+
+# ---- Test H: nix GC wait deadline exits non-zero with elapsed context ----
+
+test_nix_gc_wait_deadline_fails() {
+  local work fake_gc gc_func out rc
+  work="$(mktemp -d)"
+  fake_gc="$work/fake-nix-collect-garbage.sh"
+  cat >"$fake_gc" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' 'waiting for the big garbage collector lock...'
+sleep 10
+EOF
+  chmod +x "$fake_gc"
+
+  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_SH")"
+
+  rc=0
+  out="$(
+    NUCLEUS_NIX_COLLECT_GARBAGE_BIN="$fake_gc" \
+    NUCLEUS_GC_LOCK_WAIT_DEADLINE=2 \
+    NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
+    bash -c '
+      . "$1"
+      nix_expiry="7d"
+      '"$gc_func"'
+      run_nix_gc_with_wait_progress
+    ' nucleus-gc-test "$LIB_SH" 2>&1
+  )" || rc=$?
+
+  if [ "$rc" -ne 0 ] &&
+    grep -q 'timed out waiting for nix-collect-garbage after' <<<"$out" &&
+    grep -q 'Nix garbage collector lock' <<<"$out"; then
+    assert_pass "nix GC lock wait deadline exits non-zero with elapsed time and waited-on lock"
+  else
+    assert_fail "nix-gc-wait-deadline" "rc=$rc output: $out"
+  fi
+  rm -rf "$work"
+}
+
 # ---- Run tests ----
 
 section 1 "gc log tests"
@@ -314,5 +390,7 @@ test_gc_logs_inline_when_system_dir_writable
 test_log_gc_uses_root_scripts_when_bin_unset
 test_log_gc_dies_without_root
 test_gc_logs_resolves_logs_after_cleanup_fragment_sourced
+test_nix_gc_wait_reports_progress
+test_nix_gc_wait_deadline_fails
 
 finish_tests

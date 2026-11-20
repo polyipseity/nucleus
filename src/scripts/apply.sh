@@ -606,7 +606,23 @@ run_post_apply() {
   if [ "$vm_setup" = true ]; then _flags+=(--vm-setup); fi
   if [ "$vm_sync" = false ]; then _flags+=(--no-vm-sync); fi
   _flags+=(--target "$_target")
-  bash "$REPO_ROOT/src/scripts/post-apply.sh" "${_flags[@]}"
+
+  local _rpa_failed_step_file _rpa_rc _rpa_step
+  _rpa_failed_step_file="$(mktemp "${TMPDIR:-/tmp}/nucleus-post-apply-failed.XXXXXX")"
+  _rpa_rc=0
+  if ! NUCLEUS_POST_APPLY_FAILED_STEP_FILE="$_rpa_failed_step_file" \
+    bash "$REPO_ROOT/src/scripts/post-apply.sh" "${_flags[@]}"; then
+    _rpa_rc=1
+  fi
+  if [ -s "$_rpa_failed_step_file" ]; then
+    _rpa_step="$(tr '\n' ',' <"$_rpa_failed_step_file" | sed 's/,$//')"
+    if [ -n "$_rpa_step" ]; then
+      _apply_history_phase="post-apply:${_rpa_step}"
+      _rpa_rc=1
+    fi
+  fi
+  rm -f "$_rpa_failed_step_file"
+  return "$_rpa_rc"
 }
 
 run_terminal_activations() {

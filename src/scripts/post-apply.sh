@@ -67,6 +67,8 @@ if [ -z "$_repo_root" ]; then
 fi
 
 _apply_log=""
+_post_apply_failed_steps=""
+
 apply_log_init() {
   if [ -z "$_apply_log" ]; then
     _ali_dir="$(nucleus_log_dir)"
@@ -75,12 +77,32 @@ apply_log_init() {
   fi
 }
 
+_record_post_apply_step_failure() {
+  _rpaf_step="$1"
+  case ",$_post_apply_failed_steps," in
+  *",$_rpaf_step,"*) ;;
+  *)
+    if [ -z "$_post_apply_failed_steps" ]; then
+      _post_apply_failed_steps="$_rpaf_step"
+    else
+      _post_apply_failed_steps="$_post_apply_failed_steps,$_rpaf_step"
+    fi
+    ;;
+  esac
+  if [ -n "${NUCLEUS_POST_APPLY_FAILED_STEP_FILE:-}" ]; then
+    printf '%s\n' "$_post_apply_failed_steps" >"$NUCLEUS_POST_APPLY_FAILED_STEP_FILE"
+  fi
+}
+
 run_jellyfin_sync() {
   _rjs_script="$_repo_root/src/scripts/services/jellyfin-sync.sh"
   if [ ! -f "$_rjs_script" ]; then
     return
   fi
-  NUCLEUS_REPO_ROOT="$_repo_root" bash "$_rjs_script"
+  if ! NUCLEUS_REPO_ROOT="$_repo_root" bash "$_rjs_script"; then
+    warn -l jellyfin-sync "jellyfin-sync.sh exited with an error (system apply succeeded)"
+    _record_post_apply_step_failure "jellyfin-sync"
+  fi
 }
 
 run_ai_sync() {
@@ -104,6 +126,7 @@ run_ai_sync() {
   apply_log_init
   if ! bash "$_ras_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l ai "ai.sh sync exited with an error; model sync incomplete (system apply succeeded)"
+    _record_post_apply_step_failure "ai-sync"
   fi
 }
 
@@ -128,6 +151,7 @@ run_replica_sync() {
   apply_log_init
   if ! bash "$_rrb_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l replica-sync "cloud.sh sync exited with an error; replica sync incomplete (system apply succeeded)"
+    _record_post_apply_step_failure "replica-sync"
   fi
 }
 
@@ -143,6 +167,7 @@ run_vm_post_apply() {
     apply_log_init
     if ! bash "$_rvp_script" setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
       warn -l nucleus-vm "vm.sh setup exited with an error; VM setup incomplete (system apply succeeded)"
+      _record_post_apply_step_failure "vm"
     fi
     return
   fi
@@ -156,6 +181,7 @@ run_vm_post_apply() {
   apply_log_init
   if ! bash "$_rvp_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l nucleus-vm "vm.sh sync exited with an error; VM sync incomplete (system apply succeeded)"
+    _record_post_apply_step_failure "vm"
   fi
 }
 
@@ -170,6 +196,7 @@ run_gc() {
   apply_log_init
   if ! bash "$_rgc_script" 2>&1 | tee -a "$_apply_log"; then
     warn -l gc "gc.sh exited with an error; GC incomplete (system apply succeeded)"
+    _record_post_apply_step_failure "gc"
   fi
 }
 
@@ -193,6 +220,9 @@ main() {
   run_vm_post_apply
   run_gc
   run_manual_display
+  if [ -n "$_post_apply_failed_steps" ]; then
+    return 1
+  fi
 }
 
 main
