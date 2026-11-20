@@ -16,7 +16,6 @@
 [CmdletBinding(DefaultParameterSetName = 'Action')]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'reset', 'sync', 'status', 'restart')]
   [string]$Action = 'setup',
 
   # setup options
@@ -29,6 +28,7 @@ param(
   [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
 
   [switch]$Json = $false,
+  [Alias('list-replicas')]
   [switch]$ListReplicas = $false,
 
   [Alias("h")]
@@ -281,6 +281,11 @@ if ($ListReplicas) {
   @($cloudDrives['replicas'] | Where-Object { $_ -and $_['id'] }) |
     ForEach-Object { [string]$_['id'] } | Sort-Object -Unique
   exit 0
+}
+
+$validActions = @('setup', 'reset', 'sync', 'status', 'restart')
+if ($Action -notin $validActions) {
+  throw "cloud.ps1: invalid action '$Action'. Valid actions: $($validActions -join ', ')"
 }
 
 switch ($Action) {
