@@ -1850,6 +1850,38 @@
           "description": "End a harness turn: notify and inject one queued remote prompt."
         },
         {
+          "name": "sandbox-context",
+          "flags": [
+            {
+              "long": "--format",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "text",
+                "claude",
+                "cursor",
+                "check"
+              ],
+              "description": "Output format"
+            },
+            {
+              "long": "--session-id",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Harness session identifier"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "harness",
+              "required": true,
+              "variadic": false,
+              "description": "Harness name"
+            }
+          ],
+          "description": "Detect, record, and report sandbox state changes for a harness session."
+        },
+        {
           "name": "safe-delete-guard",
           "flags": [
             {

@@ -17,6 +17,7 @@ case $state in
       'harness-approval:Request an approval decision for a harness tool call.'
       'harness-filter:Read a harness hook payload on stdin and print a decision document.'
       'harness-drive:End a harness turn: notify and inject one queued remote prompt.'
+      'sandbox-context:Detect, record, and report sandbox state changes for a harness session.'
       'safe-delete-guard:Evaluate deletion commands against the safe-delete policy.'
     )
     _describe -t commands 'subcommand' _subcmds
@@ -55,6 +56,12 @@ case $state in
         ;;
       harness-drive)
         _arguments \
+          '1:harness:'
+        ;;
+      sandbox-context)
+        _arguments \
+          '--format[Output format]:format:(text claude cursor check)' \
+          '--session-id[Harness session identifier]:session id:' \
           '1:harness:'
         ;;
       safe-delete-guard)

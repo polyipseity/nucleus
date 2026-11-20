@@ -24,7 +24,7 @@ bash_guard_require 5 1 utils
 # subcommand, flag, and preset the parsers accept.
 usage() {
   usage_std "$(basename "$0")" \
-    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [args]..." \
+    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [--settings <json>] [--command <text>] [--hook]" \
     "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations; sandbox-context records and reports sandbox state changes."
   cat <<'EOF'
 
@@ -62,10 +62,15 @@ Subcommands:
               state for the harness session, emit context on a change or first
               observation, and update the record. Reads a hook payload from
               stdin when available to extract the session id.
+    --format <text|claude|cursor|check>  Output format.
+    --session-id <id>  Harness session identifier.
 
-  safe-delete-guard [args]...
+  safe-delete-guard [--settings <json>] [--command <text>] [--hook]
               Evaluate deletion commands against the safe-delete policy.
               Dispatches to src/scripts/notify/filters/safe-delete.ts.
+    --settings <json>  Filter settings JSON.
+    --command <text>   Command text to evaluate.
+    --hook             Read hook payload on stdin and emit hook protocol output.
 
   optimize-pdf presets (default: default):
     default   - high quality
