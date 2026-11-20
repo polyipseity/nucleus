@@ -14,7 +14,7 @@ if [ ! -x "$BD_BIN" ]; then
 fi
 
 if ! bd_app_running; then
-  die "BetterDisplay is not running; cannot configure headless display"
+  bd_start_app || die "failed to start BetterDisplay; cannot configure headless display"
 fi
 
 bd_probe
@@ -32,4 +32,8 @@ fi
 
 if [ "$need_converge" -eq 1 ]; then
   bd_converge || die "failed to converge BetterDisplay virtual screen '${BD_DISPLAY_NAME}' (observed: ${BD_PROBE_OBSERVED-})"
+  bd_verify || {
+    sleep 2
+    bd_verify
+  } || die "BetterDisplay virtual screen '${BD_DISPLAY_NAME}' did not verify after converge"
 fi

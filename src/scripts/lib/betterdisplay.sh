@@ -4,14 +4,32 @@
 # Sourceable library: function definitions only, no top-level side effects.
 
 : "${BD_BIN:=/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay}"
+: "${BD_APP:=/Applications/BetterDisplay.app}"
+: "${BD_OPEN:=/usr/bin/open}"
 : "${BD_DISPLAY_NAME:=HeadlessDisplay}"
-: "${BD_PGREP:=pgrep}"
+# Activation PATH is store-only and does not include pgrep.
+: "${BD_PGREP:=/usr/bin/pgrep}"
+: "${BD_START_TIMEOUT:=15}"
 
 export BD_PROBE_OBSERVED=""
 export BD_PROBE_STATE=""
 
 bd_app_running() {
   "$BD_PGREP" -x "BetterDisplay" >/dev/null 2>&1
+}
+
+bd_start_app() {
+  # check-suppress:suppression_doc: open failure is surfaced by the bounded poll and the caller.
+  "$BD_OPEN" -g -a "$BD_APP" || true
+  local i=0
+  while [ "$i" -lt "$BD_START_TIMEOUT" ]; do
+    if bd_app_running; then
+      return 0
+    fi
+    sleep 1
+    i=$((i + 1))
+  done
+  bd_app_running
 }
 
 bd_probe() {
@@ -74,4 +92,15 @@ bd_converge() {
     -multiplierStep=80 \
     -virtualScreenHiDPI=on \
     -connected=on >/dev/null 2>&1
+}
+
+bd_verify() {
+  bd_probe
+  [ "${BD_PROBE_STATE-}" = "healthy" ] || return 1
+
+  local tag_count
+  tag_count="$(bd_tag_ids_for_name | /usr/bin/awk 'NF { n++ } END { print n + 0 }')"
+  [ "$tag_count" -eq 1 ] || return 1
+
+  bd_spec_matches
 }

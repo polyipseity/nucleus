@@ -23,7 +23,7 @@ TMPDIR_TEST="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
 reset_fake_vars() {
-  unset BD_FAKE_PGREP_RUNNING \
+  unset BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING BD_FAKE_OPEN_RC \
     BD_FAKE_TAG_IDS BD_FAKE_TAG_IDS_AFTER_CREATE BD_FAKE_IDENTIFIERS_RC \
     BD_FAKE_CONNECTED BD_FAKE_CONNECTED_RC \
     BD_FAKE_CONNECTED_AFTER_CREATE BD_FAKE_CONNECTED_AFTER_CREATE_RC \
@@ -33,6 +33,7 @@ reset_fake_vars() {
     BD_FAKE_MULTIPLIER BD_FAKE_MULTIPLIER_RC BD_FAKE_MULTIPLIER_AFTER_CREATE \
     BD_FAKE_RESOLUTION BD_FAKE_RESOLUTION_RC BD_FAKE_RESOLUTION_AFTER_CREATE \
     BD_FAKE_CREATE_RC BD_FAKE_DISCARD_RC
+  unset BD_START_TIMEOUT
 }
 
 setup_fake_bd() {
@@ -40,20 +41,35 @@ setup_fake_bd() {
   mkdir -p "$dir/state"
   BD_BIN="$dir/BetterDisplay"
   BD_FAKE_LOG="$dir/calls.log"
+  BD_FAKE_OPEN_LOG="$dir/open.log"
   BD_FAKE_STATE_DIR="$dir/state"
   BD_PGREP="$dir/pgrep"
+  BD_OPEN="$dir/open"
   : >"$BD_FAKE_LOG"
-  rm -f "$BD_FAKE_STATE_DIR/created"
-  export BD_BIN BD_FAKE_LOG BD_FAKE_STATE_DIR BD_PGREP
+  : >"$BD_FAKE_OPEN_LOG"
+  rm -f "$BD_FAKE_STATE_DIR/created" "$BD_FAKE_STATE_DIR/pgrep_running"
+  export BD_BIN BD_FAKE_LOG BD_FAKE_OPEN_LOG BD_FAKE_STATE_DIR BD_PGREP BD_OPEN
   export BD_DISPLAY_NAME="HeadlessDisplay"
   reset_fake_vars
 
   cat >"$BD_PGREP" <<'EOF'
 #!/usr/bin/env bash
+if [ -f "${BD_FAKE_STATE_DIR:?}/pgrep_running" ]; then
+  exit 0
+fi
 if [ "${BD_FAKE_PGREP_RUNNING:-1}" = "0" ]; then
   exit 1
 fi
 exit 0
+EOF
+
+  cat >"$BD_OPEN" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${BD_FAKE_OPEN_LOG:?}"
+if [ "${BD_FAKE_OPEN_SETS_RUNNING:-0}" = "1" ]; then
+  : >"${BD_FAKE_STATE_DIR:?}/pgrep_running"
+fi
+exit "${BD_FAKE_OPEN_RC:-0}"
 EOF
 
   cat >"$BD_BIN" <<'EOF'
@@ -188,7 +204,7 @@ case "${1:-}" in
 esac
 EOF
 
-  chmod +x "$BD_PGREP" "$BD_BIN"
+  chmod +x "$BD_PGREP" "$BD_OPEN" "$BD_BIN"
 }
 
 count_calls() {
@@ -199,6 +215,16 @@ count_calls() {
   fi
   n="$(grep -c "^${prefix}" "$BD_FAKE_LOG" 2>/dev/null)" || n=0
   printf '%s\n' "${n//$'\n'/}"
+}
+
+count_open_calls() {
+  local n
+  if [ ! -f "$BD_FAKE_OPEN_LOG" ]; then
+    printf '0\n'
+    return
+  fi
+  n="$(wc -l <"$BD_FAKE_OPEN_LOG" 2>/dev/null | tr -d ' ')" || n=0
+  printf '%s\n' "${n:-0}"
 }
 
 count_connected_calls() {
@@ -394,16 +420,95 @@ test_bd_converge() {
   fi
 }
 
+test_bd_defaults_start_verify() {
+  section 4 "bd defaults, start, and verify"
+
+  (
+    unset BD_PGREP BD_APP BD_OPEN BD_START_TIMEOUT
+    # shellcheck source=../../src/scripts/lib/betterdisplay.sh
+    . "$BETTERDISPLAY_LIB"
+    if [ "${BD_PGREP-}" = "/usr/bin/pgrep" ]; then
+      assert_pass "BD_PGREP defaults to /usr/bin/pgrep"
+    else
+      assert_fail "BD_PGREP defaults to /usr/bin/pgrep" "got=${BD_PGREP-}"
+    fi
+  )
+
+  setup_fake_bd
+  BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_OPEN_SETS_RUNNING=1
+  BD_START_TIMEOUT=3
+  export BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING BD_START_TIMEOUT
+  local rc=0
+  bd_start_app || rc=$?
+  if [ "$rc" -eq 0 ] && [ "$(count_open_calls)" -eq 1 ]; then
+    assert_pass "bd_start_app success: returns 0 and calls open once"
+  else
+    assert_fail "bd_start_app success: returns 0 and calls open once" \
+      "rc=$rc open_calls=$(count_open_calls)"
+  fi
+  local open_line
+  open_line="$(cat "$BD_FAKE_OPEN_LOG")"
+  case "$open_line" in
+  *"-g -a "*) assert_pass "bd_start_app uses open -g -a" ;;
+  *) assert_fail "bd_start_app uses open -g -a" "got=$open_line" ;;
+  esac
+  case "$open_line" in
+  *" -b "*) assert_fail "bd_start_app does not use -b" "got=$open_line" ;;
+  *) assert_pass "bd_start_app does not use -b" ;;
+  esac
+
+  setup_fake_bd
+  BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_OPEN_SETS_RUNNING=0
+  BD_START_TIMEOUT=2
+  export BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING BD_START_TIMEOUT
+  rc=0
+  bd_start_app || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "bd_start_app timeout: returns 1"
+  else
+    assert_fail "bd_start_app timeout: returns 1" "rc=$rc"
+  fi
+
+  setup_fake_bd
+  rc=0
+  bd_verify || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    assert_pass "bd_verify true for healthy single matching screen"
+  else
+    assert_fail "bd_verify true for healthy single matching screen" "rc=$rc"
+  fi
+
+  setup_fake_bd
+  export BD_FAKE_HIDPI="off"
+  rc=0
+  bd_verify || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "bd_verify false when spec mismatches"
+  else
+    assert_fail "bd_verify false when spec mismatches" "rc=$rc"
+  fi
+
+  setup_fake_bd
+  export BD_FAKE_TAG_IDS="11 12"
+  rc=0
+  bd_verify || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "bd_verify false when tag count is 2"
+  else
+    assert_fail "bd_verify false when tag count is 2" "rc=$rc"
+  fi
+}
+
 test_apply_script() {
-  section 4 "apply script"
+  section 5 "apply script"
 
   setup_fake_bd
   export BD_FAKE_TAG_IDS="11"
   export BD_FAKE_CONNECTED="on,on" BD_FAKE_CONNECTED_RC=0
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_TAG_IDS="$BD_FAKE_TAG_IDS" BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" \
     BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
     bash "$APPLY_SCRIPT"
@@ -418,12 +523,23 @@ test_apply_script() {
   export BD_FAKE_TAG_IDS="11"
   export BD_FAKE_CONNECTED="on,on" BD_FAKE_CONNECTED_RC=0
   export BD_FAKE_HIDPI="off"
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="11"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+  export BD_FAKE_HIDPI_AFTER_CREATE="on"
+  export BD_FAKE_ASPECT_W_AFTER_CREATE="16" BD_FAKE_ASPECT_H_AFTER_CREATE="10"
+  export BD_FAKE_MULTIPLIER_AFTER_CREATE="80" BD_FAKE_RESOLUTION_AFTER_CREATE="1280x800"
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_TAG_IDS="$BD_FAKE_TAG_IDS" BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" \
     BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" BD_FAKE_HIDPI="$BD_FAKE_HIDPI" \
+    BD_FAKE_TAG_IDS_AFTER_CREATE="$BD_FAKE_TAG_IDS_AFTER_CREATE" \
+    BD_FAKE_CONNECTED_AFTER_CREATE="$BD_FAKE_CONNECTED_AFTER_CREATE" \
+    BD_FAKE_CONNECTED_AFTER_CREATE_RC="$BD_FAKE_CONNECTED_AFTER_CREATE_RC" \
+    BD_FAKE_HIDPI_AFTER_CREATE="$BD_FAKE_HIDPI_AFTER_CREATE" \
+    BD_FAKE_ASPECT_W_AFTER_CREATE="$BD_FAKE_ASPECT_W_AFTER_CREATE" \
+    BD_FAKE_ASPECT_H_AFTER_CREATE="$BD_FAKE_ASPECT_H_AFTER_CREATE" \
+    BD_FAKE_MULTIPLIER_AFTER_CREATE="$BD_FAKE_MULTIPLIER_AFTER_CREATE" \
+    BD_FAKE_RESOLUTION_AFTER_CREATE="$BD_FAKE_RESOLUTION_AFTER_CREATE" \
     bash "$APPLY_SCRIPT"
   if [ "$RUN_RC" -eq 0 ] && [ "$(count_create_calls)" -eq 1 ]; then
     assert_pass "apply spec drift (HiDPI off): converge once"
@@ -433,34 +549,105 @@ test_apply_script() {
   fi
 
   setup_fake_bd
-  export BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_OPEN_SETS_RUNNING=1
+  export BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING
+  export BD_FAKE_CONNECTED="Failed." BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_TAG_IDS_AFTER_CREATE="11"
+  export BD_FAKE_CONNECTED_AFTER_CREATE="on,on" BD_FAKE_CONNECTED_AFTER_CREATE_RC=0
+  export BD_FAKE_HIDPI_AFTER_CREATE="on"
+  export BD_FAKE_ASPECT_W_AFTER_CREATE="16" BD_FAKE_ASPECT_H_AFTER_CREATE="10"
+  export BD_FAKE_MULTIPLIER_AFTER_CREATE="80" BD_FAKE_RESOLUTION_AFTER_CREATE="1280x800"
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
-    BD_FAKE_PGREP_RUNNING="$BD_FAKE_PGREP_RUNNING" \
+    BD_FAKE_PGREP_RUNNING="$BD_FAKE_PGREP_RUNNING" BD_FAKE_OPEN_SETS_RUNNING="$BD_FAKE_OPEN_SETS_RUNNING" \
+    BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
+    BD_FAKE_TAG_IDS_AFTER_CREATE="$BD_FAKE_TAG_IDS_AFTER_CREATE" \
+    BD_FAKE_CONNECTED_AFTER_CREATE="$BD_FAKE_CONNECTED_AFTER_CREATE" \
+    BD_FAKE_CONNECTED_AFTER_CREATE_RC="$BD_FAKE_CONNECTED_AFTER_CREATE_RC" \
+    BD_FAKE_HIDPI_AFTER_CREATE="$BD_FAKE_HIDPI_AFTER_CREATE" \
+    BD_FAKE_ASPECT_W_AFTER_CREATE="$BD_FAKE_ASPECT_W_AFTER_CREATE" \
+    BD_FAKE_ASPECT_H_AFTER_CREATE="$BD_FAKE_ASPECT_H_AFTER_CREATE" \
+    BD_FAKE_MULTIPLIER_AFTER_CREATE="$BD_FAKE_MULTIPLIER_AFTER_CREATE" \
+    BD_FAKE_RESOLUTION_AFTER_CREATE="$BD_FAKE_RESOLUTION_AFTER_CREATE" \
     bash "$APPLY_SCRIPT"
-  if [ "$RUN_RC" -ne 0 ] && [ "$(count_connected_calls)" -eq 0 ] && [ "$(count_discard_calls)" -eq 0 ] && [ "$(count_create_calls)" -eq 0 ]; then
-    assert_pass "apply app not running: dies, zero CLI calls"
+  if [ "$RUN_RC" -eq 0 ] && [ "$(count_create_calls)" -eq 1 ] && [ "$(count_open_calls)" -eq 1 ]; then
+    assert_pass "apply app absent and started: starts, converges, verifies"
   else
-    assert_fail "apply app not running: dies, zero CLI calls" \
-      "rc=$RUN_RC connected=$(count_connected_calls) discards=$(count_discard_calls) creates=$(count_create_calls) err=$RUN_ERR"
+    assert_fail "apply app absent and started: starts, converges, verifies" \
+      "rc=$RUN_RC creates=$(count_create_calls) open_calls=$(count_open_calls) err=$RUN_ERR"
+  fi
+
+  setup_fake_bd
+  BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_OPEN_SETS_RUNNING=0
+  BD_START_TIMEOUT=2
+  export BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING BD_START_TIMEOUT
+  run_script_capture env \
+    HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
+    BD_FAKE_PGREP_RUNNING="$BD_FAKE_PGREP_RUNNING" BD_FAKE_OPEN_SETS_RUNNING="$BD_FAKE_OPEN_SETS_RUNNING" \
+    BD_START_TIMEOUT="$BD_START_TIMEOUT" \
+    bash "$APPLY_SCRIPT"
+  if [ "$RUN_RC" -ne 0 ] && [ "$(count_discard_calls)" -eq 0 ] && [ "$(count_create_calls)" -eq 0 ]; then
+    assert_pass "apply app absent and start times out: dies, zero converge/create"
+  else
+    assert_fail "apply app absent and start times out: dies, zero converge/create" \
+      "rc=$RUN_RC discards=$(count_discard_calls) creates=$(count_create_calls) err=$RUN_ERR"
   fi
   case "$RUN_ERR" in
-  *"BetterDisplay is not running"*) assert_pass "apply app not running: reports expected error" ;;
-  *) assert_fail "apply app not running: reports expected error" "stderr=$RUN_ERR" ;;
+  *"failed to start BetterDisplay; cannot configure headless display"*) assert_pass "apply start timeout: reports start-failure message" ;;
+  *) assert_fail "apply start timeout: reports start-failure message" "stderr=$RUN_ERR" ;;
+  esac
+
+  setup_fake_bd
+  BD_FAKE_PGREP_RUNNING=0
+  BD_FAKE_OPEN_SETS_RUNNING=0
+  BD_FAKE_OPEN_RC=1
+  BD_START_TIMEOUT=1
+  export BD_FAKE_PGREP_RUNNING BD_FAKE_OPEN_SETS_RUNNING BD_FAKE_OPEN_RC BD_START_TIMEOUT
+  run_script_capture env \
+    HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
+    BD_FAKE_PGREP_RUNNING="$BD_FAKE_PGREP_RUNNING" BD_FAKE_OPEN_SETS_RUNNING="$BD_FAKE_OPEN_SETS_RUNNING" \
+    BD_FAKE_OPEN_RC="$BD_FAKE_OPEN_RC" BD_START_TIMEOUT="$BD_START_TIMEOUT" \
+    bash "$APPLY_SCRIPT"
+  if [ "$RUN_RC" -ne 0 ] && [ "$(count_discard_calls)" -eq 0 ] && [ "$(count_create_calls)" -eq 0 ]; then
+    assert_pass "apply app absent and open fails: dies, zero converge/create"
+  else
+    assert_fail "apply app absent and open fails: dies, zero converge/create" \
+      "rc=$RUN_RC discards=$(count_discard_calls) creates=$(count_create_calls) err=$RUN_ERR"
+  fi
+  case "$RUN_ERR" in
+  *"failed to start BetterDisplay; cannot configure headless display"*) assert_pass "apply open failure: reports start-failure message" ;;
+  *) assert_fail "apply open failure: reports start-failure message" "stderr=$RUN_ERR" ;;
+  esac
+
+  setup_fake_bd
+  export BD_FAKE_CONNECTED="Failed." BD_FAKE_CONNECTED_RC=1
+  export BD_FAKE_HIDPI_AFTER_CREATE="off"
+  run_script_capture env \
+    HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
+    BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
+    BD_FAKE_HIDPI_AFTER_CREATE="$BD_FAKE_HIDPI_AFTER_CREATE" \
+    bash "$APPLY_SCRIPT"
+  if [ "$RUN_RC" -ne 0 ] && [ "$(count_create_calls)" -eq 1 ]; then
+    assert_pass "apply converge then verify fails: dies after converge"
+  else
+    assert_fail "apply converge then verify fails: dies after converge" \
+      "rc=$RUN_RC creates=$(count_create_calls) err=$RUN_ERR"
+  fi
+  case "$RUN_ERR" in
+  *"did not verify after converge"*) assert_pass "apply verify failure: reports verify-failure message" ;;
+  *) assert_fail "apply verify failure: reports verify-failure message" "stderr=$RUN_ERR" ;;
   esac
 }
 
 test_heartbeat_script() {
-  section 5 "heartbeat script"
+  section 6 "heartbeat script"
 
   setup_fake_bd
   export BD_FAKE_PGREP_RUNNING=0
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_PGREP_RUNNING="$BD_FAKE_PGREP_RUNNING" \
     BD_INTERVAL=0 BD_HEARTBEAT_ONCE=1 \
     bash "$HEARTBEAT_SCRIPT"
@@ -475,8 +662,6 @@ test_heartbeat_script() {
   export BD_FAKE_CONNECTED="on,on" BD_FAKE_CONNECTED_RC=0
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
     BD_INTERVAL=0 BD_HEARTBEAT_ONCE=1 \
     bash "$HEARTBEAT_SCRIPT"
@@ -491,8 +676,6 @@ test_heartbeat_script() {
   export BD_FAKE_CONNECTED="on,on,on,on" BD_FAKE_CONNECTED_RC=0
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
     BD_INTERVAL=0 BD_HEARTBEAT_ONCE=1 \
     bash "$HEARTBEAT_SCRIPT"
@@ -511,8 +694,6 @@ test_heartbeat_script() {
   export BD_FAKE_CONNECTED="Failed." BD_FAKE_CONNECTED_RC=1
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
     BD_INTERVAL=0 BD_HEARTBEAT_ONCE=1 \
     bash "$HEARTBEAT_SCRIPT"
@@ -528,8 +709,6 @@ test_heartbeat_script() {
   export BD_FAKE_CREATE_RC=1
   run_script_capture env \
     HOME="$HOME" NUCLEUS_USER_ROOT="$NUCLEUS_USER_ROOT" NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" \
-    BD_BIN="$BD_BIN" BD_PGREP="$BD_PGREP" BD_DISPLAY_NAME="$BD_DISPLAY_NAME" \
-    BD_FAKE_LOG="$BD_FAKE_LOG" BD_FAKE_STATE_DIR="$BD_FAKE_STATE_DIR" \
     BD_FAKE_CONNECTED="$BD_FAKE_CONNECTED" BD_FAKE_CONNECTED_RC="$BD_FAKE_CONNECTED_RC" \
     BD_FAKE_CREATE_RC="$BD_FAKE_CREATE_RC" \
     BD_INTERVAL=0 BD_HEARTBEAT_ONCE=1 \
@@ -541,10 +720,42 @@ test_heartbeat_script() {
   fi
 }
 
+test_activation_path_regression() {
+  section 7 "activation-like PATH regression"
+
+  local fakebin="$TMPDIR_TEST/fakebin-path"
+  mkdir -p "$fakebin"
+  ln -sf /bin/bash "$fakebin/bash"
+  ln -sf /usr/bin/env "$fakebin/env"
+  ln -sf /usr/bin/awk "$fakebin/awk"
+  ln -sf /usr/bin/sort "$fakebin/sort"
+  ln -sf /bin/sleep "$fakebin/sleep"
+
+  (
+    PATH="$fakebin"
+    unset BD_PGREP
+    # shellcheck source=../../src/scripts/lib/betterdisplay.sh
+    . "$BETTERDISPLAY_LIB"
+    if [ "${BD_PGREP-}" = "/usr/bin/pgrep" ]; then
+      assert_pass "activation-like PATH: BD_PGREP remains absolute default"
+    else
+      assert_fail "activation-like PATH: BD_PGREP remains absolute default" "got=${BD_PGREP-}"
+    fi
+    BD_PGREP="/usr/bin/true"
+    if bd_app_running; then
+      assert_pass "activation-like PATH: bd_app_running uses BD_PGREP path"
+    else
+      assert_fail "activation-like PATH: bd_app_running uses BD_PGREP path" "rc=$?"
+    fi
+  )
+}
+
 test_bd_probe
 test_bd_spec_matches
 test_bd_converge
+test_bd_defaults_start_verify
 test_apply_script
 test_heartbeat_script
+test_activation_path_regression
 
 finish_tests
