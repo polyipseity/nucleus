@@ -10,20 +10,29 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly REPO_ROOT
 
+# shellcheck disable=SC2329 # reason: register_step receives these names as strings and calls them
 _t_fast() { :; }
+# shellcheck disable=SC2329 # reason: register_step receives these names as strings and calls them
 _t_slow() { sleep 3; }
+# shellcheck disable=SC2329 # reason: register_step receives these names as strings and calls them
 _t_hang() { sleep 30; }
+
+# shellcheck disable=SC2329 # reason: invoked by the sourced step-runner.sh
+cache_file_lists() { :; }
 
 test_fast_step_reports_before_slow() {
   local _out
+  PARALLEL_JOBS=2
+  NUCLEUS_STEP_PROGRESS_INTERVAL=1
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=2 NUCLEUS_STEP_PROGRESS_INTERVAL=1
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "fast" 5 "Fast" _t_fast
     register_step "slow" 6 "Slow" _t_slow
     run_all_steps
@@ -40,14 +49,17 @@ test_fast_step_reports_before_slow() {
 
 test_running_step_reports_still_running() {
   local _out
+  PARALLEL_JOBS=2
+  NUCLEUS_STEP_PROGRESS_INTERVAL=1
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=2 NUCLEUS_STEP_PROGRESS_INTERVAL=1
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "fast" 5 "Fast" _t_fast
     register_step "slow" 6 "Slow" _t_slow
     run_all_steps
@@ -62,14 +74,18 @@ test_running_step_reports_still_running() {
 test_step_over_the_bound_fails_with_124() {
   local _start _elapsed _out
   _start=$SECONDS
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=2
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=2 NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "hang" 5 "Hang" _t_hang
     run_all_steps
     printf 'exitfile=%s\n' "$(cat "$_wave_tmpdir/step-5.exit" 2>/dev/null || true)"
@@ -97,14 +113,18 @@ test_step_over_the_bound_fails_with_124() {
 
 test_step_timeout_rejects_non_numeric() {
   local _out _rc
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=abc
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=abc NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "fast" 5 "Fast" _t_fast
     run_all_steps 2>&1
   )" && _rc=0 || _rc=$?
@@ -122,14 +142,18 @@ test_step_timeout_rejects_non_numeric() {
 
 test_progress_interval_rejects_non_numeric() {
   local _out _rc
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_PROGRESS_INTERVAL=abc
+  NUCLEUS_STEP_TIMEOUT=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_PROGRESS_INTERVAL NUCLEUS_STEP_TIMEOUT HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_PROGRESS_INTERVAL=abc NUCLEUS_STEP_TIMEOUT=0
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "fast" 5 "Fast" _t_fast
     run_all_steps 2>&1
   )" && _rc=0 || _rc=$?
@@ -152,14 +176,18 @@ test_progress_interval_rejects_non_numeric() {
 
 test_progress_interval_rejects_negative() {
   local _out _rc
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_PROGRESS_INTERVAL=-1
+  NUCLEUS_STEP_TIMEOUT=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_PROGRESS_INTERVAL NUCLEUS_STEP_TIMEOUT HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_PROGRESS_INTERVAL=-1 NUCLEUS_STEP_TIMEOUT=0
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "fast" 5 "Fast" _t_fast
     run_all_steps 2>&1
   )" && _rc=0 || _rc=$?
@@ -183,16 +211,18 @@ test_progress_interval_rejects_negative() {
 test_verbose_step_over_the_bound_fails_with_124() {
   local _start _elapsed _out
   _start=$SECONDS
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=2
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=2 NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     VERBOSE_IDS=("*")
     register_step "hang" 5 "Hang" _t_hang
     run_all_steps 2>&1
@@ -224,16 +254,18 @@ _t_verbose_two_lines() { printf 'line1\nline2\n'; }
 
 test_verbose_step_output_is_prefixed_and_complete() {
   local _out
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=0
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=0 NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     VERBOSE_IDS=("*")
     register_step "two" 5 "Two" _t_verbose_two_lines
     run_all_steps 2>&1
@@ -276,17 +308,19 @@ test_verbose_bound_kills_descendants() {
   _pid_file="$(mktemp "${TMPDIR:-/tmp}/step-runner-verbose-desc.XXXXXX")"
   rm -f "$_pid_file"
   _start=$SECONDS
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=2
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  DESC_PID_FILE="$_pid_file"
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE DESC_PID_FILE
   _out="$(
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=2 NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    # shellcheck disable=SC2030,SC2031 # reason: export in subshell capture follows established test pattern
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
-    export DESC_PID_FILE="$_pid_file"
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     VERBOSE_IDS=("*")
     # shellcheck disable=SC2329 # reason: invoked indirectly via register_step
     _t_verbose_desc() {
@@ -347,14 +381,18 @@ test_default_timeout_is_600_when_unset() {
 
 test_timeout_zero_disables_bound() {
   local _out _rc
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=0
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
   _out="$(
-    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=0 NUCLEUS_STEP_PROGRESS_INTERVAL=0
-    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
     # shellcheck source=../../src/scripts/lib/step-runner.sh
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
-    _nuc_c2_dim="" _nuc_c2_reset=""
-    cache_file_lists() { :; }
     register_step "three" 5 "Three" _t_three_seconds
     run_all_steps
     printf 'exitfile=%s\n' "$(cat "$_wave_tmpdir/step-5.exit" 2>/dev/null || true)"
