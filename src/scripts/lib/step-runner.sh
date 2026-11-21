@@ -166,7 +166,7 @@ nucleus_nix_locked() {
   while ! mkdir "$_lock_dir" 2>/dev/null; do
     _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)" # check-suppress:suppression_doc: the pid file may be absent; an empty owner falls through to stale-lock recovery
     if [ -z "$_lock_owner" ] || ! kill -0 "$_lock_owner" 2>/dev/null; then
-      rm -rf "$_lock_dir"
+      python3 -c 'import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "$_lock_dir"
       continue
     fi
     _lock_waited=$((_lock_waited + 1))
@@ -183,7 +183,7 @@ nucleus_nix_locked() {
   else
     _lock_ret=$?
   fi
-  rm -rf "$_lock_dir"
+  python3 -c 'import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "$_lock_dir"
   return "$_lock_ret"
 }
 
