@@ -320,9 +320,9 @@ EOF
   rc=0
   out="$(
     NUCLEUS_NIX_COLLECT_GARBAGE_BIN="$fake_gc" \
-    NUCLEUS_GC_LOCK_WAIT_DEADLINE=10 \
-    NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
-    bash -c '
+      NUCLEUS_GC_LOCK_WAIT_DEADLINE=10 \
+      NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
+      bash -c '
       . "$1"
       nix_expiry="7d"
       '"$gc_func"'
@@ -358,9 +358,9 @@ EOF
   rc=0
   out="$(
     NUCLEUS_NIX_COLLECT_GARBAGE_BIN="$fake_gc" \
-    NUCLEUS_GC_LOCK_WAIT_DEADLINE=2 \
-    NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
-    bash -c '
+      NUCLEUS_GC_LOCK_WAIT_DEADLINE=2 \
+      NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
+      bash -c '
       . "$1"
       nix_expiry="7d"
       '"$gc_func"'

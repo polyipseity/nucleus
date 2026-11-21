@@ -17,7 +17,8 @@ require_command python3 "token and matrix checks parse policy/script content"
 
 test_restart_tokens_require_why() {
   local out
-  out="$(python3 - "$REPO_ROOT" <<'PY'
+  out="$(
+    python3 - "$REPO_ROOT" <<'PY'
 import os, re, sys
 root=sys.argv[1]
 dirs=['src/scripts/services','src/platforms/macOS/scripts','src/platforms/Windows/modules']
@@ -60,7 +61,8 @@ PY
 
 test_policy_matrix_covers_registry_services() {
   local out
-  out="$(python3 - "$REPO_ROOT" <<'PY'
+  out="$(
+    python3 - "$REPO_ROOT" <<'PY'
 import json, re, sys, os
 root=sys.argv[1]
 with open(os.path.join(root,'src/modules/services.json'),encoding='utf-8') as f:
