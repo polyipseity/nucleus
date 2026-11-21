@@ -813,8 +813,106 @@ Invoke-StepPipeline
     }
 }
 
+function Test-PipelineTimeoutFailsStepWith124 {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_TIMEOUT = '2'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '0'
+Register-Step -Id 'hang' -Number 5 -Name 'Hang' -Action { param($Context) Start-Sleep -Seconds 30; $true }
+Invoke-StepPipeline
+$exitFile = Join-Path $script:WaveTmpDir 'step-5.exit'
+$outFile = Join-Path $script:WaveTmpDir 'step-5.out'
+if (Test-Path -LiteralPath $exitFile) { Write-Output ("exitfile=" + (Get-Content -LiteralPath $exitFile -Raw)) }
+if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile | ForEach-Object { Write-Output $_ } }
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldTimeout = $env:NUCLEUS_STEP_TIMEOUT
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $sw.Stop()
+        $code = $LASTEXITCODE
+        $hasExit124 = $out -match 'exitfile=124'
+        $namesBound = $out -match 'exceeded NUCLEUS_STEP_TIMEOUT=2s'
+        $under10 = $sw.Elapsed.TotalSeconds -lt 10
+        if ($code -eq 0 -and $hasExit124 -and $namesBound -and $under10) {
+            Assert-Pass "a step past NUCLEUS_STEP_TIMEOUT fails with 124 and names the bound"
+        } else {
+            Assert-Fail "pipeline timeout 124" "exit=$code hasExit124=$hasExit124 namesBound=$namesBound elapsed=$($sw.Elapsed.TotalSeconds)s output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldTimeout) { Remove-Item Env:NUCLEUS_STEP_TIMEOUT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_TIMEOUT = $oldTimeout }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-PipelineTimeoutRejectsNonNumeric {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-bad-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-bad-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_TIMEOUT = 'abc'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '0'
+Register-Step -Id 'fast' -Number 5 -Name 'Fast' -Action { param($Context) $true }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldTimeout = $env:NUCLEUS_STEP_TIMEOUT
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $namesVar = $out -match 'NUCLEUS_STEP_TIMEOUT must be whole seconds'
+        if ($code -eq 2 -and $namesVar) {
+            Assert-Pass "non-numeric NUCLEUS_STEP_TIMEOUT is a hard error before launch"
+        } else {
+            Assert-Fail "pipeline timeout non-numeric" "exit=$code namesVar=$namesVar output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldTimeout) { Remove-Item Env:NUCLEUS_STEP_TIMEOUT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_TIMEOUT = $oldTimeout }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Test-SaveFileListCache-NoPathBeyondSymlink
 Test-PipelineLiveProgressReportsFinishedAndHeartbeat
+Test-PipelineTimeoutFailsStepWith124
+Test-PipelineTimeoutRejectsNonNumeric
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""

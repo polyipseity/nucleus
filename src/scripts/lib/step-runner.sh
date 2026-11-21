@@ -218,6 +218,7 @@ FAIL_FAST=${FAIL_FAST:-false}
 ONLINE=${ONLINE:-false}
 VERBOSE_IDS=()
 ONLY_STEPS=()
+_step_timeout_seconds=0
 
 _step_now_ms() {
   if [ -n "${EPOCHREALTIME-}" ]; then
@@ -266,6 +267,12 @@ _run_step() {
   # directory works on every transport.
   _fifo="$_wave_tmpdir/step-$_n.fifo"
   mkfifo "$_fifo"
+  # WHY: only a bounded run needs its own process group, because only then does
+  # the runner kill the step's children. Without job control the group kill is a
+  # no-op and a stalled nix child would outlive the step it belongs to.
+  if [ "$_step_timeout_seconds" -gt 0 ]; then
+    set -m
+  fi
   (
     if "$_func" "STEP_CTX" "$@"; then
       exit 0
@@ -274,6 +281,9 @@ _run_step() {
     fi
   ) >"$_fifo" 2>&1 &
   local _func_pid=$!
+  if [ "$_step_timeout_seconds" -gt 0 ]; then
+    set +m
+  fi
 
   if $_is_verbose; then
     tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
@@ -284,7 +294,31 @@ _run_step() {
   fi
 
   _exit_code=0
-  wait "$_func_pid" || _exit_code=$?
+  if [ "$_step_timeout_seconds" -gt 0 ]; then
+    local _bound_ticks=$((_step_timeout_seconds * 4)) _ticks_waited=0
+    while kill -0 "$_func_pid" 2>/dev/null; do
+      if [ "$_ticks_waited" -ge "$_bound_ticks" ]; then
+        printf 'step %s exceeded NUCLEUS_STEP_TIMEOUT=%ss\n' "$_n" "$_step_timeout_seconds" >>"$_wave_tmpdir/step-$_n.out"
+        printf 'step %s exceeded NUCLEUS_STEP_TIMEOUT=%ss\n' "$_n" "$_step_timeout_seconds"
+        # check-suppress:suppression_doc: the process already outlived its bound; a failing signal must not change the 124 answer
+        kill -TERM -- "-$_func_pid" "$_func_pid" 2>/dev/null || true
+        sleep 0.2
+        # check-suppress:suppression_doc: same as above, and the group may not exist without job control
+        kill -KILL -- "-$_func_pid" "$_func_pid" 2>/dev/null || true
+        # check-suppress:suppression_doc: same as above
+        wait "$_func_pid" 2>/dev/null || true
+        _exit_code=124
+        break
+      fi
+      sleep 0.25
+      _ticks_waited=$((_ticks_waited + 1))
+    done
+    if [ "$_exit_code" -eq 0 ]; then
+      wait "$_func_pid" || _exit_code=$?
+    fi
+  else
+    wait "$_func_pid" || _exit_code=$?
+  fi
 
   printf '%s' "$_exit_code" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
@@ -556,6 +590,14 @@ run_all_steps() {
     _max_jobs=1
   fi
   _pipeline_start_ms=$(_step_now_ms)
+
+  _step_timeout_seconds="${NUCLEUS_STEP_TIMEOUT:-0}"
+  case "$_step_timeout_seconds" in
+  '' | *[!0-9]*)
+    error "NUCLEUS_STEP_TIMEOUT must be whole seconds (got '$_step_timeout_seconds')"
+    exit 2
+    ;;
+  esac
 
   local _i _id _state _total _started _n _name
   local -a _pending_indices=()

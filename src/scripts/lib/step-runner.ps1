@@ -501,6 +501,16 @@ function Invoke-StepPipeline {
     $progressSeconds = $parsedProgress
   }
 
+  $stepTimeoutSeconds = 0
+  if ($env:NUCLEUS_STEP_TIMEOUT) {
+    $parsedTimeout = 0
+    if (-not [int]::TryParse($env:NUCLEUS_STEP_TIMEOUT, [ref]$parsedTimeout) -or $parsedTimeout -lt 0) {
+      Write-NucleusError ("NUCLEUS_STEP_TIMEOUT must be whole seconds (got '{0}')" -f $env:NUCLEUS_STEP_TIMEOUT)
+      exit 2
+    }
+    $stepTimeoutSeconds = $parsedTimeout
+  }
+
   for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
     $id = $script:StepIds[$i]
     $n = $script:StepNumbers[$i]
@@ -644,7 +654,11 @@ function Invoke-StepPipeline {
         Reset      = $script:NucStyleReset
       })
       $handle = $ps.BeginInvoke()
-      $null = $active.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
+      $deadlineMs = 0
+      if ($stepTimeoutSeconds -gt 0) {
+        $deadlineMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() + ([int64]$stepTimeoutSeconds * 1000)
+      }
+      $null = $active.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n; DeadlineMs = $deadlineMs })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       $startedSteps++
       $null = $spawnedNumbers.Add($n)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       Write-Output ("$($script:NucStyleDim)[{0}/{1}] step {2} {3} started$($script:NucStyleReset)" -f $startedSteps, $totalSteps, $n, $name)
@@ -654,18 +668,51 @@ function Invoke-StepPipeline {
 
     # Block until the next step finishes, then drain every finished one in
     # launch order so the fail-fast report keeps that order. The bounded wait
-    # wakes the loop for the heartbeat; WaitAny alone cannot report progress.
+    # wakes the loop for the heartbeat and for step timeouts.
     $waitHandles = [System.Threading.WaitHandle[]]::new($active.Count)
     for ($k = 0; $k -lt $active.Count; $k++) {
       $waitHandles[$k] = $active[$k].AsyncResult.AsyncWaitHandle
     }
-    $waitIndex = 0
-    if ($progressSeconds -gt 0) {
-      $waitIndex = [System.Threading.WaitHandle]::WaitAny($waitHandles, $progressSeconds * 1000)
+    $waitMs = -1
+    $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    if ($progressSeconds -gt 0) { $waitMs = $progressSeconds * 1000 }
+    foreach ($rs in $active) {
+      if ($rs.DeadlineMs -gt 0) {
+        $remaining = [int]([Math]::Max(0, $rs.DeadlineMs - $nowMs))
+        if ($waitMs -lt 0 -or $remaining -lt $waitMs) { $waitMs = $remaining }
+      }
+    }
+    $waitIndex = if ($waitMs -ge 0) {
+      [System.Threading.WaitHandle]::WaitAny($waitHandles, $waitMs)
     } else {
-      $waitIndex = [System.Threading.WaitHandle]::WaitAny($waitHandles)
+      [System.Threading.WaitHandle]::WaitAny($waitHandles)
     }
     if ($waitIndex -eq [System.Threading.WaitHandle]::WaitTimeout) {
+      $nowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+      $timedOut = @($active | Where-Object { $_.DeadlineMs -gt 0 -and $nowMs -ge $_.DeadlineMs })
+      if ($timedOut.Count -gt 0) {
+        for ($k = 0; $k -lt $active.Count;) {
+          $rs = $active[$k]
+          $isTimedOut = $rs.DeadlineMs -gt 0 -and $nowMs -ge $rs.DeadlineMs
+          if (-not $isTimedOut) { $k++; continue }
+          $null = $rs.PowerShell.Stop()  # check-suppress:suppression_doc: Stop() requests runspace termination; the timeout answer is authoritative and Stop() must not change it
+          $outFile = Join-Path $script:WaveTmpDir ("step-{0}.out" -f $rs.Number)
+          $exitFile = Join-Path $script:WaveTmpDir ("step-{0}.exit" -f $rs.Number)
+          $timeFile = Join-Path $script:WaveTmpDir ("step-{0}.time" -f $rs.Number)
+          $msg = "step $($rs.Number) exceeded NUCLEUS_STEP_TIMEOUT=${stepTimeoutSeconds}s"
+          Add-Content -Path $outFile -Value $msg -Encoding utf8
+          "124" | Out-File -FilePath $exitFile -Encoding utf8 -NoNewline
+          if (-not (Test-Path -LiteralPath $timeFile)) {
+            "$($stepTimeoutSeconds * 1000)" | Out-File -FilePath $timeFile -Encoding utf8 -NoNewline
+          }
+          Write-Output $msg
+          $null = $failFastNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
+          $rs.PowerShell.Dispose()
+          $active.RemoveAt($k)
+          if ($script:FAIL_FAST) { $stopLaunching = $true }
+        }
+        continue
+      }
       foreach ($rs in $active) {
         $startFile = Join-Path $script:WaveTmpDir ("step-{0}.start" -f $rs.Number)
         if (Test-Path -LiteralPath $startFile) {

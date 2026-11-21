@@ -31,7 +31,9 @@ Step 01 runs `treefmt` in place, so a pipeline can reformat files silently: run 
 
 Both runners schedule steps through a work queue capped at `PARALLEL_JOBS` (CPU count by default): a free slot launches the next pending step immediately, and a slot releases the moment its step finishes, so a slow step never holds back a later step that could start. The `[k/N] step ... started` lines are numbered by launch order. Each step prints `step <n> finished (<dur>)` when it is reaped, and the runner prints `step <n> still running (<dur>)` every `NUCLEUS_STEP_PROGRESS_INTERVAL` seconds while a step is active (`15` by default, `0` disables the heartbeat, non-numeric or negative is a hard error before launch).
 
-POSIX polls active step wrappers on a 0.25 s tick so heartbeat and timeout checks can wake the queue while steps run. That polling keeps the bash 5.1 floor intact. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles with a bounded heartbeat wait. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
+`NUCLEUS_STEP_TIMEOUT` bounds each step in whole seconds; `0` or unset leaves a step unbounded, a non-numeric value is a hard error before launch, and an expired step writes exit code `124`, appends `step <n> exceeded NUCLEUS_STEP_TIMEOUT=<seconds>s` to its captured output, and is reported as failed.
+
+POSIX polls active step wrappers on a 0.25 s tick so heartbeat and timeout checks can wake the queue while steps run. That polling keeps the bash 5.1 floor intact. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles with a bounded heartbeat/timeout wait. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
 
 Under `--fail-fast` the first failure stops new launches; the queue drains the steps already in flight, then reports the failed set in launch order and exits 1. The queue changes only when steps launch: per-step output and timing files, the `=== [NN] name ===` headers, the `sum of steps` and `wall clock` lines, and the not-run states are unaffected.
 
@@ -47,7 +49,7 @@ Step numbers come from the `NN-` prefix of `src/scripts/checks/check-steps/<nn>-
 
 ## No ambient shared state
 
-A step reads its context parameter and its own locals, nothing else. The context is the first parameter: `$Context.<Field>` in PowerShell, `${ctx[...]}` in Bash via `local -n ctx="$1"`. Private accumulators stay out of shared scope. Documented env inputs are the exception (`REPO_ROOT`, `NUCLEUS_REPO_ROOT`, `PARALLEL_JOBS`, `NUCLEUS_STEP_PROGRESS_INTERVAL`), each needing a `# WHY:` when it is not self-evident. `NUCLEUS_STEP_TIMEOUT` is added by Task 3 of the check-runner-stall plan and follows the same whole-seconds validation shape.
+A step reads its context parameter and its own locals, nothing else. The context is the first parameter: `$Context.<Field>` in PowerShell, `${ctx[...]}` in Bash via `local -n ctx="$1"`. Private accumulators stay out of shared scope. Documented env inputs are the exception (`REPO_ROOT`, `NUCLEUS_REPO_ROOT`, `PARALLEL_JOBS`, `NUCLEUS_STEP_PROGRESS_INTERVAL`, `NUCLEUS_STEP_TIMEOUT`), each needing a `# WHY:` when it is not self-evident.
 
 PowerShell runspaces cannot inherit `$script:` state, so a read either fails or races; Bash subshells copy globals silently, so a write leaks into the parent. The context object is the only channel.
 
