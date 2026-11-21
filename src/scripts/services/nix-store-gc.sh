@@ -10,6 +10,8 @@ bash_guard_require 5 1 nix-store-gc
 . "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/expire-profile-generations.sh
 . "$SCRIPT_DIR/../lib/expire-profile-generations.sh"
+# shellcheck source=../lib/gc-nix.sh
+. "$SCRIPT_DIR/../lib/gc-nix.sh"
 
 _system_expiry="${NUCLEUS_GC_EXPIRY:-7d}"
 _nix_expiry="${NUCLEUS_GC_NIX_EXPIRY:-${_system_expiry}}"
@@ -27,4 +29,4 @@ else
   say "no system profile found; skipping system generation expiry"
 fi
 
-nix-collect-garbage --delete-older-than "$_nix_expiry"
+run_nix_gc_with_wait_progress "$_nix_expiry"

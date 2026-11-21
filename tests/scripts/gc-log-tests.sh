@@ -11,6 +11,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 EXPIRE_SH="$SCRIPT_DIR/../../src/scripts/lib/expire-profile-generations.sh"
 GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
+GC_NIX_SH="$SCRIPT_DIR/../../src/scripts/lib/gc-nix.sh"
 LOG_GC_SH="$SCRIPT_DIR/../../src/scripts/services/log-gc.sh"
 
 ensure_safe_rm_env
@@ -315,7 +316,7 @@ sleep 3
 EOF
   chmod +x "$fake_gc"
 
-  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_SH")"
+  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_NIX_SH")"
 
   rc=0
   out="$(
@@ -324,9 +325,8 @@ EOF
       NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
       bash -c '
       . "$1"
-      nix_expiry="7d"
       '"$gc_func"'
-      run_nix_gc_with_wait_progress
+      run_nix_gc_with_wait_progress 7d
     ' nucleus-gc-test "$LIB_SH" 2>&1
   )" || rc=$?
 
@@ -353,7 +353,7 @@ sleep 10
 EOF
   chmod +x "$fake_gc"
 
-  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_SH")"
+  gc_func="$(extract_func run_nix_gc_with_wait_progress "$GC_NIX_SH")"
 
   rc=0
   out="$(
@@ -362,9 +362,8 @@ EOF
       NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
       bash -c '
       . "$1"
-      nix_expiry="7d"
       '"$gc_func"'
-      run_nix_gc_with_wait_progress
+      run_nix_gc_with_wait_progress 7d
     ' nucleus-gc-test "$LIB_SH" 2>&1
   )" || rc=$?
 
