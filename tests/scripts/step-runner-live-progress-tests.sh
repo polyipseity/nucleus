@@ -120,6 +120,66 @@ test_step_timeout_rejects_non_numeric() {
   fi
 }
 
+test_progress_interval_rejects_non_numeric() {
+  local _out _rc
+  _out="$(
+    export PARALLEL_JOBS=1 NUCLEUS_STEP_PROGRESS_INTERVAL=abc NUCLEUS_STEP_TIMEOUT=0
+    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
+    # shellcheck source=../../src/scripts/lib/step-runner.sh
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+    _nuc_c2_dim="" _nuc_c2_reset=""
+    cache_file_lists() { :; }
+    register_step "fast" 5 "Fast" _t_fast
+    run_all_steps 2>&1
+  )" && _rc=0 || _rc=$?
+  if [ "$_rc" -eq 2 ]; then
+    assert_pass "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error"
+  else
+    assert_fail "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error" "rc=$_rc out=$_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q "NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds (got 'abc')"; then
+    assert_pass "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL names the variable and value"
+  else
+    assert_fail "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL names the variable and value" "got: $_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q 'step .* started\|step [0-9]* started'; then
+    assert_fail "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL exits before any step launches" "got: $_out"
+  else
+    assert_pass "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL exits before any step launches"
+  fi
+}
+
+test_progress_interval_rejects_negative() {
+  local _out _rc
+  _out="$(
+    export PARALLEL_JOBS=1 NUCLEUS_STEP_PROGRESS_INTERVAL=-1 NUCLEUS_STEP_TIMEOUT=0
+    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
+    # shellcheck source=../../src/scripts/lib/step-runner.sh
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+    _nuc_c2_dim="" _nuc_c2_reset=""
+    cache_file_lists() { :; }
+    register_step "fast" 5 "Fast" _t_fast
+    run_all_steps 2>&1
+  )" && _rc=0 || _rc=$?
+  if [ "$_rc" -eq 2 ]; then
+    assert_pass "negative NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error"
+  else
+    assert_fail "negative NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error" "rc=$_rc out=$_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q "NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds (got '-1')"; then
+    assert_pass "negative NUCLEUS_STEP_PROGRESS_INTERVAL names the variable and value"
+  else
+    assert_fail "negative NUCLEUS_STEP_PROGRESS_INTERVAL names the variable and value" "got: $_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q 'step .* started\|step [0-9]* started'; then
+    assert_fail "negative NUCLEUS_STEP_PROGRESS_INTERVAL exits before any step launches" "got: $_out"
+  else
+    assert_pass "negative NUCLEUS_STEP_PROGRESS_INTERVAL exits before any step launches"
+  fi
+}
+
 test_verbose_step_over_the_bound_fails_with_124() {
   local _start _elapsed _out
   _start=$SECONDS
@@ -315,6 +375,8 @@ test_fast_step_reports_before_slow
 test_running_step_reports_still_running
 test_step_over_the_bound_fails_with_124
 test_step_timeout_rejects_non_numeric
+test_progress_interval_rejects_non_numeric
+test_progress_interval_rejects_negative
 test_verbose_step_over_the_bound_fails_with_124
 test_verbose_step_output_is_prefixed_and_complete
 test_verbose_bound_kills_descendants

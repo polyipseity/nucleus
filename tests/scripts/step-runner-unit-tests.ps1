@@ -958,6 +958,96 @@ if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile | ForEa
     }
 }
 
+function Test-PipelineProgressIntervalRejectsNonNumeric {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-progress-bad-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-progress-bad-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_TIMEOUT = '0'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = 'abc'
+Register-Step -Id 'fast' -Number 5 -Name 'Fast' -Action { param($Context) $true }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldTimeout = $env:NUCLEUS_STEP_TIMEOUT
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $namesVar = $out -match "NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds \(got 'abc'\)"
+        $started = $out -match 'step 5 started'
+        if ($code -eq 2 -and $namesVar -and -not $started) {
+            Assert-Pass "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error before launch"
+        } else {
+            Assert-Fail "non-numeric NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error before launch" "exit=$code namesVar=$namesVar started=$started output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldTimeout) { Remove-Item Env:NUCLEUS_STEP_TIMEOUT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_TIMEOUT = $oldTimeout }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-PipelineProgressIntervalRejectsNegative {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-progress-neg-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-progress-neg-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_TIMEOUT = '0'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '-1'
+Register-Step -Id 'fast' -Number 5 -Name 'Fast' -Action { param($Context) $true }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldTimeout = $env:NUCLEUS_STEP_TIMEOUT
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $namesVar = $out -match "NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds \(got '-1'\)"
+        $started = $out -match 'step 5 started'
+        if ($code -eq 2 -and $namesVar -and -not $started) {
+            Assert-Pass "negative NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error before launch"
+        } else {
+            Assert-Fail "negative NUCLEUS_STEP_PROGRESS_INTERVAL is a hard error before launch" "exit=$code namesVar=$namesVar started=$started output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldTimeout) { Remove-Item Env:NUCLEUS_STEP_TIMEOUT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_TIMEOUT = $oldTimeout }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-StepTimeoutDefaultIs600 {
     Initialize-StepState
     . $stepRunner
@@ -976,6 +1066,8 @@ Test-PipelineLiveProgressReportsFinishedAndHeartbeat
 Test-PipelineTimeoutFailsStepWith124
 Test-PipelineTimeoutRejectsNonNumeric
 Test-PipelineTimeoutZeroDisablesBound
+Test-PipelineProgressIntervalRejectsNonNumeric
+Test-PipelineProgressIntervalRejectsNegative
 Test-StepTimeoutDefaultIs600
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
