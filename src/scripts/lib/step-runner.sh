@@ -242,7 +242,7 @@ _format_duration_s() {
 _run_step() {
   local _n="$1" _name="$2" _func="$3" _id="$4"
   shift 4
-  local _step_start_ms _elapsed_ms _exit_code _fifo
+  local _step_start_ms _elapsed_ms _exit_code _fifo _reader_pid
 
   _step_start_ms=$(_step_now_ms)
 
@@ -288,9 +288,11 @@ _run_step() {
   if $_is_verbose; then
     tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
       printf '%s[step %2d]%s %s\n' "${_nuc_c2_dim}" "$((10#${_n}))" "${_nuc_c2_reset}" "$_line" >&2
-    done
+    done &
+    _reader_pid=$!
   else
     cat <"$_fifo" >>"$_wave_tmpdir/step-$_n.out" &
+    _reader_pid=$!
   fi
 
   _exit_code=0
@@ -319,6 +321,11 @@ _run_step() {
   else
     wait "$_func_pid" || _exit_code=$?
   fi
+
+  # check-suppress:suppression_doc: reader exit follows FIFO EOF; its status must not replace the step's
+  wait "$_reader_pid" 2>/dev/null || true
+  # check-suppress:suppression_doc: tee in the verbose pipeline is not the waited pid; reap it before writing exit/time
+  wait 2>/dev/null || true
 
   printf '%s' "$_exit_code" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
@@ -663,6 +670,7 @@ run_all_steps() {
     for _k in "${!_run_pids[@]}"; do
       if kill -0 "${_run_pids[$_k]}" 2>/dev/null; then
         # WHY: a zombie still exists, so kill -0 returns 0; reap it or it lingers.
+        # check-suppress:suppression_doc: ps exits non-zero when the pid vanished between kill -0 and the state probe
         case "$(ps -o state= -p "${_run_pids[$_k]}" 2>/dev/null || true)" in
         Z*) ;;
         *) continue ;;
@@ -691,7 +699,7 @@ run_all_steps() {
         _launch_pos="${_run_positions[$_k]}"
         _n="${_STEP_NUMBERS[${_pending_indices[$_launch_pos]}]}"
         printf '%sstep %s still running (%s)%s\n' "${_nuc_c1_dim}" "$_n" \
-          "$(_format_duration_s $(( $(_step_now_ms) - $(cat "$_wave_tmpdir/step-$_n.start" 2>/dev/null || echo 0) )))" "${_nuc_c1_reset}"
+          "$(_format_duration_s $(($(_step_now_ms) - $(cat "$_wave_tmpdir/step-$_n.start" 2>/dev/null || echo 0))))" "${_nuc_c1_reset}"
       done
     fi
   done
