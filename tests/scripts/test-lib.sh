@@ -80,6 +80,39 @@ assert_fail() {
   ((++TESTS_FAILED))
 }
 
+# assert_elapsed_below <label> <limit_seconds> <elapsed_seconds> <victim_seconds>
+#
+# Upper bound on a bounded call. A literal band measures the host's scheduler,
+# not the bound: under the step runner's parallel fan-out a correctly bounded 2 s
+# wait was observed at 9 s. The discriminating question is whether the call
+# returned before the thing it bounded would have finished on its own, so
+# <victim_seconds> is required and <limit_seconds> may never reach it.
+assert_elapsed_below() {
+  local label="$1" limit="$2" elapsed="$3" victim="${4:-}"
+  if [ -z "$victim" ]; then
+    assert_fail "$label" "no victim duration given, so the bound is unprovable"
+  elif [ "$limit" -ge "$victim" ]; then
+    assert_fail "$label" "limit ${limit}s does not precede the victim's ${victim}s, so a broken bound would pass"
+  elif [ "$elapsed" -lt "$limit" ]; then
+    assert_pass "$label"
+  else
+    assert_fail "$label" "took ${elapsed}s, at or past the ${limit}s limit (victim would run ${victim}s)"
+  fi
+}
+
+# assert_elapsed_at_least <label> <floor_seconds> <elapsed_seconds>
+#
+# Lower bound: the call had to wait at least <floor_seconds>, so a fast-failing
+# probe cannot claim it honoured a timeout.
+assert_elapsed_at_least() {
+  local label="$1" floor="$2" elapsed="$3"
+  if [ "$elapsed" -ge "$floor" ]; then
+    assert_pass "$label"
+  else
+    assert_fail "$label" "returned after ${elapsed}s, before the ${floor}s floor"
+  fi
+}
+
 # finish_tests: Print the tally and exit with the suite's status. Assertions only
 # bump a counter, so a suite that never turns the tally into an exit status reports
 # success to the runner, which sees only the exit status, no matter what it

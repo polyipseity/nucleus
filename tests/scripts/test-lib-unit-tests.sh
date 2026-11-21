@@ -461,6 +461,81 @@ test_safe_rm_route_prompts_on_an_absent_trash() {
   rm -rf "$_work"
 }
 
+# ---- timing-bound assertion helpers ----
+
+test_assert_elapsed_below_passes_before_the_victim() {
+  local _before=$TESTS_PASSED _fails=$TESTS_FAILED
+  assert_elapsed_below "fast bound" 5 2 30
+  if [ $((TESTS_PASSED - _before)) -eq 1 ] && [ "$TESTS_FAILED" -eq "$_fails" ]; then
+    assert_pass "assert_elapsed_below passes a bounded run"
+  else
+    assert_fail "assert_elapsed_below passes a bounded run" \
+      "passed=$((TESTS_PASSED - _before)) failed=$((TESTS_FAILED - _fails))"
+  fi
+}
+
+test_assert_elapsed_below_fails_when_the_bound_did_not_hold() {
+  local _real_pass _real_fail _saw_pass=0 _saw_fail=0
+  _real_pass="$(declare -f assert_pass)"
+  _real_fail="$(declare -f assert_fail)"
+  assert_pass() { _saw_pass=$((_saw_pass + 1)); }
+  assert_fail() { _saw_fail=$((_saw_fail + 1)); }
+  assert_elapsed_below "slow bound" 5 30 30
+  eval "$_real_pass"
+  eval "$_real_fail"
+  if [ "$_saw_fail" -eq 1 ] && [ "$_saw_pass" -eq 0 ]; then
+    assert_pass "assert_elapsed_below fails a run that outlived its victim"
+  else
+    assert_fail "assert_elapsed_below fails a run that outlived its victim" \
+      "pass=$_saw_pass fail=$_saw_fail"
+  fi
+}
+
+test_assert_elapsed_below_rejects_a_limit_past_the_victim() {
+  local _real_pass _real_fail _saw_pass=0 _saw_fail=0
+  _real_pass="$(declare -f assert_pass)"
+  _real_fail="$(declare -f assert_fail)"
+  assert_pass() { _saw_pass=$((_saw_pass + 1)); }
+  assert_fail() { _saw_fail=$((_saw_fail + 1)); }
+  assert_elapsed_below "useless limit" 30 2 30
+  eval "$_real_pass"
+  eval "$_real_fail"
+  if [ "$_saw_fail" -eq 1 ] && [ "$_saw_pass" -eq 0 ]; then
+    assert_pass "assert_elapsed_below rejects a limit that reaches the victim"
+  else
+    assert_fail "assert_elapsed_below rejects a limit that reaches the victim" \
+      "pass=$_saw_pass fail=$_saw_fail"
+  fi
+}
+
+test_assert_elapsed_at_least_rejects_an_early_return() {
+  local _real_pass _real_fail _saw_pass=0 _saw_fail=0
+  _real_pass="$(declare -f assert_pass)"
+  _real_fail="$(declare -f assert_fail)"
+  assert_pass() { _saw_pass=$((_saw_pass + 1)); }
+  assert_fail() { _saw_fail=$((_saw_fail + 1)); }
+  assert_elapsed_at_least "waited bound" 1 0
+  eval "$_real_pass"
+  eval "$_real_fail"
+  if [ "$_saw_fail" -eq 1 ] && [ "$_saw_pass" -eq 0 ]; then
+    assert_pass "assert_elapsed_at_least rejects a wait shorter than the floor"
+  else
+    assert_fail "assert_elapsed_at_least rejects a wait shorter than the floor" \
+      "pass=$_saw_pass fail=$_saw_fail"
+  fi
+}
+
+test_assert_elapsed_at_least_accepts_a_real_wait() {
+  local _before=$TESTS_PASSED _fails=$TESTS_FAILED
+  assert_elapsed_at_least "waited bound" 1 2
+  if [ $((TESTS_PASSED - _before)) -eq 1 ] && [ "$TESTS_FAILED" -eq "$_fails" ]; then
+    assert_pass "assert_elapsed_at_least accepts a wait at or past the floor"
+  else
+    assert_fail "assert_elapsed_at_least accepts a wait at or past the floor" \
+      "passed=$((TESTS_PASSED - _before)) failed=$((TESTS_FAILED - _fails))"
+  fi
+}
+
 # ---- Run tests ----
 section 1 "Phase 2: test-lib unit tests"
 echo ""
@@ -478,5 +553,10 @@ test_ensure_safe_rm_env_reuses_one_trash_per_run
 test_ensure_safe_rm_env_leaves_a_plain_rm_alone
 test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash
 test_safe_rm_route_prompts_on_an_absent_trash
+test_assert_elapsed_below_passes_before_the_victim
+test_assert_elapsed_below_fails_when_the_bound_did_not_hold
+test_assert_elapsed_below_rejects_a_limit_past_the_victim
+test_assert_elapsed_at_least_rejects_an_early_return
+test_assert_elapsed_at_least_accepts_a_real_wait
 
 finish_tests
