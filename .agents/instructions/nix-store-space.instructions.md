@@ -16,6 +16,8 @@ Generation retention keeps the newest `generationsKeep` (default 7) and anything
 
 Scheduling: daily `nixStoreGc` runs `nix-store-gc.sh`; weekly `gc-weekly` runs `gc.sh` as root plus the user homedir via `sudo -u`.
 
+A collection that has held the store lock for an hour with no CPU-time growth between two watchdog ticks is stalled, not slow. The system watchdog reclaims it with SIGTERM, then SIGKILL after `NUCLEUS_STORE_LOCK_RECLAIM_GRACE` (default 30 s), acts at most once per `NUCLEUS_STORE_LOCK_RECLAIM_COOLDOWN` (default 6 h), and never restarts the Nix daemon. A collection younger than `NUCLEUS_STORE_LOCK_STALL_SECONDS` (default 3600) or one still burning CPU is left alone, so the bound on our own jobs (600 s) keeps them out of reach of this policy.
+
 Host `/nix`: MacBook is the APFS volume (Determinate). NixOS is Btrfs `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)) with `compress-force=zstd` and `noatime`; the NixOS guest image uses the same layout ([`src/vms/NixOS/formats/`](../../src/vms/NixOS/formats/)).
 
 ## Btrfs measurement and maintenance

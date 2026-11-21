@@ -22,6 +22,8 @@ _WATCHDOG_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # WHY no guard variable: svc-instances.sh is a pure definition library, so
 #   re-sourcing it is a no-op redefinition.
 . "$_WATCHDOG_DIR/../lib/svc-instances.sh"
+# shellcheck source=../lib/store-lock.sh
+[ -n "${_NUCLEUS_STORE_LOCK_SOURCED-}" ] || . "$_WATCHDOG_DIR/../lib/store-lock.sh"
 
 # WHY constants: the tick cadence and repair bound are properties of the
 #   watchdog itself. They were read from services.json's cloud-drive.lifecycle
@@ -83,6 +85,13 @@ _watchdog_services_json() {
     return 0
   fi
   printf '%s/src/modules/services.json' "$(derive_repo_root)"
+}
+
+_watchdog_store_lock_state_dir() {
+  case "$(uname -s)" in
+  Darwin) printf '%s\n' "/Library/Application Support/nucleus/state/store-lock" ;;
+  *) printf '%s\n' "/var/lib/nucleus/state/store-lock" ;;
+  esac
 }
 
 _watchdog_entry_field() {
@@ -184,6 +193,18 @@ _watchdog_tick() {
       _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$svc_key" "$unit_name"
     fi
   done
+
+  # WHY: only the system-scope daemon runs as root, and the store lock files are
+  # root-readable only. Both POSIX units pass --scope system to this daemon, and
+  # the user-scope agent must never reclaim another owner's collection, so an
+  # ad-hoc --oneshot run without --scope skips this duty on purpose.
+  if [ "$_scope_filter" = "system" ] && command -v store_lock_watchdog_tick >/dev/null 2>&1; then
+    store_lock_watchdog_tick \
+      "$(_watchdog_store_lock_state_dir)" \
+      "${NUCLEUS_STORE_LOCK_STALL_SECONDS:-3600}" \
+      "${NUCLEUS_STORE_LOCK_RECLAIM_GRACE:-30}" \
+      "${NUCLEUS_STORE_LOCK_RECLAIM_COOLDOWN:-21600}"
+  fi
 }
 
 # The instance id is the concrete unit/label, so expansion matches the service
