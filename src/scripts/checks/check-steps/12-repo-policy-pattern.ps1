@@ -347,7 +347,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $skipErrors = 0
   # WHY: the runners document the declared-applicability contract, and
   # repository-policy.awk plus both gate steps carry the pattern list itself.
-  $skipScopeExcluded = @('step-runner.sh', 'step-runner.ps1', 'repository-policy.awk', $selfLeaf, $selfShLeaf) + $allStepLeaves + $allStepShLeaves
+  $skipScopeExcluded = @('step-runner.sh', 'step-runner.ps1', 'repository-policy.awk', 'store-lock.sh', $selfLeaf, $selfShLeaf) + $allStepLeaves + $allStepShLeaves
   $skipConstructPattern = '\bskip_step\b|\bSkip-Step\b|\bInvoke-SkippedStep\b|--skip-steps|-SkipStep|\breturn[ \t]+2\b|\bSKIPPED\b|-SkipMessage|\bassert_skip\b|\bTESTS_SKIPPED\b'
   # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   $skipFiles = @(if ($HasArgs) {

@@ -18,6 +18,8 @@ bash_guard_require 5 1 apply
 . "$SCRIPT_DIR/lib/lib.sh"
 # shellcheck source=lib/apply-history.sh
 . "$SCRIPT_DIR/lib/apply-history.sh"
+# shellcheck source=lib/store-lock.sh
+. "$SCRIPT_DIR/lib/store-lock.sh"
 
 usage() {
   cat "$SCRIPT_DIR/apply-usage.txt"
@@ -742,7 +744,13 @@ Darwin)
   printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   # WHY -H: root-owned HOME keeps Nix from inheriting a user-owned one.
   _apply_history_phase="rebuild"
-  run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
+  _apply_store_lock_seen="$(mktemp "${TMPDIR:-/tmp}/nucleus-apply-store-lock.XXXXXX")"
+  store_lock_run_bounded \
+    "${NUCLEUS_STORE_LOCK_DEADLINE:-600}" \
+    "${NUCLEUS_STORE_LOCK_PROGRESS_INTERVAL:-30}" \
+    "waiting for the big garbage collector lock" \
+    "$_apply_store_lock_seen" \
+    -- run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
   _apply_history_phase="post-apply"
   # refresh the recorded live repo root in case the checkout moved during activation
   _post_rebuild_repo_root="$(derive_repo_root)"
@@ -781,7 +789,13 @@ Linux)
     printf '%s\n' "$REPO_ROOT" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     _apply_history_phase="rebuild"
-    run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
+    _apply_store_lock_seen="$(mktemp "${TMPDIR:-/tmp}/nucleus-apply-store-lock.XXXXXX")"
+    store_lock_run_bounded \
+      "${NUCLEUS_STORE_LOCK_DEADLINE:-600}" \
+      "${NUCLEUS_STORE_LOCK_PROGRESS_INTERVAL:-30}" \
+      "waiting for the big garbage collector lock" \
+      "$_apply_store_lock_seen" \
+      -- run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
     _apply_history_phase="post-apply"
     # refresh in case the checkout moved during activation
     _post_rebuild_repo_root="$(derive_repo_root)"
