@@ -424,16 +424,23 @@ run_hermetic_eval() {
     "darwin:./src#darwinConfigurations.MacBook.config.system.build.toplevel"
     "nixos:./src#nixosConfigurations.NixOS.config.system.build.toplevel"
   )
-  # WHY: one target per invocation, because a single call carrying both proved
-  # unable to say which target it was in when it stalled for ten minutes on this host.
+  # WHY: one target per invocation, because a single call carrying both could not
+  # name the target it stalled on and hid a ten-minute hang on this host.
   # The cost is one extra process; the gain is a named failure.
+  # WHY: nix eval --read-only, not nix build --dry-run. A dry-run build writes the
+  # evaluated paths into the store, and that write blocks on the store's garbage
+  # collector big lock while a collection runs; teardown then joins the blocked
+  # async path writer and the step never returns (sample of the hang: CmdEval
+  # destructor -> EvalState destructor -> AsyncPathWriterImpl destructor ->
+  # std::thread::join). Read-only evaluation proves the same property, that the
+  # flake evaluates with no forwarded environment, and no collection can block it.
   for _hermetic_target in "${_hermetic_targets[@]}"; do
     _target="${_hermetic_target%%:*}"
     _label="${_hermetic_target#*:}"
     _t0=$(_ne_now_ms)
     if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
       NIX_CONFIG="$_nix_cfg" \
-      nix build --dry-run "$_label" \
+      nix eval --raw --read-only "${_label}.drvPath" \
       >"$_hermetic_out" 2>&1; then
       say "hermetic eval: $_target toplevel passed ($(_ne_dur_s $(($(_ne_now_ms) - _t0))))"
       continue
