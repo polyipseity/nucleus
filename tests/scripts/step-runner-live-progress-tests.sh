@@ -261,6 +261,56 @@ test_verbose_bound_kills_descendants() {
   fi
 }
 
+# shellcheck disable=SC2329 # reason: invoked indirectly via register_step
+_t_three_seconds() { sleep 3; }
+
+test_default_timeout_is_600_when_unset() {
+  local _out
+  _out="$(
+    unset NUCLEUS_STEP_TIMEOUT
+    # shellcheck source=../../src/scripts/lib/step-runner.sh
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    printf 'default=%s\n' "${_step_timeout_default_seconds:-unset}"
+    printf 'effective=%s\n' "${_step_timeout_seconds:-unset}"
+  )"
+  if printf '%s\n' "$_out" | grep -q 'default=600'; then
+    assert_pass "the default step timeout constant is 600"
+  else
+    assert_fail "the default step timeout constant is 600" "got: $_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q 'effective=600'; then
+    assert_pass "the effective step timeout defaults to the default constant when unset"
+  else
+    assert_fail "the effective step timeout defaults to the default constant when unset" "got: $_out"
+  fi
+}
+
+test_timeout_zero_disables_bound() {
+  local _out _rc
+  _out="$(
+    export PARALLEL_JOBS=1 NUCLEUS_STEP_TIMEOUT=0 NUCLEUS_STEP_PROGRESS_INTERVAL=0
+    export HAS_ARGS=false FAIL_FAST=false ONLINE=false
+    # shellcheck source=../../src/scripts/lib/step-runner.sh
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+    _nuc_c2_dim="" _nuc_c2_reset=""
+    cache_file_lists() { :; }
+    register_step "three" 5 "Three" _t_three_seconds
+    run_all_steps
+    printf 'exitfile=%s\n' "$(cat "$_wave_tmpdir/step-5.exit" 2>/dev/null || true)"
+  )" && _rc=0 || _rc=$?
+  if [ "$_rc" -eq 0 ]; then
+    assert_pass "NUCLEUS_STEP_TIMEOUT=0 disables the bound"
+  else
+    assert_fail "NUCLEUS_STEP_TIMEOUT=0 disables the bound" "rc=$_rc out=$_out"
+  fi
+  if printf '%s\n' "$_out" | grep -q 'exitfile=0' && ! printf '%s\n' "$_out" | grep -q 'exceeded NUCLEUS_STEP_TIMEOUT'; then
+    assert_pass "NUCLEUS_STEP_TIMEOUT=0 lets a 3 s step complete without exceeded"
+  else
+    assert_fail "NUCLEUS_STEP_TIMEOUT=0 lets a 3 s step complete without exceeded" "got: $_out"
+  fi
+}
+
 test_fast_step_reports_before_slow
 test_running_step_reports_still_running
 test_step_over_the_bound_fails_with_124
@@ -268,5 +318,7 @@ test_step_timeout_rejects_non_numeric
 test_verbose_step_over_the_bound_fails_with_124
 test_verbose_step_output_is_prefixed_and_complete
 test_verbose_bound_kills_descendants
+test_default_timeout_is_600_when_unset
+test_timeout_zero_disables_bound
 
 finish_tests

@@ -53,6 +53,7 @@ $script:StepRequires = [System.Collections.Generic.List[string]]::new()
 $script:StepLibPath = $null
 $script:OnlySteps = @()
 $script:NotRunStates = @{}
+$script:StepTimeoutDefaultSeconds = 600
 
 function Format-StepDuration {
   param(
@@ -501,7 +502,7 @@ function Invoke-StepPipeline {
     $progressSeconds = $parsedProgress
   }
 
-  $stepTimeoutSeconds = 0
+  $stepTimeoutSeconds = $script:StepTimeoutDefaultSeconds
   if ($env:NUCLEUS_STEP_TIMEOUT) {
     $parsedTimeout = 0
     if (-not [int]::TryParse($env:NUCLEUS_STEP_TIMEOUT, [ref]$parsedTimeout) -or $parsedTimeout -lt 0) {

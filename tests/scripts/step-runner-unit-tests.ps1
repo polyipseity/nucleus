@@ -909,10 +909,74 @@ Invoke-StepPipeline
     }
 }
 
+function Test-PipelineTimeoutZeroDisablesBound {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-zero-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-timeout-zero-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_TIMEOUT = '0'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '0'
+Register-Step -Id 'three' -Number 5 -Name 'Three' -Action { param($Context) Start-Sleep -Seconds 3; $true }
+Invoke-StepPipeline
+$exitFile = Join-Path $script:WaveTmpDir 'step-5.exit'
+$outFile = Join-Path $script:WaveTmpDir 'step-5.out'
+if (Test-Path -LiteralPath $exitFile) { Write-Output ("exitfile=" + (Get-Content -LiteralPath $exitFile -Raw)) }
+if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile | ForEach-Object { Write-Output $_ } }
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldTimeout = $env:NUCLEUS_STEP_TIMEOUT
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $hasExit0 = $out -match 'exitfile=0'
+        $hasExceeded = $out -match 'exceeded NUCLEUS_STEP_TIMEOUT'
+        if ($code -eq 0 -and $hasExit0 -and -not $hasExceeded) {
+            Assert-Pass "NUCLEUS_STEP_TIMEOUT=0 disables the bound"
+        } else {
+            Assert-Fail "NUCLEUS_STEP_TIMEOUT=0 disables the bound" "exit=$code hasExit0=$hasExit0 hasExceeded=$hasExceeded output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldTimeout) { Remove-Item Env:NUCLEUS_STEP_TIMEOUT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_TIMEOUT = $oldTimeout }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-StepTimeoutDefaultIs600 {
+    Initialize-StepState
+    . $stepRunner
+
+    $defaultVar = Get-Variable -Name StepTimeoutDefaultSeconds -Scope Script -ErrorAction SilentlyContinue
+    $actual = if ($null -eq $defaultVar) { 'unset' } else { $defaultVar.Value }
+    if ($actual -eq 600) {
+        Assert-Pass "the default step timeout constant is 600"
+    } else {
+        Assert-Fail "the default step timeout constant is 600" "got '$actual'"
+    }
+}
+
 Test-SaveFileListCache-NoPathBeyondSymlink
 Test-PipelineLiveProgressReportsFinishedAndHeartbeat
 Test-PipelineTimeoutFailsStepWith124
 Test-PipelineTimeoutRejectsNonNumeric
+Test-PipelineTimeoutZeroDisablesBound
+Test-StepTimeoutDefaultIs600
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""

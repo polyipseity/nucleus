@@ -218,7 +218,8 @@ FAIL_FAST=${FAIL_FAST:-false}
 ONLINE=${ONLINE:-false}
 VERBOSE_IDS=()
 ONLY_STEPS=()
-_step_timeout_seconds=0
+_step_timeout_default_seconds=600
+_step_timeout_seconds="$_step_timeout_default_seconds"
 
 _step_now_ms() {
   if [ -n "${EPOCHREALTIME-}" ]; then
@@ -598,7 +599,7 @@ run_all_steps() {
   fi
   _pipeline_start_ms=$(_step_now_ms)
 
-  _step_timeout_seconds="${NUCLEUS_STEP_TIMEOUT:-0}"
+  _step_timeout_seconds="${NUCLEUS_STEP_TIMEOUT:-$_step_timeout_default_seconds}"
   case "$_step_timeout_seconds" in
   '' | *[!0-9]*)
     error "NUCLEUS_STEP_TIMEOUT must be whole seconds (got '$_step_timeout_seconds')"
