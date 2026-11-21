@@ -17,9 +17,15 @@ init_test_state
 # shellcheck source=../../src/scripts/lib/gc-nix.sh
 . "$REPO_ROOT/src/scripts/lib/gc-nix.sh"
 
-_stub="$(mktemp -d)/nix-collect-garbage"
+_stub_dir="$(mktemp -d)"
+_stub="$_stub_dir/nix-collect-garbage"
 cat >"$_stub" <<'STUB'
 #!/usr/bin/env bash
+# WHY the pid file: a victim that dies before its first line of stdout still
+# proves the reap, and the harness must not depend on the child winning a race
+# against the deadline to record who it was. _STUB_DIR is exported by the suite.
+printf '%s\n' "$$" >"${_STUB_DIR:?}/pid"
+sleep "${STUB_START_DELAY:-0}"
 printf 'stub-pid=%s\n' "$$"
 printf 'arguments=%s\n' "$*"
 printf 'waiting for the big garbage collector lock...\n'
@@ -27,6 +33,8 @@ exec sleep "${STUB_SLEEP:-0}"
 STUB
 chmod +x "$_stub"
 export NUCLEUS_NIX_COLLECT_GARBAGE_BIN="$_stub"
+_STUB_DIR="$_stub_dir"
+export _STUB_DIR
 
 _case_deadline_kills_the_child() {
   local _t0 _out _rc _elapsed _pid
@@ -35,7 +43,7 @@ _case_deadline_kills_the_child() {
     run_nix_gc_with_wait_progress 7d 2>&1)"
   _rc=$?
   _elapsed=$(($(date +%s) - _t0))
-  _pid="$(printf '%s\n' "$_out" | sed -n 's/^stub-pid=//p' | head -1)"
+  _pid="$(cat "$_stub_dir/pid" 2>/dev/null || true)"
 
   if [ "$_rc" -eq 1 ]; then
     assert_pass "expired run exits 1"
@@ -57,8 +65,30 @@ _case_deadline_kills_the_child() {
   esac
   if [ -n "$_pid" ] && ! kill -0 "$_pid" 2>/dev/null; then
     assert_pass "the child is killed and reaped"
+  elif [ -z "$_pid" ]; then
+    assert_fail "the child is killed and reaped" "the stub never recorded its pid"
   else
     assert_fail "the child is killed and reaped" "pid=$_pid still alive"
+  fi
+}
+
+_case_deadline_fires_before_the_child_speaks() {
+  local _content
+  # WHY truncate: every case shares one stub dir, so a stale pid from the
+  # previous victim would make this pass for the wrong reason. Truncating needs
+  # no deletion transport, unlike removing the file.
+  : >"$_stub_dir/pid"
+  STUB_START_DELAY=3 STUB_SLEEP=60 \
+    NUCLEUS_GC_LOCK_WAIT_DEADLINE=5 NUCLEUS_GC_LOCK_WAIT_PROGRESS_INTERVAL=1 \
+    run_nix_gc_with_wait_progress 7d >/dev/null 2>&1
+  _content="$(cat "$_stub_dir/pid" 2>/dev/null || true)"
+
+  if [ -n "$_content" ] && ! kill -0 "$_content" 2>/dev/null; then
+    assert_pass "a silent child is reaped"
+  elif [ -z "$_content" ]; then
+    assert_fail "a silent child is reaped" "the stub never recorded its pid"
+  else
+    assert_fail "a silent child is reaped" "pid=$_content still alive"
   fi
 }
 
@@ -113,6 +143,7 @@ _case_invalid_deadline_falls_back_to_the_default() {
 
 section "1" "bounded nix-collect-garbage"
 _case_deadline_kills_the_child
+_case_deadline_fires_before_the_child_speaks
 _case_success_passes_output_through
 _case_zero_deadline_disables_the_bound
 _case_invalid_deadline_falls_back_to_the_default
