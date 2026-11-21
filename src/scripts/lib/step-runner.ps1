@@ -297,48 +297,6 @@ function Remove-WaveTempDir {
   }
 }
 
-# Owns ALL orchestration I/O: timing, section headers, exit file writing, fail-fast.
-# Step actions receive params and write messages to stdout only.
-function Invoke-Step {
-  param(
-    [Parameter(Mandatory)]
-    [int]$Number,
-    [Parameter(Mandatory)]
-    [string]$Name,
-    [Parameter(Mandatory)]
-    [scriptblock]$Action
-  )
-
-  $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
-
-  "`n=== [$Number] $Name ===" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
-  $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
-  [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString() | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.start") -Encoding utf8 -NoNewline
-
-  $exitCode = 0
-  try {
-    $stepParams = @{ HasArgs = $script:HAS_ARGS; RepoRoot = $RepoRoot; WaveTmpDir = $script:WaveTmpDir; PositionalArgs = $script:positionalArgs }
-    $result = & $Action @stepParams
-    # Steps signal pass ($true) or fail ($false), and the return value is the
-    # LAST pipeline element.
-    $status = @($result)[-1]
-    if ($status -eq $false) { $exitCode = 1 }
-  } catch {
-    $exitCode = 1
-    Write-Output "ERROR: $_"
-  }
-
-  "$exitCode" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
-  $stepStart.Stop()
-  $elapsedMs = $stepStart.ElapsedMilliseconds
-  "$elapsedMs" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
-  Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $Number, (Format-StepDuration -Milliseconds $elapsedMs))
-
-  if ($exitCode -ne 0 -and $script:FAIL_FAST) {
-    exit $exitCode
-  }
-}
-
 function Read-Argument {
   param([string[]]$Arguments)
   $script:FAIL_FAST = $false
