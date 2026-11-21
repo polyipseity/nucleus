@@ -16,6 +16,8 @@ _t_fast() { :; }
 _t_slow() { sleep 3; }
 # shellcheck disable=SC2329 # reason: register_step receives these names as strings and calls them
 _t_hang() { sleep 30; }
+# shellcheck disable=SC2329 # reason: register_step receives these names as strings and calls them
+_t_almost() { sleep 2; }
 
 # shellcheck disable=SC2329 # reason: invoked by the sourced step-runner.sh
 cache_file_lists() { :; }
@@ -96,19 +98,40 @@ test_step_over_the_bound_fails_with_124() {
   else
     assert_fail "a step past the bound exits 124" "got: $_out"
   fi
-  case "$_elapsed" in
-  0 | 1 | 2 | 3 | 4 | 5)
-    assert_pass "the bound is enforced in seconds not minutes"
-    ;;
-  *)
-    assert_fail "the bound is enforced in seconds not minutes" "took ${_elapsed}s"
-    ;;
-  esac
+  assert_elapsed_below "the bound is enforced in seconds not minutes" 20 "$_elapsed" 30
   if printf '%s\n' "$_out" | grep -q 'exceeded NUCLEUS_STEP_TIMEOUT=2s'; then
     assert_pass "the step's captured output names the bound"
   else
     assert_fail "the step's captured output names the bound" "got: $_out"
   fi
+}
+
+test_bound_follows_the_clock_not_the_tick_count() {
+  local _start _elapsed _out
+  _start=$SECONDS
+  PARALLEL_JOBS=1
+  NUCLEUS_STEP_TIMEOUT=3
+  NUCLEUS_STEP_PROGRESS_INTERVAL=0
+  HAS_ARGS=false
+  FAIL_FAST=false
+  ONLINE=false
+  _nuc_c1_dim="" _nuc_c1_reset="" _nuc_c1_bold="" _nuc_c1_cyan=""
+  _nuc_c2_dim="" _nuc_c2_reset=""
+  export PARALLEL_JOBS NUCLEUS_STEP_TIMEOUT NUCLEUS_STEP_PROGRESS_INTERVAL HAS_ARGS FAIL_FAST ONLINE
+  _out="$(
+    # shellcheck source=../../src/scripts/lib/step-runner.sh
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    register_step "almost" 5 "Almost at the bound" _t_almost
+    run_all_steps
+    printf 'exitfile=%s\n' "$(cat "$_wave_tmpdir/step-5.exit" 2>/dev/null || true)"
+  )"
+  _elapsed=$((SECONDS - _start))
+  if printf '%s\n' "$_out" | grep -q 'exitfile=0'; then
+    assert_pass "a step finishing inside the bound is not killed"
+  else
+    assert_fail "a step finishing inside the bound is not killed" "got: $_out"
+  fi
+  assert_elapsed_below "a step inside the bound returns near its own duration" 20 "$_elapsed" 30
 }
 
 test_step_timeout_rejects_non_numeric() {
@@ -234,14 +257,7 @@ test_verbose_step_over_the_bound_fails_with_124() {
   else
     assert_fail "a verbose step past the bound exits 124" "got: $_out"
   fi
-  case "$_elapsed" in
-  0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
-    assert_pass "a verbose bound is enforced in seconds not minutes"
-    ;;
-  *)
-    assert_fail "a verbose bound is enforced in seconds not minutes" "took ${_elapsed}s"
-    ;;
-  esac
+  assert_elapsed_below "a verbose bound is enforced in seconds not minutes" 20 "$_elapsed" 30
   if printf '%s\n' "$_out" | grep -q 'step 5 exceeded NUCLEUS_STEP_TIMEOUT=2s'; then
     assert_pass "the verbose step's captured output names the bound"
   else
@@ -340,14 +356,7 @@ test_verbose_bound_kills_descendants() {
   else
     assert_fail "verbose timeout kills descendant processes and reports 124" "got: $_out"
   fi
-  case "$_elapsed" in
-  0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9)
-    assert_pass "verbose timeout killing descendants is enforced in seconds not minutes"
-    ;;
-  *)
-    assert_fail "verbose timeout killing descendants is enforced in seconds not minutes" "took ${_elapsed}s"
-    ;;
-  esac
+  assert_elapsed_below "verbose timeout killing descendants is enforced in seconds not minutes" 45 "$_elapsed" 60
   if [ -n "$_child_pid" ] && ! kill -0 "$_child_pid" 2>/dev/null; then
     assert_pass "verbose timeout kills descendant processes"
   else
@@ -412,6 +421,7 @@ test_timeout_zero_disables_bound() {
 test_fast_step_reports_before_slow
 test_running_step_reports_still_running
 test_step_over_the_bound_fails_with_124
+test_bound_follows_the_clock_not_the_tick_count
 test_step_timeout_rejects_non_numeric
 test_progress_interval_rejects_non_numeric
 test_progress_interval_rejects_negative

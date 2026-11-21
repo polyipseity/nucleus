@@ -298,9 +298,15 @@ _run_step() {
 
   _exit_code=0
   if [ "$_step_timeout_seconds" -gt 0 ]; then
-    local _bound_ticks=$((_step_timeout_seconds * 4)) _ticks_waited=0
+    # WHY wall clock rather than a tick count: each tick also does read -t,
+    # kill -0 and date, so a counted 0.25 s tick costs more than 0.25 s and the
+    # drift lands on the deadline: a 2 s bound reported 2.290 s idle and 9 s
+    # under the runner's own parallel fan-out. step-runner.ps1 already computes
+    # a wall-clock deadline from the stopwatch, so this is the parity fix.
+    local _bound_ms=$((_step_timeout_seconds * 1000)) _step_now
     while kill -0 "$_func_pid" 2>/dev/null; do
-      if [ "$_ticks_waited" -ge "$_bound_ticks" ]; then
+      _step_now=$(_step_now_ms)
+      if [ $((_step_now - _step_start_ms)) -ge "$_bound_ms" ]; then
         printf 'step %s exceeded NUCLEUS_STEP_TIMEOUT=%ss\n' "$_n" "$_step_timeout_seconds" >>"$_wave_tmpdir/step-$_n.out"
         printf 'step %s exceeded NUCLEUS_STEP_TIMEOUT=%ss\n' "$_n" "$_step_timeout_seconds"
         # check-suppress:suppression_doc: the process already outlived its bound; a failing signal must not change the 124 answer
@@ -314,7 +320,6 @@ _run_step() {
         break
       fi
       sleep 0.25
-      _ticks_waited=$((_ticks_waited + 1))
     done
     if [ "$_exit_code" -eq 0 ]; then
       wait "$_func_pid" || _exit_code=$?
