@@ -476,9 +476,15 @@ write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"s
 _start=$SECONDS
 if tty_run - "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   _elapsed="$(elapsed_since "$_start")"
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$_elapsed" -ge 1 ] && [ "$_elapsed" -lt 15 ] &&
-    [ -z "$(pending_requests)" ]; then
-    assert_pass "the hermes source stops at its per-source timeout and clears the request"
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ -z "$(pending_requests)" ]; then
+    assert_elapsed_at_least "the hermes source stops at its per-source timeout and clears the request" 1 "$_elapsed"
+    # WHY inline: a harness hang ceiling, not a product bound. The 1s source timeout
+    # is a floor; nothing bounds the whole run, so no victim exists to derive from.
+    if [ "$_elapsed" -lt 15 ]; then
+      assert_pass "the hermes timeout case stays within the harness budget"
+    else
+      assert_fail "the hermes timeout case stays within the harness budget" "elapsed=${_elapsed}s"
+    fi
   else
     assert_fail "hermes timeout" "out=$(cat "$WORK/out") elapsed=${_elapsed}s requests=$(pending_requests)"
   fi
@@ -549,8 +555,8 @@ _start=$SECONDS
 if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   _elapsed="$(elapsed_since "$_start")"
   if [ "$(decision_of "$WORK/out")" = "allow" ] && [ -s "$HARNESS_APPROVAL_LOG" ] &&
-    [ -z "$(pending_requests)" ] && [ "$_elapsed" -lt 20 ]; then
-    assert_pass "with both sources enabled the typed prompt wins and the request is cleaned up"
+    [ -z "$(pending_requests)" ]; then
+    assert_elapsed_below "with both sources enabled the typed prompt wins and the request is cleaned up" 20 "$_elapsed" 30
   else
     assert_fail "race prompt-first" "out=$(cat "$WORK/out") log=$(head -1 "$HARNESS_APPROVAL_LOG") requests=$(pending_requests) elapsed=${_elapsed}s"
   fi
@@ -569,9 +575,8 @@ if _request="$(wait_for_request)"; then
   answer_request "$_request" deny
   if wait "$_approval_pid"; then
     _elapsed="$(elapsed_since "$_start")"
-    if [ "$(decision_of "$WORK/out")" = "deny" ] && [ "$_elapsed" -lt 30 ] &&
-      [ -z "$(pending_requests)" ]; then
-      assert_pass "with both sources enabled the remote answer wins without waiting for the prompt timeout"
+    if [ "$(decision_of "$WORK/out")" = "deny" ] && [ -z "$(pending_requests)" ]; then
+      assert_elapsed_below "with both sources enabled the remote answer wins without waiting for the prompt timeout" 30 "$_elapsed" 60
     else
       assert_fail "race hermes-first" "out=$(cat "$WORK/out") elapsed=${_elapsed}s requests=$(pending_requests)"
     fi

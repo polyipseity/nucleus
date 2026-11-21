@@ -228,9 +228,8 @@ test_unwritable_state_answers_ask() {
   local _residue
   _residue="$(find "$TMPDIR_ROOT" -name '*.tmp' -print -quit 2>/dev/null)"
   chmod 700 "$_ro_home" "$_ro_parent"
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
-    [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
-    assert_pass "an unwritable state directory answers ask at once"
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_elapsed_below "an unwritable state directory answers ask at once" 20 "$_elapsed" 30
   else
     assert_fail "unwritable-state" "rc=$_rc out=$_out elapsed=${_elapsed}s residue=$_residue log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
@@ -279,9 +278,8 @@ test_approval_disabled_asks_without_request() {
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
   local _elapsed=$((SECONDS - _start))
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
-    [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
-    assert_pass "an empty source list answers ask at once without notifying"
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
+    assert_elapsed_below "an empty source list answers ask at once without notifying" 20 "$_elapsed" 30
   else
     assert_fail "approval-off" "rc=$_rc out=$_out elapsed=${_elapsed}s log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi

@@ -169,6 +169,8 @@ test_wait_until_times_out() {
   _elapsed=$(($(date +%s) - _start))
   if [ "$_status" -eq 0 ]; then
     assert_fail "wait_until times out" "returned 0 for a probe that never succeeds"
+  # WHY not assert_elapsed_below: an elif guard inside this case chain, not a
+  # scored assertion. The helper emits its own pass/fail, which would report twice.
   elif [ "$_elapsed" -gt 3 ]; then
     assert_fail "wait_until times out" "waited ${_elapsed}s on a 1s timeout"
   elif ! printf '%s' "$_err" | grep -q 'timed out after 1s waiting for never to appear'; then
@@ -218,6 +220,8 @@ test_wait_for_utm_registration_times_out() {
   UTMCTL="$_real_utmctl"
   if [ "$_status" -eq 0 ]; then
     assert_fail "wait_for_utm_registration times out" "returned 0 with no VM registered"
+  # WHY not assert_elapsed_below: an elif guard inside this case chain, not a
+  # scored assertion. The helper emits its own pass/fail, which would report twice.
   elif [ "$_elapsed" -gt 3 ]; then
     assert_fail "wait_for_utm_registration times out" "waited ${_elapsed}s on a 1s timeout"
   elif ! printf '%s' "$_err" | grep -q "timed out after 1s waiting for UTM to register 'absent-vm'"; then

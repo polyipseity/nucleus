@@ -72,11 +72,7 @@ _case_deadline_kills_the_group() {
   else
     assert_fail "an expired run returns 124" "rc=$_rc output=$_out"
   fi
-  if [ "$_elapsed" -lt 20 ]; then
-    assert_pass "the deadline is enforced (${_elapsed}s)"
-  else
-    assert_fail "the deadline is enforced" "took ${_elapsed}s"
-  fi
+  assert_elapsed_below "the deadline is enforced" 20 "$_elapsed" 120
   case "$_out" in
   *"waiting for the Nix store garbage collector lock (elapsed"*) assert_pass "the wait is reported" ;;
   *) assert_fail "the wait is reported" "output: $_out" ;;

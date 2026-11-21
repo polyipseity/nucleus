@@ -1353,6 +1353,8 @@ if repair_completed; then
 else
   assert_pass "a repair outliving the bound never completes"
 fi
+# WHY not assert_elapsed_below: the victim is the suite's own configurable work
+# time, and this site's whole point is "returned before that work finished".
 if [ "$_elapsed" -lt "$_repair_work_seconds" ]; then
   assert_pass "the bound returns before the repair would have finished"
 else

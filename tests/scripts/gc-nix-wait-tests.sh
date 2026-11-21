@@ -50,11 +50,7 @@ _case_deadline_kills_the_child() {
   else
     assert_fail "expired run exits 1" "rc=$_rc output=$_out"
   fi
-  if [ "$_elapsed" -lt 20 ]; then
-    assert_pass "expiry is enforced near the deadline (${_elapsed}s)"
-  else
-    assert_fail "expiry is enforced near the deadline" "took ${_elapsed}s"
-  fi
+  assert_elapsed_below "expiry is enforced near the deadline" 20 "$_elapsed" 60
   case "$_out" in
   *"waiting for the Nix garbage collector lock (elapsed"*) assert_pass "lock wait progress is reported" ;;
   *) assert_fail "lock wait progress is reported" "output: $_out" ;;
@@ -122,11 +118,12 @@ _case_zero_deadline_disables_the_bound() {
   _out="$(STUB_SLEEP=3 NUCLEUS_GC_LOCK_WAIT_DEADLINE=0 run_nix_gc_with_wait_progress 7d 0 2>&1)"
   _rc=$?
   _elapsed=$(($(date +%s) - _t0))
-  if [ "$_rc" -eq 0 ] && [ "$_elapsed" -ge 3 ]; then
-    assert_pass "zero deadline runs to completion (${_elapsed}s)"
+  if [ "$_rc" -eq 0 ]; then
+    assert_pass "zero deadline runs to completion"
   else
     assert_fail "zero deadline runs to completion" "rc=$_rc elapsed=${_elapsed}s output=$_out"
   fi
+  assert_elapsed_at_least "a zero deadline actually waits for the work" 3 "$_elapsed"
 }
 
 _case_invalid_deadline_falls_back_to_the_default() {
