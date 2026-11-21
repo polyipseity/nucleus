@@ -247,6 +247,7 @@ _run_step() {
 
   printf '\n=== [%s] %s ===\n' "$_n" "$_name" >"$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" >"$_wave_tmpdir/step-$_n.name"
+  printf '%s' "$_step_start_ms" >"$_wave_tmpdir/step-$_n.start"
 
   local _is_verbose=false
   if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
@@ -557,7 +558,7 @@ run_all_steps() {
   _pipeline_start_ms=$(_step_now_ms)
 
   local _i _id _state _total _started _n _name
-  local -a _pending_indices=() _spawned_steps=()
+  local -a _pending_indices=()
   _NOT_RUN_STATES=()
   _started=0
 
@@ -578,9 +579,25 @@ run_all_steps() {
 
   # Work queue: keep up to _max_jobs wrappers running and launch the next
   # pending step the moment a slot frees, instead of waiting out a batch.
-  local _pos=0 _wait_ret _reaped_pid _slot _launch_pos _k _stop_launching=false
+  # WHY poll loop: wait -n blocks, so a heartbeat and Task 3's timeout would
+  # never fire while a step was running. The 0.25 s tick wakes the loop for both.
+  local _pos=0 _wait_ret _launch_pos _k _stop_launching=false
+  local _reaped_any=false _tick_seconds=0.25 _progress_seconds _ticks_per_progress _ticks=0
   local -a _run_pids=() _run_positions=() _launched_positions=() _fail_fast_indices=()
   local -A _failed_positions=()
+
+  _progress_seconds="${NUCLEUS_STEP_PROGRESS_INTERVAL:-15}"
+  case "$_progress_seconds" in
+  '' | *[!0-9]*)
+    error "NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds (got '$_progress_seconds')"
+    exit 2
+    ;;
+  esac
+  if [ "$_progress_seconds" -gt 0 ]; then
+    _ticks_per_progress=$((_progress_seconds * 4))
+  else
+    _ticks_per_progress=0
+  fi
 
   while :; do
     while ! $_stop_launching && [ "${#_run_pids[@]}" -lt "$_max_jobs" ] && [ "$_pos" -lt "${#_pending_indices[@]}" ]; do
@@ -595,32 +612,45 @@ run_all_steps() {
       _run_pids+=($!)
       _run_positions+=("$_launch_pos")
       _launched_positions+=("$_launch_pos")
-      _spawned_steps+=("$_n")
       printf '%s[%d/%d] step %s %s started%s\n' "${_nuc_c1_dim}" "$_started" "$_total" "$_n" "$_name" "${_nuc_c1_reset}"
     done
 
     [ "${#_run_pids[@]}" -eq 0 ] && break
 
-    # Blocks until any wrapper exits; the pid tells us which slot freed.
-    _reaped_pid=""
-    _wait_ret=0
-    wait -n -p _reaped_pid || _wait_ret=$?
-    _slot=-1
+    _reaped_any=false
     for _k in "${!_run_pids[@]}"; do
-      if [ "${_run_pids[$_k]}" = "$_reaped_pid" ]; then
-        _slot=$_k
-        break
+      if kill -0 "${_run_pids[$_k]}" 2>/dev/null; then
+        # WHY: a zombie still exists, so kill -0 returns 0; reap it or it lingers.
+        case "$(ps -o state= -p "${_run_pids[$_k]}" 2>/dev/null || true)" in
+        Z*) ;;
+        *) continue ;;
+        esac
+      fi
+      _reaped_any=true
+      _wait_ret=0
+      wait "${_run_pids[$_k]}" || _wait_ret=$?
+      _launch_pos="${_run_positions[$_k]}"
+      _n="${_STEP_NUMBERS[${_pending_indices[$_launch_pos]}]}"
+      printf '%sstep %s finished (%s)%s\n' "${_nuc_c1_dim}" "$_n" \
+        "$(_format_duration_s "$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)")" "${_nuc_c1_reset}"
+      unset "_run_pids[$_k]" "_run_positions[$_k]"
+      if [ "$_wait_ret" -ne 0 ] && $FAIL_FAST; then
+        _failed_positions[$_launch_pos]=1
+        _stop_launching=true
       fi
     done
-    # A reaped pid outside the set is a leftover process-substitution child.
-    [ "$_slot" -ge 0 ] || continue
+    $_reaped_any && continue
 
-    _launch_pos="${_run_positions[$_slot]}"
-    unset "_run_pids[$_slot]" "_run_positions[$_slot]"
-
-    if [ "$_wait_ret" -ne 0 ] && $FAIL_FAST; then
-      _failed_positions[$_launch_pos]=1
-      _stop_launching=true
+    sleep "$_tick_seconds"
+    _ticks=$((_ticks + 1))
+    if [ "$_ticks_per_progress" -gt 0 ] && [ "$_ticks" -ge "$_ticks_per_progress" ]; then
+      _ticks=0
+      for _k in "${!_run_pids[@]}"; do
+        _launch_pos="${_run_positions[$_k]}"
+        _n="${_STEP_NUMBERS[${_pending_indices[$_launch_pos]}]}"
+        printf '%sstep %s still running (%s)%s\n' "${_nuc_c1_dim}" "$_n" \
+          "$(_format_duration_s $(( $(_step_now_ms) - $(cat "$_wave_tmpdir/step-$_n.start" 2>/dev/null || echo 0) )))" "${_nuc_c1_reset}"
+      done
     fi
   done
 
@@ -636,13 +666,6 @@ run_all_steps() {
   fi
 
   printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) >"$_wave_tmpdir/pipeline.wall_ms"
-
-  local _elapsed_ms _duration_s
-  for _n in "${_spawned_steps[@]}"; do
-    _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
-    _duration_s=$(_format_duration_s "$_elapsed_ms")
-    printf '%sstep %s finished (%s)%s\n' "${_nuc_c1_dim}" "$_n" "$_duration_s" "${_nuc_c1_reset}"
-  done
 }
 
 # One step's summary line, shared by the fail-fast abort and aggregate_results so

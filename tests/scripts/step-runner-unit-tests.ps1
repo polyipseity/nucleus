@@ -768,9 +768,56 @@ function Test-SaveFileListCache-NoPathBeyondSymlink {
     }
 }
 
+function Test-PipelineLiveProgressReportsFinishedAndHeartbeat {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-live-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-live-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '2'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '1'
+Register-Step -Id 'fast' -Number 5 -Name 'Fast' -Action { param($Context) $true }
+Register-Step -Id 'slow' -Number 6 -Name 'Slow' -Action { param($Context) Start-Sleep -Seconds 3; $true }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    $oldProgress = $env:NUCLEUS_STEP_PROGRESS_INTERVAL
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $fast = [regex]::Match($out, '(?m)^.*step 5 finished').Index
+        $slow = [regex]::Match($out, '(?m)^.*step 6 finished').Index
+        $hasFast = $out -match 'step 5 finished'
+        $hasSlow = $out -match 'step 6 finished'
+        $heartbeat = $out -match 'step 6 still running'
+        if ($code -eq 0 -and $hasFast -and $hasSlow -and $heartbeat -and $fast -lt $slow) {
+            Assert-Pass "pipeline reports fast step finished before slow step and emits heartbeat"
+        } else {
+            Assert-Fail "pipeline live progress" "exit=$code hasFast=$hasFast hasSlow=$hasSlow heartbeat=$heartbeat fast=$fast slow=$slow output=[$out]"
+        }
+    } finally {
+        if ($null -eq $oldProgress) { Remove-Item Env:NUCLEUS_STEP_PROGRESS_INTERVAL -ErrorAction SilentlyContinue } else { $env:NUCLEUS_STEP_PROGRESS_INTERVAL = $oldProgress }  # check-suppress:suppression_doc: env var may not exist; Remove-Item on missing env is benign
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue
+        # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Test-SaveFileListCache-NoPathBeyondSymlink
+Test-PipelineLiveProgressReportsFinishedAndHeartbeat
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""
 
 exit $script:failCount
+

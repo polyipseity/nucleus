@@ -312,6 +312,7 @@ function Invoke-Step {
 
   "`n=== [$Number] $Name ===" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
   $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
+  [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString() | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.start") -Encoding utf8 -NoNewline
 
   $exitCode = 0
   try {
@@ -330,6 +331,7 @@ function Invoke-Step {
   $stepStart.Stop()
   $elapsedMs = $stepStart.ElapsedMilliseconds
   "$elapsedMs" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
+  Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $Number, (Format-StepDuration -Milliseconds $elapsedMs))
 
   if ($exitCode -ne 0 -and $script:FAIL_FAST) {
     exit $exitCode
@@ -489,6 +491,16 @@ function Invoke-StepPipeline {
   $pendingIndices = [System.Collections.Generic.List[int]]::new()
   $spawnedNumbers = [System.Collections.Generic.List[int]]::new()
 
+  $progressSeconds = 15
+  if ($env:NUCLEUS_STEP_PROGRESS_INTERVAL) {
+    $parsedProgress = 0
+    if (-not [int]::TryParse($env:NUCLEUS_STEP_PROGRESS_INTERVAL, [ref]$parsedProgress) -or $parsedProgress -lt 0) {
+      Write-NucleusError ("NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds (got '{0}')" -f $env:NUCLEUS_STEP_PROGRESS_INTERVAL)
+      exit 2
+    }
+    $progressSeconds = $parsedProgress
+  }
+
   for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
     $id = $script:StepIds[$i]
     $n = $script:StepNumbers[$i]
@@ -590,6 +602,7 @@ function Invoke-StepPipeline {
         $outFile = "$WaveTmpDir/step-$Number.out"
         "`n=== [$Number] $Name ===" | Out-File -FilePath $outFile -Encoding utf8
         $Name | Out-File -FilePath "$WaveTmpDir/step-$Number.name" -Encoding utf8 -NoNewline
+        [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString() | Out-File -FilePath "$WaveTmpDir/step-$Number.start" -Encoding utf8 -NoNewline
 
         $exitCode = 0
         try {
@@ -640,13 +653,29 @@ function Invoke-StepPipeline {
     if ($active.Count -eq 0) { break }
 
     # Block until the next step finishes, then drain every finished one in
-    # launch order so the fail-fast report keeps that order.
+    # launch order so the fail-fast report keeps that order. The bounded wait
+    # wakes the loop for the heartbeat; WaitAny alone cannot report progress.
     $waitHandles = [System.Threading.WaitHandle[]]::new($active.Count)
     for ($k = 0; $k -lt $active.Count; $k++) {
       $waitHandles[$k] = $active[$k].AsyncResult.AsyncWaitHandle
     }
-    # check-suppress:suppression_doc: WaitAny's return is the index of the signaled handle; the drain below re-scans IsCompleted
-    $null = [System.Threading.WaitHandle]::WaitAny($waitHandles)
+    $waitIndex = 0
+    if ($progressSeconds -gt 0) {
+      $waitIndex = [System.Threading.WaitHandle]::WaitAny($waitHandles, $progressSeconds * 1000)
+    } else {
+      $waitIndex = [System.Threading.WaitHandle]::WaitAny($waitHandles)
+    }
+    if ($waitIndex -eq [System.Threading.WaitHandle]::WaitTimeout) {
+      foreach ($rs in $active) {
+        $startFile = Join-Path $script:WaveTmpDir ("step-{0}.start" -f $rs.Number)
+        if (Test-Path -LiteralPath $startFile) {
+          $started = [int64](Get-Content -LiteralPath $startFile -Raw)
+          $elapsed = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - $started
+          Write-Output ("$($script:NucStyleDim)step {0} still running ({1})$($script:NucStyleReset)" -f $rs.Number, (Format-StepDuration -Milliseconds $elapsed))
+        }
+      }
+      continue
+    }
 
     for ($k = 0; $k -lt $active.Count;) {
       $rs = $active[$k]
@@ -654,14 +683,22 @@ function Invoke-StepPipeline {
         $k++
         continue
       }
+      $rsRunspaceFailed = $false
       try {
         $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
+        $rsRunspaceFailed = $true
         $null = $runspaceFailedNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
         Write-StepRunspaceFailure -Number $rs.Number -Reason "$_"
         if ($script:FAIL_FAST) { $stopLaunching = $true }
       } finally {
         $rs.PowerShell.Dispose()
+      }
+      if (-not $rsRunspaceFailed) {
+        $timeFile = Join-Path $script:WaveTmpDir ("step-{0}.time" -f $rs.Number)
+        $elapsedMs = 0
+        if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [long](Get-Content -LiteralPath $timeFile -Raw) }
+        Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $rs.Number, (Format-StepDuration -Milliseconds $elapsedMs))
       }
       # Removing at $k without advancing keeps the launch order intact.
       $active.RemoveAt($k)
@@ -699,16 +736,8 @@ function Invoke-StepPipeline {
 
   $pipelineStart.Stop()
   "$($pipelineStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir 'pipeline.wall_ms') -Encoding utf8 -NoNewline
-
-  foreach ($n in $spawnedNumbers) {
-    # A step whose runspace threw never finished; the summary reports it as failed
-    # with the recorded reason, so claiming it finished here would contradict it.
-    if ($runspaceFailedNumbers.Contains($n)) { continue }
-    $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
-    $elapsedMs = 0
-    if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
-    Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $n, (Format-StepDuration -Milliseconds $elapsedMs))
-  }
+  # Step finished lines are printed at drain time so a slow step does not hide a
+  # fast step's completion. The trailing loop is intentionally absent.
 }
 
 # One step's summary line (state glyph, duration, name). Shared by the fail-fast
