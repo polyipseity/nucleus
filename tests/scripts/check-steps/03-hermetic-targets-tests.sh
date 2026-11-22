@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests: run_hermetic_eval evaluates every toplevel read-only, keeps the
-# environment hermetic, and still fails loudly on an unexpected error.
+# Tests: run_hermetic_eval evaluates every toplevel, registers evaluated paths,
+# keeps the environment hermetic, and still fails loudly on an unexpected error.
 set -uo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -16,6 +16,7 @@ eval "$(extract_func run_hermetic_eval "$_step_file")"
 eval "$(extract_func _ne_now_ms "$_step_file")"
 eval "$(extract_func _ne_dur_s "$_step_file")"
 
+_real_nix="$(command -v nix 2>/dev/null || true)"
 _stub_dir="$(mktemp -d)"
 cat >"$_stub_dir/nix" <<'STUB'
 #!/usr/bin/env bash
@@ -34,7 +35,7 @@ declare -A _ctx=(
   [NIX_FILES]=_hermetic_nix_files
 )
 
-_case_both_targets_read_only() {
+_case_both_targets_eval_drvpath_without_read_only() {
   STUB_LOG="$(mktemp)"
   export STUB_LOG STUB_RC=0 STUB_OUT="/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-system.drv"
   local _out _rc
@@ -52,17 +53,17 @@ _case_both_targets_read_only() {
     assert_fail "two invocations recorded" "log: $(cat "$STUB_LOG")"
   fi
 
-  if grep -q -- '--read-only ./src#darwinConfigurations.MacBook.config.system.build.toplevel.drvPath' "$STUB_LOG" &&
-    grep -q -- '--read-only ./src#nixosConfigurations.NixOS.config.system.build.toplevel.drvPath' "$STUB_LOG"; then
-    assert_pass "each target is evaluated read-only through its drvPath"
+  if grep -q -- '--read-only' "$STUB_LOG"; then
+    assert_fail "--read-only is not used" "log: $(cat "$STUB_LOG")"
   else
-    assert_fail "each target is evaluated read-only through its drvPath" "log: $(cat "$STUB_LOG")"
+    assert_pass "--read-only is not used"
   fi
 
-  if grep -q 'eval --raw --read-only' "$STUB_LOG"; then
-    assert_pass "read-only evaluation is requested"
+  if grep -q -- 'eval --raw ./src#darwinConfigurations.MacBook.config.system.build.toplevel.drvPath' "$STUB_LOG" &&
+    grep -q -- 'eval --raw ./src#nixosConfigurations.NixOS.config.system.build.toplevel.drvPath' "$STUB_LOG"; then
+    assert_pass "each target is evaluated via drvPath without --read-only"
   else
-    assert_fail "read-only evaluation is requested" "log: $(cat "$STUB_LOG")"
+    assert_fail "each target is evaluated via drvPath without --read-only" "log: $(cat "$STUB_LOG")"
   fi
 
   if [ "$(grep -c '^repo_root=unset$' "$STUB_LOG")" -eq 2 ]; then
@@ -132,10 +133,62 @@ _case_poisoned_eval_cache_is_named() {
   esac
 }
 
+_case_behavioural_real_nix_registers_paths() {
+  if [ -z "${_real_nix:-}" ] || ! command -v "$_real_nix" >/dev/null 2>&1; then
+    echo "SKIP: behavioural nix eval test (no real nix on PATH)"
+    assert_pass "behavioural test skipped (no nix)"
+    return
+  fi
+  if ! "$_real_nix" --version >/dev/null 2>&1; then
+    echo "SKIP: behavioural nix eval test (nix not functional)"
+    assert_pass "behavioural test skipped (nix not functional)"
+    return
+  fi
+  local _tdir _sys _outpath _rc
+  _tdir="$(mktemp -d)"
+  _sys="$("$_real_nix" config show system 2>/dev/null || true)"
+  if [ -z "$_sys" ]; then
+    echo "SKIP: behavioural nix eval test (cannot determine system)"
+    assert_pass "behavioural test skipped (cannot determine system)"
+    rm -rf "$_tdir"
+    return
+  fi
+  cat >"$_tdir/flake.nix" <<EOF
+{
+  outputs = { ... }: {
+    packages.${_sys}.foo = builtins.path { path = ./.; name = "tiny-flake-src"; };
+  };
+}
+EOF
+  _outpath="$("$_real_nix" eval --raw "$_tdir#packages.${_sys}.foo" 2>&1)"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    assert_fail "behavioural: nix eval --raw succeeds" "rc=$_rc out=$_outpath"
+    rm -rf "$_tdir"
+    return
+  fi
+  assert_pass "behavioural: nix eval --raw succeeds"
+  case "$_outpath" in
+  /nix/store/*) assert_pass "behavioural: eval returns a /nix/store path" ;;
+  *)
+    assert_fail "behavioural: eval returns a /nix/store path" "got: $_outpath"
+    rm -rf "$_tdir"
+    return
+    ;;
+  esac
+  if "$_real_nix" path-info "$_outpath" >/dev/null 2>&1; then
+    assert_pass "behavioural: nix path-info succeeds for evaluated path"
+  else
+    assert_fail "behavioural: nix path-info succeeds for evaluated path" "path-info failed for $_outpath"
+  fi
+  rm -rf "$_tdir"
+}
+
 section "1" "hermetic eval"
-_case_both_targets_read_only
+_case_both_targets_eval_drvpath_without_read_only
 _case_env_regression_is_named
 _case_unexpected_failure_is_named
 _case_poisoned_eval_cache_is_named
+_case_behavioural_real_nix_registers_paths
 
 finish_tests
