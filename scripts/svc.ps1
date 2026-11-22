@@ -65,6 +65,9 @@ param(
   [Alias('list-endpoints')]
   [switch]$ListEndpoints,
 
+  [switch]$User,
+  [switch]$System,
+
   [Alias("h")]
   [switch]$Help,
 
@@ -86,6 +89,8 @@ if (-not $IsWindows) {
   foreach ($n in @($ServiceName)) { if (-not [string]::IsNullOrWhiteSpace([string]$n)) { $forward.Add([string]$n) } }
   if ($ListServices) { $forward.Add('--list-services') }
   if ($ListEndpoints) { $forward.Add('--list-endpoints') }
+  if ($User) { $forward.Add('--user') }
+  if ($System) { $forward.Add('--system') }
   if ($Json) { $forward.Add('--json') }
   if ($Disable) { $forward.Add('--disable') }
   if ($Enable) { $forward.Add('--enable') }
@@ -106,15 +111,7 @@ if ($Help) {
   exit 0
 }
 
-# A missing action is an error, matching svc.sh (message on stderr, exit 1):
-# callers act on the result of a service operation, so a run that performed
-# nothing must not read as success.
-if ($ListServices) {
-  foreach ($id in Get-FilteredServiceIdList) { Write-Output $id }
-  exit 0
-}
-
-if (-not $Action) {
+if (-not $Action -and -not $ListServices -and -not $ListEndpoints) {
   Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"
   exit 1
 }
@@ -358,6 +355,20 @@ function Resolve-ServiceName {
     $rows += New-ResolvedRow -RegistryKey "ERROR:$name" -DisplayName $name -HostEntry $errorEntry -InstanceId $name -Class 'error'
   }
   return $rows
+}
+
+if ($ListServices) {
+  $domainFilter = 'all'
+  if ($User) { $domainFilter = 'user' }
+  if ($System) { $domainFilter = 'system' }
+  foreach ($row in (Resolve-ServiceName -Names @())) {
+    if ($row.class -eq 'error') { continue }
+    $isSystem = Test-ServiceIsSystemScope -ResolvedEntry $row
+    $domain = if ($isSystem) { 'system' } else { 'user' }
+    if ($domainFilter -ne 'all' -and $domain -ne $domainFilter) { continue }
+    Write-Output $row.instanceId
+  }
+  exit 0
 }
 
 function Get-InstanceArgument {
