@@ -125,6 +125,36 @@ register_step() {
 
 _wave_tmpdir=""
 _wave_tmpdir_created=false
+_runner_steps_started=0
+_runner_abort_rc=0
+_runner_abort_cmd=""
+_runner_abort_func=""
+_runner_abort_reported=false
+
+_runner_abort_err_trap() {
+  _runner_abort_rc=$?
+  _runner_abort_cmd=$BASH_COMMAND
+  _runner_abort_func="${FUNCNAME[1]:-}"
+}
+
+_runner_abort_exit_trap() {
+  local _rc=$?
+  _wave_cleanup
+  if [ "$_runner_abort_reported" = false ] && [ "$_runner_steps_started" -eq 0 ] && [ "$_rc" -ne 0 ] && [ "${_NUCLEUS_ERROR_REPORTED:-false}" != true ]; then
+    _runner_abort_reported=true
+    printf 'error: runner aborted before any step started (exit %s)' "$_rc" >&2
+    # WHY: ERR only fires on command failures, not explicit exits. A stale
+    # command from an earlier ERR would misattribute the abort.
+    if [ -n "$_runner_abort_cmd" ] && [ "${_runner_abort_rc:-}" = "$_rc" ]; then
+      printf ': %s' "$_runner_abort_cmd" >&2
+      if [ -n "$_runner_abort_func" ] && [ "$_runner_abort_func" != "main" ]; then
+        printf ' (in %s)' "$_runner_abort_func" >&2
+      fi
+    fi
+    printf '
+' >&2
+  fi
+}
 
 _wave_cleanup_stale() {
   local _d _pid
@@ -145,9 +175,17 @@ _wave_init() {
     exit 1
   }
   _wave_tmpdir_created=true
+  _runner_steps_started=0
+  _runner_abort_rc=0
+  _runner_abort_cmd=""
+  _runner_abort_func=""
+  _runner_abort_reported=false
+  _NUCLEUS_ERROR_REPORTED=false
   printf '%s' "$$" >"$_wave_tmpdir/pid"
+  set -E
+  trap '_runner_abort_err_trap' ERR
   trap '_wave_cleanup; exit' INT TERM
-  trap '_wave_cleanup' EXIT
+  trap '_runner_abort_exit_trap' EXIT
 }
 
 _wave_cleanup() {
@@ -624,6 +662,7 @@ run_all_steps() {
   local -a _pending_indices=()
   _NOT_RUN_STATES=()
   _started=0
+  _runner_steps_started=0
 
   for _i in "${!_STEP_FUNCS[@]}"; do
     _id="${_STEP_IDS[$_i]}"
@@ -671,6 +710,7 @@ run_all_steps() {
       _name="${_STEP_NAMES[$_i]}"
       _id="${_STEP_IDS[$_i]}"
       _started=$((_started + 1))
+      _runner_steps_started="$_started"
       _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "$_id" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
       _run_pids+=($!)
       _run_positions+=("$_launch_pos")

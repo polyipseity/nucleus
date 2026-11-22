@@ -930,7 +930,93 @@ EOF
   fi
 }
 
+# ---- Runner abort diagnostics ----
+
+test_runner_abort_before_any_step_started_reports_diagnostic() {
+  local _out _exit=0 _tmp _harness
+  _tmp=$(mktemp)
+  _harness=$(mktemp)
+  cat >"$_harness" <<EOF
+set -euo pipefail
+REPO_ROOT="$REPO_ROOT"
+. "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+# WHY: force a raw pre-launch failure; cache_file_lists is called before the
+# work queue launches any step.
+cache_file_lists() { false; }
+register_step "never-runs" 1 "Never runs" true
+run_all_steps
+EOF
+  bash "$_harness" >"$_tmp" 2>&1 || _exit=$?
+  _out=$(cat "$_tmp")
+  rm -f "$_tmp" "$_harness"
+  if [ "$_exit" -ne 0 ] &&
+    [[ "$_out" == *"error: runner aborted before any step started (exit "*")"* ]] &&
+    [[ "$_out" == *"false"* ]] &&
+    [[ "$_out" == *"cache_file_lists"* ]]; then
+    assert_pass "runner abort before any step started prints diagnostic with exit and command"
+  else
+    assert_fail "runner abort before any step started prints diagnostic with exit and command" "exit=$_exit output=[$_out]"
+  fi
+}
+
+test_runner_abort_diagnostic_silent_for_help() {
+  local _out _exit=0
+  _out=$(
+    set +e
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    usage() { echo "usage: test"; }
+    parse_args --help
+  ) 2>&1 || _exit=$?
+  if [ "$_exit" -eq 0 ] && [[ "$_out" != *"runner aborted before any step started"* ]]; then
+    assert_pass "runner abort diagnostic is silent for --help"
+  else
+    assert_fail "runner abort diagnostic is silent for --help" "exit=$_exit output=[$_out]"
+  fi
+}
+
+test_runner_abort_diagnostic_silent_for_list_steps() {
+  local _out _exit=0
+  _out=$(
+    set +e
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    register_step "x" 1 "X" true
+    printf '%s\n' "${_STEP_IDS[@]}"
+    exit 0
+  ) 2>&1 || _exit=$?
+  if [ "$_exit" -eq 0 ] && [[ "$_out" == *"x"* ]] && [[ "$_out" != *"runner aborted before any step started"* ]]; then
+    assert_pass "runner abort diagnostic is silent for --list-steps"
+  else
+    assert_fail "runner abort diagnostic is silent for --list-steps" "exit=$_exit output=[$_out]"
+  fi
+}
+
+test_runner_abort_diagnostic_silent_for_normal_step_failure() {
+  local _out _exit=0
+  _out=$(
+    set +e
+    # shellcheck disable=SC2031 # reason: subshell-scoped; the change is intentionally local to this test
+    export PARALLEL_JOBS=1
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
+    step_fails() { return 7; }
+    register_step "fails" 1 "Fails" step_fails
+    run_all_steps
+    aggregate_results
+  ) 2>&1 || _exit=$?
+  if [ "$_exit" -ne 0 ] && [[ "$_out" != *"runner aborted before any step started"* ]]; then
+    assert_pass "runner abort diagnostic is silent when a step has started and failed normally"
+  else
+    assert_fail "runner abort diagnostic is silent when a step has started and failed normally" "exit=$_exit output=[$_out]"
+  fi
+}
+
 echo "--- Wave cleanup ---"
 test_wave_cleanup_stale_rm_failure_reports_and_continues
+
+echo "--- Runner abort diagnostics ---"
+test_runner_abort_before_any_step_started_reports_diagnostic
+test_runner_abort_diagnostic_silent_for_help
+test_runner_abort_diagnostic_silent_for_list_steps
+test_runner_abort_diagnostic_silent_for_normal_step_failure
 
 finish_tests

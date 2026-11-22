@@ -420,6 +420,8 @@ function Save-FileListCache {
 }
 
 function Invoke-StepPipeline {
+  $startedSteps = 0
+  try {
   Initialize-WaveTempDir
   Save-FileListCache
 
@@ -450,7 +452,6 @@ function Invoke-StepPipeline {
   if ($maxJobs -lt 1) { $maxJobs = 1 }
 
   $pipelineStart = [System.Diagnostics.Stopwatch]::StartNew()
-  $startedSteps = 0
   $pendingIndices = [System.Collections.Generic.List[int]]::new()
   $spawnedNumbers = [System.Collections.Generic.List[int]]::new()
 
@@ -748,6 +749,22 @@ function Invoke-StepPipeline {
   "$($pipelineStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir 'pipeline.wall_ms') -Encoding utf8 -NoNewline
   # Step finished lines are printed at drain time so a slow step does not hide a
   # fast step's completion. The trailing loop is intentionally absent.
+  } catch {
+    $isParseOrValidation = $_.Exception -is [System.Management.Automation.ParseException] -or
+      $_.Exception -is [System.ArgumentException] -or
+      $_.Exception -is [System.ArgumentNullException]
+    if ($startedSteps -eq 0 -and -not $isParseOrValidation) {
+      $exitCode = if ((Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue) -and $LASTEXITCODE -and $LASTEXITCODE -ne 0) { [int]$LASTEXITCODE } else { 1 } # check-suppress:suppression_doc: LASTEXITCODE may be unset in a fresh session; absence means no native exit code
+      $msg = "error: runner aborted before any step started (exit $exitCode): $($_.Exception.Message)"
+      if (Get-Command -Name Write-ErrorMessage -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: Write-ErrorMessage is optional in minimal harnesses; fall back to Write-Error
+        Write-ErrorMessage $msg
+      } else {
+        Write-Error $msg
+      }
+      exit $exitCode
+    }
+    throw
+  }
 }
 
 # One step's summary line (state glyph, duration, name). Shared by the fail-fast

@@ -4,6 +4,7 @@
 # pass re-exports PARALLEL_JOBS and redefines the functions.
 [ -n "${_NUCLEUS_LIB_SOURCED-}" ] && return
 _NUCLEUS_LIB_SOURCED=1
+_NUCLEUS_ERROR_REPORTED=false
 
 : "${PARALLEL_JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
 export PARALLEL_JOBS
@@ -164,6 +165,7 @@ error() {
   fi
   _err_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c2_ulcyan" "$_nuc_c2_blue" "$_nuc_c2_reset")"
   printf '%s\n' "${_nuc_c2_bold}${_err_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_red}error${_nuc_c2_reset}: $_err_msg" >&2
+  _NUCLEUS_ERROR_REPORTED=true
   return 1
 }
 

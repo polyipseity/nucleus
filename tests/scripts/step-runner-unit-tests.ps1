@@ -1061,6 +1061,49 @@ function Test-StepTimeoutDefaultIs600 {
     }
 }
 
+function Test-RunnerAbortBeforeAnyStepStarted {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-abort-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-abort-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+function Write-NucleusError { param([string]$Message) Write-Output "err: $Message" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$env:PARALLEL_JOBS = '1'
+$env:NUCLEUS_STEP_PROGRESS_INTERVAL = '0'
+function Save-FileListCache { throw "forced pre-launch failure" }
+Register-Step -Id 'never-runs' -Number 1 -Name 'Never runs' -Action { param($Context) $true }
+try {
+    Invoke-StepPipeline
+} catch {
+    # The runner should exit itself on this path; catching means it leaked.
+    Write-Output "leaked: $($_.Exception.Message)"
+    exit 99
+}
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        if ($code -ne 0 -and $out -match 'runner aborted before any step started' -and $out -match 'forced pre-launch failure') {
+            Assert-Pass "runner abort before any step started reports diagnostic"
+        } else {
+            Assert-Fail "runner abort before any step started reports diagnostic" "exit=$code output=[$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $driver -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+        Remove-Item -LiteralPath $walkDir -Recurse -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort temp cleanup; path may already be gone
+    }
+}
+
 Test-SaveFileListCache-NoPathBeyondSymlink
 Test-PipelineLiveProgressReportsFinishedAndHeartbeat
 Test-PipelineTimeoutFailsStepWith124
@@ -1069,9 +1112,9 @@ Test-PipelineTimeoutZeroDisablesBound
 Test-PipelineProgressIntervalRejectsNonNumeric
 Test-PipelineProgressIntervalRejectsNegative
 Test-StepTimeoutDefaultIs600
+Test-RunnerAbortBeforeAnyStepStarted
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""
 
 exit $script:failCount
-
