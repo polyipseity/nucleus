@@ -83,7 +83,7 @@ else
       run_health_check
     ' 2>&1
   )"
-  if printf '%s\n' "$_fwd_out" | grep -Fq -- 'run /repo/src#apply health-check --store-audit --min-free-bytes 8000000000'; then
+  if printf '%s\n' "$_fwd_out" | grep -Fq -- 'run /repo/src#apply -- health-check --store-audit --min-free-bytes 8000000000'; then
     assert_pass "run_health_check forwards --store-audit and --min-free-bytes"
   else
     assert_fail "run_health_check forwards flags" "got: $_fwd_out"
@@ -102,7 +102,7 @@ else
       run_health_check
     ' 2>&1
   )"
-  if [ "$_def_out" = "run /repo/src#apply health-check" ]; then
+  if [ "$_def_out" = "run /repo/src#apply -- health-check" ]; then
     assert_pass "run_health_check forwards only default args when no overrides set"
   else
     assert_fail "run_health_check default forwarding" "got: $_def_out"

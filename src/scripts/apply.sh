@@ -523,7 +523,7 @@ run_health_check() {
   if [ -n "$health_check_min_free_bytes" ]; then
     _rhc_args+=(--min-free-bytes "$health_check_min_free_bytes")
   fi
-  run_nix run "$REPO_ROOT/src#apply" "${_rhc_args[@]}"
+  run_nix run "$REPO_ROOT/src#apply" -- "${_rhc_args[@]}"
 }
 
 run_pre_build() {
