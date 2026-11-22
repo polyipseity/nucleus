@@ -38,6 +38,9 @@ param(
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' }
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -254,11 +257,6 @@ function Invoke-CloudRestart {
       Write-NucleusInfo "$($mount['id']) rclone stopped (pid $($process.ProcessId)); the platform manager (task loop) remounts it within 30s"
     }
   }
-}
-
-if ($Action -in @('--list-replicas', '-list-replicas', '--ListReplicas', '-ListReplicas')) {
-  $ListReplicas = $true
-  $Action = ''
 }
 
 if ($ListReplicas) {

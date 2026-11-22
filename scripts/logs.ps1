@@ -106,12 +106,16 @@ param(
   [string]$Expiry,
   [switch]$Json,
   [switch]$DryRun,
+  [Alias('list-logs')]
   [switch]$ListLogs,
   [switch]$Help
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
 
 # WHY: only the entry script changes its own session. A dot-sourcing caller
 # loads the functions and keeps its strict mode, its error preference, and its

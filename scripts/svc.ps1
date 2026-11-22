@@ -60,7 +60,9 @@ param(
   # With start or restart: clear blocked/restart health state before the action.
   [switch]$Unblock,
 
+  [Alias('list-services')]
   [switch]$ListServices,
+  [Alias('list-endpoints')]
   [switch]$ListEndpoints,
 
   [Alias("h")]
@@ -73,6 +75,9 @@ param(
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' }
 
 $ErrorActionPreference = 'Stop'
 

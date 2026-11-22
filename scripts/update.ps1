@@ -107,6 +107,10 @@ $ErrorActionPreference = 'Stop'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+
+$null = Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-sections' = 'ListSections' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+if ($ListSections) { $Action = 'lockfile' }
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed

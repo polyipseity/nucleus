@@ -37,6 +37,7 @@ $ScriptDir = $PSScriptRoot
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
 # Manual argument parsing: accepts PowerShell-style and POSIX-style flags.
 # Bare flags mean no action word was given (B10/E4).
@@ -46,6 +47,9 @@ $WindowsTemplateOverride = ''
 $AnnotationCheckOnly = $false
 $ValidateOnly = $false
 $ListSteps = $false
+
+# Normalize --list-* before the hand-rolled loop (the loop also handles it).
+$null = Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-steps' = 'ListSteps' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 
 $_ua = @($args)
 $i = 0

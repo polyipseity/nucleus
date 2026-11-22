@@ -97,6 +97,7 @@ param(
   [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
+  [Alias('list-logs')]
   [switch]$ListLogs,
   [Alias("h")]
   [switch]$Help
@@ -104,6 +105,9 @@ param(
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
 
 $ErrorActionPreference = 'Stop'
 

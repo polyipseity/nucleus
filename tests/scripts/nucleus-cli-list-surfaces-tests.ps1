@@ -48,6 +48,9 @@ try {
   $logs = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/logs.ps1') -ListLogs -Scope user 2>$null)
   $ok = ($logs.Count -eq 2 -and $logs[0] -eq 'alpha' -and $logs[1] -eq 'beta')
   Assert-True -cond $ok -name 'logs.ps1 -ListLogs lists live log base names' -detail ($logs -join '|')
+  $logsKebab = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/logs.ps1') --list-logs -Scope user 2>$null)
+  $okKebab = ($logsKebab.Count -eq 2 -and $logsKebab[0] -eq 'alpha' -and $logsKebab[1] -eq 'beta')
+  Assert-True -cond $okKebab -name 'logs.ps1 --list-logs accepts kebab flag' -detail ($logsKebab -join '|')
 } finally {
   # check-suppress:suppression_doc: cleanup of test-owned state must not fail the test when already gone
   Remove-Item Env:NUCLEUS_LOG_DIR -ErrorAction SilentlyContinue
