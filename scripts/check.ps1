@@ -49,7 +49,7 @@ $ValidateOnly = $false
 $ListSteps = $false
 
 # Normalize --list-* before the hand-rolled loop (the loop also handles it).
-$null = Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-steps' = 'ListSteps' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-steps' = 'ListSteps' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 
 $_ua = @($args)
 $i = 0
@@ -339,6 +339,9 @@ function Invoke-CheckSh {
     Pop-Location
   }
 }
+
+if ([string]::IsNullOrWhiteSpace($Action)) { $Action = 'all' }
+Assert-NucleusCliAction -Action $Action -Valid @('all','packer','sh','pwsh','nix','yaml') -CommandName check
 
 if ($Action -in @('packer', 'sh', 'pwsh')) {
   $subcmdHelp = @($Paths | Where-Object { $_ -in @('-h', '--help', '-Help', 'help') }).Count -gt 0

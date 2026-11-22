@@ -39,7 +39,7 @@ param(
 Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' }
+Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -287,9 +287,7 @@ if ($ListReplicas) {
 }
 
 $validActions = @('setup', 'reset', 'sync', 'status', 'restart')
-if ($Action -notin $validActions) {
-  throw "cloud.ps1: invalid action '$Action'. Valid actions: $($validActions -join ', ')"
-}
+Assert-NucleusCliAction -Action $Action -Valid $validActions -CommandName cloud.ps1
 
 switch ($Action) {
   'setup' {

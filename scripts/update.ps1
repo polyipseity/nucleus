@@ -109,7 +109,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-$null = Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-sections' = 'ListSections' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-sections' = 'ListSections' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 if ($ListSections) { $Action = 'lockfile' }
 
 if ($Help) {
@@ -119,6 +119,8 @@ if ($Help) {
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 if ($Action -eq 'update') { $Action = 'all' }
+
+Assert-NucleusCliAction -Action $Action -Valid @('all','lockfile','update') -CommandName update
 
 # ---------------------------------------------------------------------------
 # Invoke-UpdateAll: flake input updates + SOPS recipient rewrap

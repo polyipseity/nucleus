@@ -39,7 +39,7 @@ $null = $FrameworkDir  # check-suppress:suppression_doc: consumed by test-lib.ps
 $_listSteps = $false
 $_listAction = ''
 $_args = @($args)
-$null = Resolve-NucleusListFlags -Action ([ref]$_listAction) -Flags @{ 'list-steps' = '_listSteps' } -Arguments $_args # check-suppress:suppression_doc: helper returns remaining args; we only need the switch side effect here
+$null = Resolve-NucleusCliFlag -Action ([ref]$_listAction) -Flags @{ 'list-steps' = '_listSteps' } -Arguments $_args # check-suppress:suppression_doc: helper returns remaining args; we only need the switch side effect here
 if ($_listSteps -or $args -contains '--list-steps' -or $args -contains '-ListSteps') {
   Set-Location -Path $RepoRoot
   $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"

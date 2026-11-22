@@ -43,7 +43,6 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'unblock', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -80,7 +79,7 @@ param(
 Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' }
+Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' }
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
@@ -114,6 +113,8 @@ if (-not $Action -and -not $ListServices -and -not $ListEndpoints) {
   Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"
   exit 1
 }
+
+Assert-NucleusCliAction -Action $Action -Valid @('list','status','start','stop','restart','enable','disable','unblock','verify','endpoint','logs','log-paths','log-config') -CommandName svc
 
 # WHY: a remedy switch on the wrong action is a mistake rather than an extra flag to
 # ignore, and rejecting it here means no elevation prompt and no service-manager call

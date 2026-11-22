@@ -72,7 +72,6 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('cleanup-nix', 'graveyard', 'logs', 'preferences')]
   [string]$Action = '',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
@@ -110,7 +109,7 @@ param(
 Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
+Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
 
 $ErrorActionPreference = 'Stop'
 
@@ -133,6 +132,8 @@ if ($ListLogs) {
   & (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin -ListLogs
   exit $LASTEXITCODE
 }
+
+Assert-NucleusCliAction -Action $Action -Valid @('cleanup-nix','graveyard','logs','preferences') -CommandName gc
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT

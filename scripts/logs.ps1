@@ -86,7 +86,6 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')]
   [string]$Action,
   [Parameter(Position = 1)]
   [Alias('LogName')]
@@ -115,7 +114,7 @@ param(
 Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
+Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' }
 
 # WHY: only the entry script changes its own session. A dot-sourcing caller
 # loads the functions and keeps its strict mode, its error preference, and its
@@ -732,6 +731,8 @@ if ([string]::IsNullOrWhiteSpace($Action)) {
   Write-NucleusError -CommandName logs 'missing action (append, expire, gc, label, rotate, show, stats, tail)'
   exit 1
 }
+
+Assert-NucleusCliAction -Action $Action -Valid @('append','expire','gc','label','rotate','show','stats','tail') -CommandName logs
 
 $logDir = Get-LogsDir -ScopeName $Scope
 $userLogDir = Get-LogsDir -ScopeName 'user'
