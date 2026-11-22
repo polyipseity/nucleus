@@ -132,7 +132,9 @@ _wave_cleanup_stale() {
     [ -d "$_d" ] || continue                  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
     _pid=$(cat "$_d/pid" 2>/dev/null || true) # check-suppress:suppression_doc: pid file may not exist yet; empty pid handled below
     if [ -z "$_pid" ] || ! kill -0 "$_pid" 2>/dev/null; then
-      rm -rf "$_d"
+      if ! rm -rf -- "$_d"; then
+        error "failed to remove stale wave temp dir: $_d" || continue
+      fi
     fi
   done
 }

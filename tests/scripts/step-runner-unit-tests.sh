@@ -886,4 +886,51 @@ test_nix_lock_serializes
 echo "--- nixpkgs pinning ---"
 test_nucleus_pin_nixpkgs_exports_nix_path_when_prepinned
 
+# ---- Wave cleanup ----
+
+# _wave_cleanup_stale removes stale nucleus-step-runner-* dirs whose pid is dead.
+# A failing rm must be reported naming the directory and must not abort cleanup.
+test_wave_cleanup_stale_rm_failure_reports_and_continues() {
+  local _out _exit=0 _shim_dir _real_rm _stale_dir _tmpdir
+  _tmpdir="${TMPDIR:-/tmp}"
+  _stale_dir="$(mktemp -d "${_tmpdir}/nucleus-step-runner-XXXXXX")"
+  printf '%s\n' "99999999" >"$_stale_dir/pid"
+
+  _shim_dir="$(mktemp -d)"
+  _real_rm="$(command -v rm)"
+  cat >"$_shim_dir/rm" <<EOF
+#!/usr/bin/env bash
+for _arg in "\$@"; do
+  if [[ "\$_arg" == *nucleus-step-runner-* ]]; then
+    echo "shim refusing \$_arg" >&2
+    exit 1
+  fi
+done
+exec "$_real_rm" "\$@"
+EOF
+  chmod +x "$_shim_dir/rm"
+
+  _out=$(
+    # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
+    PATH="$_shim_dir:$PATH" "$BASH" -c '
+      set -euo pipefail
+      . "$1"
+      _wave_cleanup_stale
+    ' _ "$STEP_RUNNER" 2>&1
+  ) || _exit=$?
+
+  "$_real_rm" -rf -- "$_stale_dir" "$_shim_dir"
+
+  if [ "$_exit" -eq 0 ] &&
+    [[ "$_out" == *"error"* ]] &&
+    [[ "$_out" == *"$_stale_dir"* ]]; then
+    assert_pass "wave cleanup reports stale-dir rm failure and continues"
+  else
+    assert_fail "wave cleanup stale rm failure" "exit=$_exit output=[$_out]"
+  fi
+}
+
+echo "--- Wave cleanup ---"
+test_wave_cleanup_stale_rm_failure_reports_and_continues
+
 finish_tests
