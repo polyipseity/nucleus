@@ -2269,7 +2269,14 @@ vm_android_download_userdebug_recovery() {
   _adur_dl_url="https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_adur_asset_name"
   _adur_tag=''
 
-  _adur_tag="$(vm_android_jqssun_release_tag_for_asset "$_adur_asset_name")" || return 1
+  _adur_tag=''
+  if ! _adur_tag="$(vm_android_jqssun_release_tag_for_asset "$_adur_asset_name")"; then
+    if [ -f "$_adur_img" ]; then
+      say "could not resolve jqssun release tag; using cached userdebug recovery: $_adur_img"
+      return 0
+    fi
+    return 1
+  fi
 
   if [ -f "$_adur_img" ]; then
     _adur_cached_tag=''
