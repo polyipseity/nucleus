@@ -256,6 +256,11 @@ function Invoke-CloudRestart {
   }
 }
 
+if ($Action -in @('--list-replicas', '-list-replicas', '--ListReplicas', '-ListReplicas')) {
+  $ListReplicas = $true
+  $Action = ''
+}
+
 if ($ListReplicas) {
   $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
   if (Test-Path -LiteralPath $modulePath) { Import-Module $modulePath -Force -DisableNameChecking }
