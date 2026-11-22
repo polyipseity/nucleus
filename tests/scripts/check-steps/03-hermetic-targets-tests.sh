@@ -111,9 +111,31 @@ _case_unexpected_failure_is_named() {
   esac
 }
 
+_case_poisoned_eval_cache_is_named() {
+  STUB_LOG="$(mktemp)"
+  export STUB_LOG STUB_RC=1
+  export STUB_OUT="error: evaluation of cached failed attribute 'darwinConfigurations.MacBook.config.system.build.toplevel' unexpectedly succeeded"
+  local _out _rc
+  _out="$(run_hermetic_eval _ctx 2>&1)"
+  _rc=$?
+  if [ "$_rc" -ne 1 ]; then
+    assert_fail "the poisoned cache fails the step" "expected rc 1, got $_rc: $_out"
+    return
+  fi
+  case "$_out" in
+  *"hermetic eval hit a poisoned eval-cache record (darwin toplevel): an earlier evaluation of this attribute failed and Nix refuses to trust a later success. Clear the stale record, or fix the impure fetch that failed:"*)
+    assert_pass "the poisoned cache is named as the cause"
+    ;;
+  *)
+    assert_fail "the poisoned cache is named as the cause" "reported: $_out"
+    ;;
+  esac
+}
+
 section "1" "hermetic eval"
 _case_both_targets_read_only
 _case_env_regression_is_named
 _case_unexpected_failure_is_named
+_case_poisoned_eval_cache_is_named
 
 finish_tests

@@ -445,8 +445,13 @@ run_hermetic_eval() {
       say "hermetic eval: $_target toplevel passed ($(_ne_dur_s $(($(_ne_now_ms) - _t0))))"
       continue
     fi
+    # WHY: a stale eval-cache failure record trips Nix's impurity detector, and the
+    # message does not say what to do about it. Name the cause and the remedy so a
+    # future poison is diagnosable instead of reading as an unexplained regression.
     if grep -Eq "required argument 'repoRoot'|getEnv" "$_hermetic_out"; then
       error "hermetic eval regressed to env-var dependency ($_target toplevel):"
+    elif grep -Eq "evaluation of cached failed attribute" "$_hermetic_out"; then
+      error "hermetic eval hit a poisoned eval-cache record ($_target toplevel): an earlier evaluation of this attribute failed and Nix refuses to trust a later success. Clear the stale record, or fix the impure fetch that failed:"
     else
       error "hermetic eval failed for an unexpected reason ($_target toplevel):"
     fi
