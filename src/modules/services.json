@@ -84,7 +84,8 @@
       "Windows": {
         "service": "nucleus-caddy",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -130,7 +131,9 @@
       "Windows": {
         "taskPath": "\\NucleusCamillaDSP",
         "type": "windows-schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "user",
+        "justification": "Runs as an AtLogOn scheduled task in the interactive user session (Sync-CamillaDSPService.ps1)."
       }
     }
   },
@@ -168,7 +171,9 @@
       "Windows": {
         "taskPath": "\\NucleusCamillaDSPHeartbeat",
         "type": "windows-schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "user",
+        "justification": "Runs as an AtLogOn scheduled task in the interactive user session (Sync-CamillaDSPHeartbeatService.ps1)."
       }
     }
   },
@@ -219,7 +224,9 @@
       "Windows": {
         "taskPath": "\\NucleusCamillaGUI",
         "type": "windows-schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "user",
+        "justification": "Runs as an AtLogOn scheduled task in the interactive user session (scheduler-user.dsc.yml)."
       }
     }
   },
@@ -272,7 +279,8 @@
               "cloud-drive-mount-<instance>"
             ]
           }
-        }
+        },
+        "scope": "user"
       }
     }
   },
@@ -311,7 +319,8 @@
         "taskPath": "\\NucleusDiscordMusicRPC",
         "type": "windows-schtask",
         "platform": "Windows",
-        "justification": "Per-user scheduled task running Discord RPC in user session"
+        "justification": "Per-user scheduled task running Discord RPC in user session",
+        "scope": "user"
       }
     }
   },
@@ -372,7 +381,7 @@
     }
   },
   "hermes-agent": {
-    "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
+    "description": "AI agent gateway — messaging integrations (Telegram, Discord, Slack) and cron jobs",
     "displayName": "Hermes Agent",
     "logging": {
       "capture": "all",
@@ -405,7 +414,8 @@
         "service": "hermes-gateway",
         "type": "windows-native",
         "platform": "Windows",
-        "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME."
+        "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME.",
+        "scope": "system"
       }
     }
   },
@@ -484,7 +494,8 @@
       "Windows": {
         "service": "JellyfinServer",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -568,7 +579,8 @@
         "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access.",
         "service": "nucleus-litellm",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -599,7 +611,8 @@
         "platform": "Windows",
         "service": "log-gc-system",
         "taskPath": "\\nucleus\\",
-        "type": "windows-schtask"
+        "type": "windows-schtask",
+        "scope": "system"
       }
     }
   },
@@ -631,7 +644,9 @@
         "platform": "Windows",
         "service": "log-gc-user",
         "taskPath": "\\nucleus\\",
-        "type": "windows-schtask"
+        "type": "windows-schtask",
+        "scope": "user",
+        "justification": "Runs as a Daily scheduled task with RunOnlyIfLoggedOn true (scheduler.dsc.yml)."
       }
     }
   },
@@ -713,7 +728,8 @@
       "Windows": {
         "service": "ollama",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -754,7 +770,8 @@
       "Windows": {
         "service": "nucleus-redis",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -788,7 +805,8 @@
       "Windows": {
         "service": "TermService",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -820,7 +838,9 @@
         "platform": "Windows",
         "service": "sccache-gc",
         "taskPath": "\\nucleus\\",
-        "type": "windows-schtask"
+        "type": "windows-schtask",
+        "scope": "user",
+        "justification": "Runs as a Daily scheduled task with RunOnlyIfLoggedOn true (scheduler.dsc.yml)."
       }
     }
   },
@@ -854,7 +874,8 @@
       "Windows": {
         "taskPath": "\\nucleus\\service-watchdog",
         "type": "windows-schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -889,7 +910,7 @@
         "unitPath": "~/.config/systemd/user/nucleus-service-watchdog-user.service"
       },
       "Windows": {
-        "justification": "User-scope watchdog not needed on Windows \u2014 scheduled task runs with system scope",
+        "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope",
         "type": "omitted",
         "platform": "Windows"
       }
@@ -954,7 +975,8 @@
         "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand.",
         "service": "ssh-agent",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   },
@@ -993,7 +1015,8 @@
       "Windows": {
         "service": "sshd",
         "type": "windows-native",
-        "platform": "Windows"
+        "platform": "Windows",
+        "scope": "system"
       }
     }
   }

@@ -119,6 +119,39 @@ let
       all (h: entry.hosts.${h} ? justification) hosts
     ) userScopedServices) "User-scoped services must have justification on every host")
 
+    (assert' (all (
+      name:
+      let
+        entry = parsedServices.${name};
+        hosts = entry.hosts;
+      in
+      (!hosts ? Windows)
+      || (
+        let
+          w = hosts.Windows;
+        in
+        if w.type == "omitted" then
+          !(w ? scope)
+        else
+          (w ? scope) && (w.scope == "user" || w.scope == "system")
+      )
+    ) serviceNames) "Windows host entries have scope user|system, or no scope iff omitted")
+
+    (assert' (all (
+      name:
+      let
+        entry = parsedServices.${name};
+        hosts = entry.hosts;
+      in
+      (!hosts ? Windows)
+      || (
+        let
+          w = hosts.Windows;
+        in
+        (!(w ? scope) || w.scope != "user") || (w ? justification)
+      )
+    ) serviceNames) "User-scoped Windows host entries must have justification")
+
     (assert' (parsedServices ? service-watchdog) "service-watchdog present in services.json")
     (assert' (parsedServices.service-watchdog ? hosts) "service-watchdog has hosts")
     (assert' (parsedServices.service-watchdog ? displayName) "service-watchdog has displayName")

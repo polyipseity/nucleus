@@ -121,10 +121,17 @@ run_service_registry() {
         )
       ] | @tsv' "$_svc_json")
 
-    # Validate macos-launchctl/nixos-systemctl entries have valid scope
+    # Validate scope: required (user|system) for all non-omitted host entries;
+    # must be absent for omitted entries.
     while IFS=$'\t' read -r _name _host _type _scope; do
       case "$_type" in
-      macos-launchctl | nixos-systemctl)
+      omitted)
+        if [ -n "$_scope" ]; then
+          error "services.json: '$_name' host '$_host' is omitted but has scope '$_scope'"
+          _svc_errors=$((_svc_errors + 1))
+        fi
+        ;;
+      macos-launchctl | nixos-systemctl | windows-native | windows-schtask)
         case "$_scope" in
         user | system) ;;
         *)
