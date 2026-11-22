@@ -981,7 +981,6 @@ test_runner_abort_diagnostic_silent_for_list_steps() {
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     register_step "x" 1 "X" true
     printf '%s\n' "${_STEP_IDS[@]}"
-    exit 0
   ) 2>&1 || _exit=$?
   if [ "$_exit" -eq 0 ] && [[ "$_out" == *"x"* ]] && [[ "$_out" != *"runner aborted before any step started"* ]]; then
     assert_pass "runner abort diagnostic is silent for --list-steps"

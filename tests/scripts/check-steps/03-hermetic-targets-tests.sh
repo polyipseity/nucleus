@@ -160,10 +160,10 @@ _case_behavioural_real_nix_registers_paths() {
   };
 }
 EOF
-  _outpath="$("$_real_nix" eval --raw "$_tdir#packages.${_sys}.foo" 2>&1)"
+  _outpath="$("$_real_nix" eval --raw "$_tdir#packages.${_sys}.foo" 2>"$_tdir/eval.stderr")"
   _rc=$?
   if [ "$_rc" -ne 0 ]; then
-    assert_fail "behavioural: nix eval --raw succeeds" "rc=$_rc out=$_outpath"
+    assert_fail "behavioural: nix eval --raw succeeds" "rc=$_rc out=$_outpath err=$(cat "$_tdir/eval.stderr")"
     rm -rf "$_tdir"
     return
   fi
