@@ -419,6 +419,7 @@ test_only_steps_empty_value() {
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     usage() { true; }
     register_step "alpha" 1 "Alpha" true
+    _NUCLEUS_BUNDLE_FRESHNESS_NOTICED=1
     parse_args "--only-steps="
     echo "${#ONLY_STEPS[@]}"
   )
@@ -531,6 +532,7 @@ test_parse_args_scoped() {
   result=$(
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     usage() { true; }
+    _NUCLEUS_BUNDLE_FRESHNESS_NOTICED=1
     parse_args --scoped
     echo "$SCOPED $HAS_ARGS"
   )

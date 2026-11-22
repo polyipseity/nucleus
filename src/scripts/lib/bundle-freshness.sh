@@ -23,7 +23,7 @@ _bundle_freshness_applied_rev() {
   _bf_applied_hist_path="$(apply_history_path)" || return 0
   [ -f "$_bf_applied_hist_path" ] || return 0
   # Newest success wins: a later failed apply deployed nothing.
-  apply_history_read_all_entries 2>/dev/null | # check-suppress:suppression_doc: corrupt/unreadable history must not fail the pipeline
+  apply_history_read_all_entries 2>/dev/null |                                                        # check-suppress:suppression_doc: corrupt/unreadable history must not fail the pipeline
     jq -s -r '[.[] | select(.result == "success")] | last | .commitHash // empty' 2>/dev/null || true # check-suppress:suppression_doc: parse failure must not fail the pipeline
 }
 

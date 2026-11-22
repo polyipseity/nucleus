@@ -82,7 +82,7 @@ make_tree() { # <name>
   cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
   cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
-  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/bash-guard.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$_root/src/scripts/lib/"
+  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/bash-guard.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$LIB_DIR_DIR/apply-history.sh" "$LIB_DIR_DIR/bundle-freshness.sh" "$_root/src/scripts/lib/"
   # The bridge entry points source the log library beside them, so the fixture
   # carries it where the script tree does.
   cp "$FILTER_DIR"/*.ts "$_root/src/scripts/notify/filters/"
