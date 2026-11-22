@@ -82,6 +82,11 @@ Assert-NucleusPowerShell -Minimum '7.0'
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' }
 
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  exit 0
+}
+
 if (-not $IsWindows) {
   $svcSh = Join-Path $PSScriptRoot 'svc.sh'
   $forward = [System.Collections.Generic.List[string]]::new()
@@ -95,7 +100,6 @@ if (-not $IsWindows) {
   if ($Disable) { $forward.Add('--disable') }
   if ($Enable) { $forward.Add('--enable') }
   if ($Unblock) { $forward.Add('--unblock') }
-  if ($Help) { $forward.Add('--help') }
   if ($Elevated) { $forward.Add('--elevated') }
   & bash $svcSh @forward
   exit $LASTEXITCODE
@@ -105,11 +109,6 @@ $ErrorActionPreference = 'Stop'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
-
-if ($Help) {
-  Get-Help $PSCommandPath -Detailed
-  exit 0
-}
 
 if (-not $Action -and -not $ListServices -and -not $ListEndpoints) {
   Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"
