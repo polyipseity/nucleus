@@ -79,6 +79,23 @@ Assert-NucleusPowerShell -Minimum '7.0'
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 Resolve-NucleusListFlags -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' }
 
+if (-not $IsWindows) {
+  $svcSh = Join-Path $PSScriptRoot 'svc.sh'
+  $forward = [System.Collections.Generic.List[string]]::new()
+  if (-not [string]::IsNullOrWhiteSpace($Action)) { $forward.Add($Action) }
+  foreach ($n in @($ServiceName)) { if (-not [string]::IsNullOrWhiteSpace([string]$n)) { $forward.Add([string]$n) } }
+  if ($ListServices) { $forward.Add('--list-services') }
+  if ($ListEndpoints) { $forward.Add('--list-endpoints') }
+  if ($Json) { $forward.Add('--json') }
+  if ($Disable) { $forward.Add('--disable') }
+  if ($Enable) { $forward.Add('--enable') }
+  if ($Unblock) { $forward.Add('--unblock') }
+  if ($Help) { $forward.Add('--help') }
+  if ($Elevated) { $forward.Add('--elevated') }
+  & bash $svcSh @forward
+  exit $LASTEXITCODE
+}
+
 $ErrorActionPreference = 'Stop'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'

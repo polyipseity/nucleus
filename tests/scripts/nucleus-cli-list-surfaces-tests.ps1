@@ -58,6 +58,21 @@ try {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
 
+Write-Output "`n=== [4] svc.ps1 POSIX delegation ==="
+if (-not $IsWindows) {
+  $svcPs1 = Join-Path $repoRoot 'scripts/svc.ps1'
+  $svcSh = Join-Path $repoRoot 'scripts/svc.sh'
+  $psSvc = @(& pwsh -NoProfile -File $svcPs1 --list-services 2>$null)
+  $shSvc = @(& bash $svcSh --list-services 2>$null)
+  $svcOk = ($psSvc.Count -gt 0 -and (($psSvc -join "`n") -eq ($shSvc -join "`n")))
+  Assert-True -cond $svcOk -name 'svc.ps1 --list-services delegates to svc.sh on POSIX' -detail ("ps=" + ($psSvc -join '|') + " sh=" + ($shSvc -join '|'))
+  $psList = (& pwsh -NoProfile -File $svcPs1 list 2>&1 | Out-String).Trim()
+  $shList = (& bash $svcSh list 2>&1 | Out-String).Trim()
+  Assert-True -cond ($LASTEXITCODE -eq 0 -and $psList.Length -gt 0 -and $psList -eq $shList) -name 'svc.ps1 list delegates to svc.sh on POSIX'
+} else {
+  Write-Output "- SKIP: svc.ps1 POSIX delegation (Windows host)"
+}
+
 Write-Output "`n$passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }
 exit 0
