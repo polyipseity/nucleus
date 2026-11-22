@@ -62,6 +62,9 @@
 .PARAMETER NoSystemGc
   POSIX-only system profile generation expiration skip, accepted and ignored on Windows.
 
+.PARAMETER ListLogs
+  Print known nucleus-logs names, one per line.
+
 .NOTES
   Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
 #>

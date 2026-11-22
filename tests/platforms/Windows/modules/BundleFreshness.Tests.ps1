@@ -36,6 +36,7 @@ Describe 'Write-BundleFreshnessNotice' {
   BeforeEach {
     $script:BfStubAppliedRev = $null
     $script:BfStubHeadRev = $null
+    $script:_NUCLEUS_BUNDLE_FRESHNESS_NOTICED = $false
   }
 
   It 'stays silent when the deployed revision matches HEAD' {
@@ -59,5 +60,14 @@ Describe 'Write-BundleFreshnessNotice' {
     $script:BfStubHeadRev = 'bbbbbbbb'
     $output = (Write-BundleFreshnessNotice *>&1 | Out-String).Trim()
     $output | Should -BeNullOrEmpty
+  }
+
+  It 'emits the notice only once per process' {
+    $script:BfStubAppliedRev = 'aaaaaaaa'
+    $script:BfStubHeadRev = 'bbbbbbbb'
+    $first = (Write-BundleFreshnessNotice *>&1 | Out-String).Trim()
+    $second = (Write-BundleFreshnessNotice *>&1 | Out-String).Trim()
+    $first | Should -Match 'built by an apply at aaaaaaaa'
+    $second | Should -BeNullOrEmpty
   }
 }

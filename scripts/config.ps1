@@ -19,11 +19,14 @@
 #>
 
 
+[CmdletBinding()]
 param(
   [Parameter(Position = 0)]
   [string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$Arguments
+  [string[]]$Arguments,
+  [Alias('h')]
+  [switch]$Help
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
@@ -31,6 +34,11 @@ Assert-NucleusPowerShell -Minimum '7.0'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
+
+if ($Help -or $Command -in @('-h', '--help', '-?', 'help')) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
 
 $configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json"
 

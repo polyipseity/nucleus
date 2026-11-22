@@ -58,6 +58,11 @@ $ErrorActionPreference = "Stop"
 
 if ($NoApply) { $Apply = $false }
 
+if ($Help -or ($ApplyArgs -contains '--help') -or ($ApplyArgs -contains '-h')) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
+
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
@@ -67,11 +72,6 @@ $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.Window
 if ($isAdmin -and -not $ForceAdmin) {
   Write-NucleusError "this script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
-}
-
-if ($Help) {
-  Get-Help $PSCommandPath -Detailed
-  return
 }
 
 $VersionsFilePath = Join-Path -Path $PSScriptRoot -ChildPath "bootstrap-versions.env"
