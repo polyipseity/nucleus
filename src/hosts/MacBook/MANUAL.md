@@ -5,22 +5,22 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 ## system
 
 1. `/nix` missing before the first Nix install: run `nucleus-bootstrap`, reboot when prompted, then re-run bootstrap. Apply never edits `/etc/synthetic.conf`.
-2. Cloud mounts need no file system extension: rclone loads fuse-t and mounts through a local NFSv4 server, so a fresh install has nothing to enable or approve (the macFUSE FSKit extension left this machine on 2026-10-14 because macOS reverted its System Settings enablement after every failed start, and the mounts stopped coming up). If a fuse-t enablement prompt ever appears, it targets the optional FSKit mode the mounts do not use; leave it off.
-3. Never install a kernel extension for the mounts: cloud mounts run over fuse-t's NFS server, which needs neither a kernel extension nor any System Settings approval.
-4. NTFS read-write: the ntfs-3g fork links `/usr/local/lib/libfuse-t.dylib`, so it needs the declared `fuse-t` cask. An absent provider means that cask is missing: install it (`brew install --cask fuse-t`) and re-run apply, then launch Mounty and remount from the menu-bar icon. Read-only after Windows Fast Startup: unmount, `sudo ntfsfix /dev/diskXsY`, reconnect. A failed ntfs-3g build logs to `/Library/Application Support/nucleus/logs/ntfs-3g-build.log`.
+2. Cloud mounts need no file system extension: rclone loads fuse-t and mounts through a local NFSv4 server, so a fresh install has nothing to enable or approve. If a fuse-t enablement prompt ever appears, it targets the optional FSKit mode the mounts do not use; leave it off.
+3. Never install a kernel extension for the mounts.
+4. NTFS read-write: ntfs-3g needs the declared `fuse-t` cask. An absent provider means that cask is missing: install it (`brew install --cask fuse-t`) and re-run apply, then launch Mounty and remount from the menu-bar icon. Read-only after Windows Fast Startup: unmount, `sudo ntfsfix /dev/diskXsY`, reconnect. A failed ntfs-3g build logs to `/Library/Application Support/nucleus/logs/ntfs-3g-build.log`.
 5. Mounty's embedded `com.cu4uc.MountyHelper` cannot be unregistered by a script on macOS 13+: turn it off in Mounty's settings so only the registry-driven launch agent remains.
 6. Hide MiddleClick from the menu bar with command-drag until the icon shows the ✖️ mark. The icon returns each time the app relaunches. Parsec has no hide option, so hide it per session the same way.
 7. Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick, and Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 8. Grant Automation to the terminal that runs `nucleus-vm setup`, so UTM imports can be approved.
 9. Allow full disk access for remote users: System Settings > General > Sharing > Remote Login > (i) > Allow full disk access for remote users.
 10. LuLu's icon is hidden through `noIconMode`, so reopening LuLu restores its preferences window.
-11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are NixOS systemd options rather than settings this nix reads, so they never applied and nix could only warn `unknown setting`; a wrong name there now fails the check pipeline.
+11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are NixOS systemd options rather than settings this nix reads. A wrong name there now fails the check pipeline.
 12. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
 
 ## macOS settings with no API
 
-1. Charge limit: set System Settings > Battery > (i) > Charge Limit to 80 % once. Apple exposes no `pmset` key, profile, or CLI for it, so apply cannot set it. Apply already converges the firmware gate with `battery maintain 80`; the native limit is the backstop when that helper breaks. Confirm the firmware gate with `sudo /usr/local/co.palokaj.battery/smc -k CHWA -r` (`01` = engaged) and the result with `pmset -g batt` (`80%; AC attached; not charging`).
-2. Finder sidebar favorites: apply refreshes `sharedfilelistd` and `cfprefsd` itself, so only log out and back in when apply reported a sidebar failure.
+1. Charge limit: set System Settings > Battery > (i) > Charge Limit to 80 % once. Apply converges the firmware gate with `battery maintain 80`; the native limit is the backstop when that helper breaks. Confirm the firmware gate with `sudo /usr/local/co.palokaj.battery/smc -k CHWA -r` (`01` = engaged) and the result with `pmset -g batt` (`80%; AC attached; not charging`).
+2. Finder sidebar favorites: log out and back in when apply reported a sidebar failure.
 
 ## apps
 
@@ -31,22 +31,22 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 5. CamillaDSP: run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone.
    - After an apply, confirm device detection: `nucleus-camilladsp-heartbeat --probe` prints `default_output`, `available`, and `target`, and exits 0 only when it can bind a device.
 6. OBS virtual camera: start the virtual camera once, then approve the Driver Extension under Privacy & Security and grant Camera. OBS 28+ installs the CoreMediaIO plugin on first launch, so nothing needs installing by hand.
-7. Stats ships `eu.exelban.Stats.LaunchAtLogin`, an embedded SMAppService helper no script can unregister. If two Stats processes start at login, open Stats > Open application settings and turn Start at login off. Do not run `sfltool resetbtm`, which clears login items for every app.
+7. Stats ships `eu.exelban.Stats.LaunchAtLogin`. If two Stats processes start at login, open Stats > Open application settings and turn Start at login off. Do not run `sfltool resetbtm`, which clears login items for every app.
 8. OrbStack's menu bar applet is toggled declaratively through the macOS 26 Control Center gate. To restore it after a manual toggle: System Settings > Menu Bar > OrbStack > Allow in the Menu Bar.
-9. Raycast: if you set the clipboard shortcut to `⌥ ⌘ C`, clear it in Raycast settings. Raycast stores that setting in its local database, so no script can change it.
-10. `XQuartz` supplies the X11 server the sandbox allowlist expects. Launch it once after apply so `/private/tmp/.X11-unix/X0` exists, and approve its first-launch prompts; an X11 client started from pi then reaches it inside srt. Linux needs no equivalent because `services.xserver` provides one, and a second display needs its own `network.allowUnixSockets` entry.
+9. Raycast: if you set the clipboard shortcut to `⌥ ⌘ C`, clear it in Raycast settings.
+10. `XQuartz` supplies the X11 server the sandbox allowlist expects. Launch it once after apply so `/private/tmp/.X11-unix/X0` exists, and approve its first-launch prompts; an X11 client started from pi then reaches it inside srt. A second display needs its own `network.allowUnixSockets` entry.
 
 ## secrets and remotes
 
 1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `~/.config/rclone/rclone.conf` first when unencrypted remotes exist.
 2. Run `nucleus-cloud setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
-3. Cloud mounts supervise themselves on every host: launchd `KeepAlive`, systemd `Restart=always`, and the Windows task loop each remount a dead mount within 30 seconds, with no manual step in between. `nucleus-cloud status` prints each mount's state with the last 20 lines of its retained mount log under the host's log root; `nucleus-cloud restart` stops the mounts and lets the platform manager bring them back, as a convenience only. The same wrapper contract, the same verbs, and the same cadence run on MacBook, NixOS, and Windows (`scripts/cloud.ps1`).
+3. Cloud mounts supervise themselves; no manual step is needed. `nucleus-cloud status` prints each mount's state with the last 20 lines of its retained mount log under the host's log root; `nucleus-cloud restart` stops the mounts and lets the platform manager bring them back.
 
 ## recovery
 
 1. Caddy local-CA trust runs during apply. To redo it: `sudo caddy trust --address 127.0.0.1:2019`.
 2. Lock-screen wallpaper: apply rewrites the WallpaperKit store and warns when macOS denies the write. To fix it by hand, choose Photos in System Settings > Wallpaper > Screen Saver, point it at `~/Pictures/wallpapers`, then lock the screen to confirm.
-3. Pre-login (FileVault) wallpaper: macOS exports the login-window image from the desktop session into Preboot. SIP protects Preboot, so nucleus does not write it. With FileVault on, the pre-boot screen keeps Apple's default; after unlock, the user list shows the last exported desktop picture. If the image is stale, set the wallpaper in System Settings and log out to let macOS export it. Some machines never export (missing space map in WallpaperAgent); then the image stays as-is.
+3. Pre-login (FileVault) wallpaper: if the image is stale, set the wallpaper in System Settings and log out to let macOS export it. Some machines never export (missing space map in WallpaperAgent); then the image stays as-is.
 4. LiteLLM returning HTTP 429/500 (`Missing credentials`, `No deployments available`) on every `default` request means the daemon was built with no `KEYFILE:ENVVAR` pairs, usually because `src/modules/lib/env-secrets.nix` is out of sync with the decrypted SOPS secrets. Check `sudo launchctl print system/local.litellm | grep ProgramArguments`, then run `nucleus-apply` and `nucleus-svc restart litellm`. `ai.nix` fails eval first when the catalog declares keys that resolve to nothing.
 
 ## speech to text
