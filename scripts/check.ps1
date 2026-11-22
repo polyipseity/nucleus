@@ -86,6 +86,21 @@ while ($i -lt $_ua.Count) {
   }
 }
 
+# A first positional token that is not a known action, not a flag, and not an
+# existing path is a typo (e.g. `check.ps1 bogus`); reject it instead of silently
+# running the full pipeline. Known actions and flags are already handled above;
+# real paths (scoped check) must keep working.
+if ($_ua.Count -gt 0) {
+  $_firstToken = [string]$_ua[0]
+  if ($_firstToken -notin @('all', 'packer', 'sh', 'pwsh', 'nix', 'yaml') -and $_firstToken -notmatch '^-') {
+    $_tokenExists = (Test-Path -LiteralPath $_firstToken) -or (Test-Path -LiteralPath (Join-Path $RepoRoot $_firstToken))
+    if (-not $_tokenExists) {
+      Write-NucleusError -CommandName check "unknown action or path '$_firstToken'"
+      exit 1
+    }
+  }
+}
+
 if ($ListSteps) {
   Set-Location -Path $RepoRoot
   $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"

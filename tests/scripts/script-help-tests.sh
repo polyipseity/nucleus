@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Tests for the help and missing-input paths of the four grouped PowerShell
-# entry points, scripts/utils.ps1, ai.ps1, svc.ps1, vm.ps1, the Windows twins
-# of scripts/<name>.sh.
+# Tests for the help and missing-input paths of the PowerShell entry points
+# scripts/utils.ps1, ai.ps1, svc.ps1, vm.ps1, and check.ps1 unknown-token
+# rejection/path regression (F6). The four grouped entry points are the Windows
+# twins of scripts/<name>.sh.
 #
 # Why a bash suite drives pwsh: the contract is "the two platforms answer the
 # same invocation the same way", so the twin that runs everywhere (the .sh one)
@@ -263,5 +264,29 @@ for _script in utils ai svc vm; do
     assert_fail "$_script.ps1: help block placement" "first line is '$_first_line'"
   fi
 done
+
+section 5 "check.ps1 rejects unknown first positional that is not an existing path"
+# WHY: a typo'd subcommand or path must not silently run the full pipeline; a
+# real path must still be accepted as a scoped check (F6).
+run_ps check.ps1 bogus_nonexistent_token
+if [ "$PS_EXIT" -eq 1 ]; then
+  assert_pass "check.ps1 bogus token: exits 1"
+else
+  assert_fail "check.ps1 bogus token: exit status" "expected 1, got $PS_EXIT"
+fi
+if printf '%s' "$PS_STDERR" | one_line | grep -qE "unknown action or path 'bogus_nonexistent_token'"; then
+  assert_pass "check.ps1 bogus token: reports unknown action or path on stderr"
+else
+  assert_fail "check.ps1 bogus token: stderr message" \
+    "expected unknown action or path, got $(printf '%s' "$PS_STDERR" | one_line | cut -c1-160)"
+fi
+
+run_ps check.ps1 src/scripts/lib/lib.sh --only-steps=service-registry
+if [ "$PS_EXIT" -eq 0 ]; then
+  assert_pass "check.ps1 existing path: exits 0 (scoped path handling intact)"
+else
+  assert_fail "check.ps1 existing path: exit status" \
+    "expected 0, got $PS_EXIT; stderr=$(printf '%s' "$PS_STDERR" | one_line | cut -c1-160)"
+fi
 
 finish_tests
