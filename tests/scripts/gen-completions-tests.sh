@@ -460,8 +460,22 @@ _completion_subcommand_labels() {
 # parameter, meaning the first one inside the script's top-level param block. Six
 # of the apps declare more than one ValidateSet (gc.ps1:67 and :89, logs.ps1:85
 # and :97, svc.ps1:40, :170, :430), so anchoring on the block keeps a nested
-# option list from answering for the subcommands.
+# option list from answering for the subcommands. Scripts that dropped Action
+# ValidateSet for --list-* normalization validate via Assert-NucleusCliAction
+# -Valid @(...); prefer that authoritative action list when present.
 _validate_set_labels() {
+  local _labels
+  _labels="$(
+    grep -E 'Assert-NucleusCliAction\b' "$1" |
+      grep -oE "@\([^)]+\)" |
+      head -n 1 |
+      grep -oE "'[^']+'" |
+      tr -d "'"
+  )"
+  if [ -n "$_labels" ]; then
+    printf '%s\n' "$_labels"
+    return
+  fi
   awk '
     { sub(/\r$/, "") }
     !in_block && $0 == "param(" { in_block = 1; next }

@@ -77,7 +77,7 @@ if (-not $Action) {
 }
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
-$ManifestPath = Join-Path $RepoRoot 'src\modules\VMs.json'
+$ManifestPath = Join-Path $RepoRoot 'src\modules\vms\VMs.json'
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\SizeStrings.ps1')
