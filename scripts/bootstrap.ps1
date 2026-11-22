@@ -44,6 +44,9 @@ param(
   [switch]$ReplicaSync = $(if ($env:NUCLEUS_REPLICA_SYNC -eq 'true') { $true } else { $false }),
 
   [Parameter()]
+  [switch]$NoReplicaSync,
+
+  [Parameter()]
   [string]$TargetUser = $(if ($env:NUCLEUS_TARGET_USER) { $env:NUCLEUS_TARGET_USER } else { '' }),
 
   [Alias("h")]
@@ -57,6 +60,7 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $ErrorActionPreference = "Stop"
 
 if ($NoApply) { $Apply = $false }
+if ($NoReplicaSync) { $ReplicaSync = $false }
 
 if ($Help -or ($ApplyArgs -contains '--help') -or ($ApplyArgs -contains '-h')) {
   Get-Help $PSCommandPath -Detailed

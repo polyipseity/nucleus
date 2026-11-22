@@ -62,6 +62,30 @@
 .PARAMETER NoSystemGc
   POSIX-only system profile generation expiration skip, accepted and ignored on Windows.
 
+.PARAMETER GenerationsKeep
+  POSIX-only master generation-count override, accepted and ignored on Windows.
+
+.PARAMETER HmGenerationsKeep
+  POSIX-only Home Manager generations to keep, accepted and ignored on Windows.
+
+.PARAMETER SystemGenerationsKeep
+  POSIX-only system profile generations to keep, accepted and ignored on Windows.
+
+.PARAMETER NoDryRun
+  Disable dry-run mode (default on Windows).
+
+.PARAMETER Harness
+  Logs: filter show by harness (forwarded to nucleus-logs).
+
+.PARAMETER Kind
+  Logs: filter show by kind (forwarded to nucleus-logs).
+
+.PARAMETER Lines
+  Logs: tail line count (forwarded to nucleus-logs).
+
+.PARAMETER Since
+  Logs: filter show since timestamp (forwarded to nucleus-logs).
+
 .PARAMETER ListLogs
   Print known nucleus-logs names, one per line.
 
@@ -99,6 +123,14 @@ param(
   [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
+  [string]$GenerationsKeep = '',
+  [string]$HmGenerationsKeep = '',
+  [string]$SystemGenerationsKeep = '',
+  [switch]$NoDryRun,
+  [string]$Harness = '',
+  [string]$Kind = '',
+  [string]$Lines = '',
+  [string]$Since = '',
   [Alias('list-logs')]
   [switch]$ListLogs,
   [Alias("h")]
@@ -112,6 +144,10 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 
 $ErrorActionPreference = 'Stop'
+
+if ($NoDryRun) { $DryRun = $false }
+# check-suppress:suppression_doc: POSIX-only generation-count overrides, accepted and ignored on Windows
+$null = $GenerationsKeep, $HmGenerationsKeep, $SystemGenerationsKeep
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -535,6 +571,10 @@ switch ($Action) {
     if ($LogMaxSize) { $logsArguments += @('-MaxSize', $LogMaxSize) }
     if ($LogMaxFiles) { $logsArguments += @('-MaxFiles', $LogMaxFiles) }
     if ($LogCompress) { $logsArguments += @('-Compress', $LogCompress) }
+    if ($Harness) { $logsArguments += @('-Harness', $Harness) }
+    if ($Kind) { $logsArguments += @('-Kind', $Kind) }
+    if ($Lines) { $logsArguments += @('-Lines', $Lines) }
+    if ($Since) { $logsArguments += @('-Since', $Since) }
     Invoke-NucleusLogCommand -Arguments $logsArguments
     exit $LASTEXITCODE
   }

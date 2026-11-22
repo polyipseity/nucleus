@@ -22,6 +22,9 @@
 .PARAMETER GcOnly
   Skip model pulls; only remove locally installed models absent from the manifest (sync only).
 
+.PARAMETER NoGcOnly
+  Re-enable model pulls; cancels -GcOnly (sync only).
+
 .PARAMETER Profile
   Profile name to filter by (list only).
 
@@ -49,6 +52,7 @@ param(
 
   [switch]$DryRun,
   [switch]$GcOnly,
+  [switch]$NoGcOnly,
   [Alias('Profile','OllamaProfile')]
   [string]$AiProfile,
   [switch]$Json,
@@ -62,7 +66,7 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $ErrorActionPreference = 'Stop'
 
 # Used inside functions below via closure (PSSA cannot track)
-$null = $DryRun, $GcOnly, $AiProfile, $Json  # check-suppress:suppression_doc: splatting variables, declared for parameter binding
+$null = $DryRun, $GcOnly, $NoGcOnly, $AiProfile, $Json  # check-suppress:suppression_doc: splatting variables, declared for parameter binding
 
 $fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $fmtModulePath -Force -DisableNameChecking
@@ -106,7 +110,8 @@ function Invoke-AiSync {
   $prevProfile = $env:NUCLEUS_AI_SYNC_PROFILE
   if ($AiProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $AiProfile }
   try {
-    Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$GcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -Json:$Json
+    $effectiveGcOnly = $GcOnly -and -not $NoGcOnly
+    Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$effectiveGcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -Json:$Json
   } finally {
     if ($null -ne $prevProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $prevProfile } else { Remove-Item Env:NUCLEUS_AI_SYNC_PROFILE -ErrorAction SilentlyContinue } # check-suppress:suppression_doc: env var may not exist; cleanup is best-effort
   }

@@ -29,6 +29,12 @@
   unpack:  Regenerate per-platform VM artifacts from the <id>.vm.json descriptors after
            copying a packed tree here. Pass --dry-run to preview.
 
+  General flags:
+    --accept-gsi-license      Accept the Android GSI license.
+    --no-accept-gsi-license   Do not accept the Android GSI license (default).
+    --mido-patch-file PATH    Override runtime Mido patch file path.
+    --mido-script PATH        Override the Mido script path.
+
 .PARAMETER Action
   The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
 
@@ -456,6 +462,9 @@ function Invoke-VMReset {
   for ($i = 1; $i -lt $SubcommandArgs.Length; $i++) {
     switch ($SubcommandArgs[$i]) {
       '--accept-gsi-license' { $acceptGsiLicense = $true }
+      '--no-accept-gsi-license' { $acceptGsiLicense = $false }
+      '--mido-patch-file' { $i++ } # accepted for parity; not used on Windows
+      '--mido-script' { $i++ } # accepted for parity; not used on Windows
       default { Write-NucleusWarning "ignoring unknown flag for reset: $($SubcommandArgs[$i])" }
     }
   }
