@@ -44,7 +44,7 @@ function Resolve-NucleusCliFlag {
   }
 
   if ($Arguments.Count -eq 0) {
-    Write-Output -NoEnumerate ([string[]]@())
+    Write-Output -NoEnumerate -InputObject ([string[]]@())
     return
   }
 
@@ -61,7 +61,7 @@ function Resolve-NucleusCliFlag {
     }
     if (-not $matched) { $remaining.Add([string]$arg) }
   }
-  Write-Output -NoEnumerate ([string[]]$remaining.ToArray())
+  Write-Output -NoEnumerate -InputObject ([string[]]$remaining.ToArray())
 }
 
 function Assert-NucleusCliAction {

@@ -314,8 +314,22 @@ function Invoke-VMList {
   $runningNameList = Get-VMRunningIdList
 
   # Filter to enabled VMs matching the current host
-  $vms = $manifest.VMs | Where-Object {
+  $vms = @($manifest.VMs | Where-Object {
     $_.enabled -eq $true -and $_.hosts -contains $hostName
+  })
+
+  if ($SubcommandArgs -contains '--json') {
+    $out = @($vms | ForEach-Object {
+      $state = if ($_.id -in $runningNameList) { 'running' } else { 'stopped' }
+      $props = [ordered]@{}
+      foreach ($p in $_.PSObject.Properties) { $props[$p.Name] = $p.Value }
+      $props['state'] = $state
+      [pscustomobject]$props
+    })
+    # WHY -InputObject: piping a single-element array unwraps it to an object,
+    # and piping an empty array produces no output.
+    Write-Output (ConvertTo-Json -Compress -Depth 10 -InputObject $out)
+    return
   }
 
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS"

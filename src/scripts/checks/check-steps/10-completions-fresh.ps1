@@ -163,7 +163,16 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
         $provExit = $LASTEXITCODE
         if ($provExit -ne 0) {
           $provText = (($provOut | ForEach-Object { "$_" }) -join "`n")
-          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero (exit $provExit): $testCmd; output: $provText"
+          $rawText = ''
+          # WHY: the pipeline's stdout was consumed by the downstream filter; on
+          # failure, re-run the producer alone so the error names its actual output.
+          if ($mappedCmd -match '\s*\|\s*jq\b') {
+            $rawCmd = $mappedCmd -replace '\s*\|\s*jq\b.*$', ''
+            $rawOut = & pwsh -NoLogo -NoProfile -NonInteractive -Command $rawCmd 2>&1
+            $rawExit = $LASTEXITCODE
+            $rawText = "; raw: exit $rawExit output: $((($rawOut | ForEach-Object { "$_" }) -join "`n"))"
+          }
+          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero (exit $provExit): $testCmd; output: $provText${rawText}"
           return $false
         }
       }
