@@ -325,6 +325,15 @@ packer | pwsh | sh)
 esac
 
 if [ -n "$action" ]; then
+  _bf_subcmd_help=false
+  for _bf_arg in "$@"; do
+    case "$_bf_arg" in
+    -h | --help | help) _bf_subcmd_help=true ;;
+    esac
+  done
+  if [ "$_bf_subcmd_help" = false ]; then
+    warn_if_bundle_predates_tree
+  fi
   case "$action" in
   packer) do_packer "$@" ;;
   sh) do_sh "$@" ;;
@@ -345,5 +354,6 @@ else
   say "nix pinning: unpinned (will resolve from flakeInputs when needed)"
   say "nix pinning hint: if fetch/GC/403 blocks resolution, rerun with NUCLEUS_PINNED_NIXPKGS=\"\$NIX_PATH_PIN\" ./scripts/check.sh (no NIX_PATH=, no nix_path prefix)"
 fi
+warn_if_bundle_predates_tree
 run_all_steps
 aggregate_results

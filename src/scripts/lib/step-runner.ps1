@@ -398,6 +398,10 @@ function Read-Argument {
       elseif ($_f -like '*.nix') { $script:NIX_FILES += $_f }
     }
   }
+
+  if (Get-Command Write-BundleFreshnessNotice -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: notice helper is optional when the freshness lib is not sourced by the caller
+    Write-BundleFreshnessNotice
+  }
 }
 
 function Save-FileListCache {

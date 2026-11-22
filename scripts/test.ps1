@@ -33,6 +33,7 @@ $null = $FrameworkDir  # check-suppress:suppression_doc: consumed by test-lib.ps
 
 . (Join-Path $TestDir "test-lib.ps1")
 . (Join-Path $TestDir "test-steps.ps1")
+. (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
 
 if ($args -contains '--list-steps' -or $args -contains '-ListSteps') {
   Set-Location -Path $RepoRoot
@@ -45,5 +46,6 @@ if ($args -contains '--list-steps' -or $args -contains '-ListSteps') {
 
 Read-Argument $args
 Test-Prerequisite
+Write-BundleFreshnessNotice
 Invoke-StepPipeline
 Format-StepSummary

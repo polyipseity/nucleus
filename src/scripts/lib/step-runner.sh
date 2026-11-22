@@ -541,6 +541,9 @@ parse_args() {
       esac
     done
   fi
+
+  # check-suppress:suppression_doc: notice helper is optional when the freshness lib is not sourced by the caller
+  command -v warn_if_bundle_predates_tree >/dev/null 2>&1 && warn_if_bundle_predates_tree
 }
 
 cache_file_lists() {
@@ -574,6 +577,9 @@ run_all_steps() {
   _wave_cleanup_stale
   _wave_init
   cache_file_lists
+
+  # check-suppress:suppression_doc: notice helper is optional when the freshness lib is not sourced by the caller
+  command -v warn_if_bundle_predates_tree >/dev/null 2>&1 && warn_if_bundle_predates_tree
 
   # Every step receives this object as its first argument, so no step reads
   # enclosing globals and the contract matches the PowerShell runner.

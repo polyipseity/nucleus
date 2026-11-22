@@ -114,6 +114,9 @@ parse_args() {
     usage >&2
     exit 1
   fi
+
+  # check-suppress:suppression_doc: notice helper is optional when the freshness lib is not sourced by the caller
+  command -v warn_if_bundle_predates_tree >/dev/null 2>&1 && warn_if_bundle_predates_tree
 }
 
 cache_file_lists() {

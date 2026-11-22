@@ -686,3 +686,8 @@ extract_ports() {
     .network // empty | to_entries[] | "\(.value.host // "0.0.0.0") \(.value.port)"
   ' 2>/dev/null || true # check-suppress:suppression_doc: service entry may not have a network block; jq returns empty, not an error.
 }
+
+# shellcheck source=apply-history.sh disable=SC3028 # reason: BASH_SOURCE with $0 fallback; lib.sh is sourced from bash entrypoints.
+. "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)/apply-history.sh"
+# shellcheck source=bundle-freshness.sh disable=SC3028 # reason: BASH_SOURCE with $0 fallback; lib.sh is sourced from bash entrypoints.
+. "$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)/bundle-freshness.sh"

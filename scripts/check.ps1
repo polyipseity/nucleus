@@ -336,6 +336,14 @@ function Invoke-CheckSh {
   }
 }
 
+if ($Action -in @('packer', 'sh', 'pwsh')) {
+  $subcmdHelp = @($Paths | Where-Object { $_ -in @('-h', '--help', '-Help', 'help') }).Count -gt 0
+  if (-not $subcmdHelp) {
+    . (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
+    Write-BundleFreshnessNotice
+  }
+}
+
 switch ($Action) {
   'packer' {
     # WHY: filter pipeline flags from Paths: subcommands don't understand them.
@@ -362,9 +370,11 @@ switch ($Action) {
 
     . (Join-Path $CheckDir "check-lib.ps1")
     . (Join-Path $CheckDir "check-steps.ps1")
+    . (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
 
     Read-Argument $Paths
     Test-Prerequisite
+    Write-BundleFreshnessNotice
     Invoke-StepPipeline
     Format-StepSummary
   }

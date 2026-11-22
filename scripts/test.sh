@@ -66,5 +66,6 @@ else
   say "nix pinning: unpinned (will resolve from flakeInputs when needed)"
   say "nix pinning hint: if fetch/GC/403 blocks resolution, rerun with NUCLEUS_PINNED_NIXPKGS=\"\$NIX_PATH_PIN\" ./scripts/test.sh (no NIX_PATH=, no nix_path prefix)"
 fi
+warn_if_bundle_predates_tree
 run_all_steps
 aggregate_results

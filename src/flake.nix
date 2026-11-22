@@ -856,6 +856,7 @@
               pkgs.check-jsonschema
               pkgs.findutils
               pkgs.git
+              pkgs.jq
               pkgs.powershell
               pkgs.ripgrep
               # WHY: the runner image ships no zsh, and two suites need it.
