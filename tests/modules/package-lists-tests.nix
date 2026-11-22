@@ -131,7 +131,11 @@ let
   sp = lockfile.cursor.superpowers or { };
   spSourceIsUri = (sp ? source) && builtins.match "https://.*" sp.source != null;
   spRevIsHex = (sp ? rev) && builtins.match "[0-9a-f]{40}" sp.rev != null;
-  spIsValid = hasCursor && hasSuperpowers && spSourceIsUri && spRevIsHex;
+  # WHY: without a content hash the fetch is not a fixed-output derivation, so Nix
+  # must reach the network at evaluation time and a failed fetch is recorded in the
+  # eval cache, which later trips the "cached failed attribute" impurity error.
+  spHashIsSri = (sp ? hash) && builtins.match "sha256-[A-Za-z0-9+/]{43}=" sp.hash != null;
+  spIsValid = hasCursor && hasSuperpowers && spSourceIsUri && spRevIsHex && spHashIsSri;
 
   # --- Windows DSC overlap parity (from winget-overlap-parity-tests.nix) ---
   # Evaluate core.nix for one host to get the resolved package set.
@@ -430,7 +434,7 @@ in
       if stirlingNixPnames == [ ] then [ "<none>" ] else stirlingNixPnames
     )
   }";
-  test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
+  test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source, 40-char hex rev, and a sha256 SRI hash";
 
   # Windows DSC overlap parity tests.
   test_wp_resolved_matches_committed = assert' wpResolvedMatchesCommitted "winget-packages.json must equal the Nix-resolved Windows enable set";

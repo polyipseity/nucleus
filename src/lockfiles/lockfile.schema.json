@@ -11,6 +11,11 @@
         {
           "additionalProperties": false,
           "properties": {
+            "hash": {
+              "description": "Content hash of the fetched tree (sha256 SRI). Required when the pin is fetched at flake-evaluation time, so the fetch is a fixed-output derivation and evaluation needs no network.",
+              "pattern": "^sha256-[A-Za-z0-9+/]{43}=$",
+              "type": "string"
+            },
             "rev": {
               "description": "VCS commit hash (git rev, etc.)",
               "type": "string"

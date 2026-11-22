@@ -41,10 +41,18 @@ let
       or (throw "src/modules/packages/desired.json has no '${manager}' entry for host '${hostName}'");
 
   superpowersLockfile = lockfile.cursor.superpowers;
-  superpowersSrc = builtins.fetchGit {
+  # WHY pkgs.fetchgit, not builtins.fetchGit: builtins.fetchGit evaluates during
+  # flake evaluation, so without a content hash Nix must reach the network there,
+  # and a single transient failure is recorded in the eval cache. Every later
+  # success then trips Nix's impurity detector ("evaluation of cached failed
+  # attribute ... unexpectedly succeeded") and the failure is permanent. A pinned
+  # pkgs.fetchgit is a fixed-output derivation: evaluation stays offline, and the
+  # check pipeline reports the repository rather than this host's network.
+  superpowersSrc = pkgs.fetchgit {
     url = superpowersLockfile.source;
     rev = superpowersLockfile.rev;
-    submodules = false;
+    hash = superpowersLockfile.hash;
+    fetchSubmodules = false;
   };
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
