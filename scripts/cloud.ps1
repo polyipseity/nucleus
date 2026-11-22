@@ -39,7 +39,7 @@ param(
 Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' }
+$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
