@@ -253,13 +253,9 @@ svc_run_bounded() {
 
   # Run in its own process group so timeout kills can reap children that keep
   # stdout/stderr open and would otherwise block command substitutions.
-  if command -v setsid >/dev/null 2>&1; then
-    setsid "$@" &
-  else
-    set -m
-    "$@" &
-    set +m
-  fi
+  set -m
+  "$@" &
+  set +m
   pid=$!
 
   while kill -0 "$pid" 2>/dev/null; do

@@ -1284,9 +1284,9 @@ section 23 "A repair call is bounded by the watchdog repair constant"
 _repair_marker="$_tmp/repair-invoked.txt"
 _repair_work_seconds="${NUCLEUS_TEST_REPAIR_WORK_SECONDS:-3}"
 _orig_repair="$(declare -f supervisor_repair)"
-# WHY an executable mock too: svc_run_bounded runs the repair under setsid when
-# setsid is available, and setsid execs the command so it cannot run a shell
-# function. The shell function remains for direct-call cases in this shell.
+# The executable mock keeps supervisor_repair resolvable on PATH; the shell
+# function below is the direct-call target in this shell. svc_run_bounded runs
+# commands in a background subshell, which inherits shell functions.
 cat >"$_tmp/bin/supervisor_repair" <<REPAIR_MOCK
 #!/usr/bin/env bash
 printf 'started\n' >>"$_repair_marker"
@@ -1381,6 +1381,30 @@ else
   assert_fail "a repair inside the bound runs to completion" "the repair was abandoned or never invoked"
 fi
 assert_not_contains "a completed repair is not reported as a timeout" "$captured_output" "timed out"
+
+# (4) A function target runs even when setsid is on PATH.  Before the fix,
+#     svc_run_bounded routed through setsid when available, and setsid cannot
+#     exec a shell function, so repairs silently no-oped on Linux.
+cat >"$_tmp/bin/setsid" <<'SETSID'
+#!/usr/bin/env bash
+exec "$@"
+SETSID
+chmod +x "$_tmp/bin/setsid"
+_func_marker="$_tmp/func-repair-ran.txt"
+rm -f "$_func_marker"
+# shellcheck disable=SC2329 # reason: invoked by svc_run_bounded in this shell
+_repair_func_target() { printf 'ran\n' >"$_func_marker"; }
+_srb_rc=0
+svc_run_bounded 5 _repair_func_target || _srb_rc=$?
+assert_eq "a function target under fake setsid exits 0" "0" "$_srb_rc"
+if [ -f "$_func_marker" ] && grep -q '^ran$' "$_func_marker"; then
+  assert_pass "a function target runs when setsid exists on PATH"
+else
+  assert_fail "a function target runs when setsid exists on PATH" \
+    "the function was not invoked; svc_run_bounded likely routed it through setsid"
+fi
+rm -f "$_tmp/bin/setsid" "$_func_marker"
+unset -f _repair_func_target
 
 eval "$_orig_repair"
 rm -f "$_tmp/bin/supervisor_repair"
