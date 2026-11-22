@@ -73,6 +73,62 @@ if (-not $IsWindows) {
   Write-Output "- SKIP: svc.ps1 POSIX delegation (Windows host)"
 }
 
+Write-Output "`n=== [5] spec --list-* conformance (PowerShell) ==="
+$specFile = Join-Path $repoRoot 'src/modules/completions/nucleus-cli-spec.json'
+$specText = Get-Content $specFile -Raw
+$foundFlags = @([regex]::Matches($specText, '--list-[a-z-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+$expected = @('--list-endpoints','--list-logs','--list-replicas','--list-sections','--list-services','--list-steps')
+$specOk = (($foundFlags -join ',') -eq ($expected -join ','))
+Assert-True -cond $specOk -name 'spec --list-* inventory matches expected set' -detail ($foundFlags -join '|')
+
+function Invoke-ListFlag([string]$label, [scriptblock]$cmd) {
+  $out = @(& $cmd 2>$null)
+  $rc = $LASTEXITCODE
+  $ok = ($rc -eq 0 -and $out.Count -gt 0)
+  Assert-True -cond $ok -name "$label rc=0 and produces output" -detail ("rc=$rc out=" + (($out | Select-Object -First 1) -join ''))
+}
+
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-conformance-" + [Guid]::NewGuid().ToString('n'))
+New-Item -ItemType Directory -Path $tmp -Force > $null
+New-Item -ItemType File -Path (Join-Path $tmp 'alpha.log') -Force > $null
+New-Item -ItemType File -Path (Join-Path $tmp 'beta.log') -Force > $null
+try {
+  $env:NUCLEUS_LOG_DIR = $tmp
+  Invoke-ListFlag 'check.ps1 --list-steps' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/check.ps1') --list-steps }
+  Invoke-ListFlag 'cloud.ps1 --list-replicas' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/cloud.ps1') --list-replicas }
+  Invoke-ListFlag 'gc.ps1 --list-logs' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/gc.ps1') --list-logs }
+  Invoke-ListFlag 'logs.ps1 --list-logs' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/logs.ps1') --list-logs }
+  Invoke-ListFlag 'svc.ps1 --list-services' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/svc.ps1') --list-services }
+  Invoke-ListFlag 'test.ps1 --list-steps' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/test.ps1') --list-steps }
+  Invoke-ListFlag 'update.ps1 lockfile --list-sections' { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/update.ps1') lockfile --list-sections }
+
+  if (-not $IsWindows) {
+    $hostName = if ((uname -s).Trim() -eq 'Darwin') { 'MacBook' } else { 'NixOS' }
+    $svcJson = Get-Content (Join-Path $repoRoot 'src/modules/services.json') -Raw | ConvertFrom-Json -AsHashtable
+    $svcWithEp = $null
+    foreach ($svc in @(& bash (Join-Path $repoRoot 'scripts/svc.sh') --list-services 2>$null)) {
+      $s = [string]$svc
+      if ([string]::IsNullOrWhiteSpace($s) -or $s.Contains('\')) { continue }
+      $entry = $svcJson[$s]
+      if ($null -eq $entry) { continue }
+      $h = $entry.hosts[$hostName]
+      if ($null -eq $h -or $h.type -eq 'omitted') { continue }
+      $net = if ($entry.ContainsKey('network')) { $entry['network'] } else { $null }
+      if ($null -ne $net -and @($net).Count -gt 0) { $svcWithEp = $s; break }
+    }
+    if ($svcWithEp) {
+      Invoke-ListFlag "svc.ps1 endpoint $svcWithEp --list-endpoints" { & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/svc.ps1') endpoint $svcWithEp --list-endpoints }
+    } else {
+      Assert-True -cond $false -name 'svc.ps1 endpoint --list-endpoints has host service with network endpoints'
+    }
+  } else {
+    Write-Output "- SKIP: svc.ps1 endpoint --list-endpoints (covered by CI on Windows)"
+  }
+} finally {
+  Remove-Item Env:NUCLEUS_LOG_DIR -ErrorAction SilentlyContinue
+  Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+}
+
 Write-Output "`n$passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }
 exit 0

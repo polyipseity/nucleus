@@ -165,4 +165,46 @@ else
   assert_fail "config --help documents list --json" "missing"
 fi
 
+section 7 "spec --list-* conformance: every spec'd flag is runnable"
+
+# Enumerate all --list-* flags from the CLI spec and verify each has a runnable
+# provider on this host. This catches "spec advertises flag, handler missing" drift.
+spec_file="$REPO_ROOT/src/modules/completions/nucleus-cli-spec.json"
+spec_flags="$(jq -r '.. | strings | select(startswith("--list-"))' "$spec_file" | LC_ALL=C sort -u)"
+expected_flags=$'--list-endpoints\n--list-logs\n--list-replicas\n--list-sections\n--list-services\n--list-steps'
+
+if [ "$spec_flags" = "$expected_flags" ]; then
+  assert_pass "spec --list-* inventory matches expected set"
+else
+  assert_fail "spec --list-* inventory matches expected set" "got: $(printf '%s' "$spec_flags" | tr '\\n' '|')"
+fi
+
+run_list_flag() {
+  local label="$1"
+  shift
+  local out rc
+  out="$("$@" 2>/dev/null)"
+  rc=$?
+  if [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+    assert_pass "$label rc=0 and produces output"
+  else
+    assert_fail "$label rc=0 and produces output" "rc=$rc out=$(printf '%s' "$out" | head -c 80 | tr '\\n' '|')"
+  fi
+}
+
+run_list_flag "check --list-steps" "$CHECK_SH" --list-steps
+run_list_flag "cloud --list-replicas" "$CLOUD_SH" --list-replicas
+run_list_flag "gc --list-logs" env NUCLEUS_LOG_DIR="$tmp_logs" "$REPO_ROOT/scripts/gc.sh" --list-logs
+run_list_flag "logs --list-logs" env NUCLEUS_LOG_DIR="$tmp_logs" "$LOGS_SH" --list-logs
+run_list_flag "svc --list-services" "$SVC_SH" --list-services
+run_list_flag "test --list-steps" "$TEST_SH" --list-steps
+run_list_flag "update lockfile --list-sections" "$REPO_ROOT/scripts/update.sh" lockfile --list-sections
+
+# svc endpoint --list-endpoints requires a service argument; reuse the one found in section 5.
+if [ -n "$svc_with_ep" ]; then
+  run_list_flag "svc endpoint --list-endpoints <svc>" "$SVC_SH" endpoint "$svc_with_ep" --list-endpoints
+else
+  assert_fail "svc endpoint --list-endpoints <svc> rc=0 and produces output" "no host-declared service with network endpoints found"
+fi
+
 finish_tests
