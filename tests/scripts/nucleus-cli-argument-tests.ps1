@@ -1,0 +1,247 @@
+# nucleus-cli-argument-tests.ps1 - tests for Resolve-NucleusArgument normalizer.
+# Plain pwsh script; run directly. No Pester discovery.
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+$libPath = Join-Path $repoRoot 'src/scripts/lib/nucleus-cli-flags.ps1'
+
+$passed = 0
+$failed = 0
+
+function Assert-True([bool]$cond, [string]$name, [string]$detail = '') {
+  if ($cond) {
+    Write-Output "PASS $name"
+    $script:passed++
+  } else {
+    if ($detail) { Write-Output "FAIL ${name}: $detail" } else { Write-Output "FAIL $name" }
+    $script:failed++
+  }
+}
+
+function Assert-HasSubstring([string]$haystack, [string]$needle, [string]$name) {
+  $ok = $haystack.Contains($needle)
+  $detail = if ($ok) { '' } else { "expected to contain '$needle', got: $haystack" }
+  Assert-True -cond $ok -name $name -detail $detail
+}
+
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-arg-test-" + [Guid]::NewGuid().ToString('n'))
+New-Item -ItemType Directory -Path $tempRoot -Force > $null
+
+try {
+  . $libPath
+
+  function Write-Fixture([string]$name, [string]$paramBlock, [string]$body) {
+    $path = Join-Path $tempRoot $name
+    $libEscaped = $libPath -replace "'", "''"
+    $content = @"
+param(
+$paramBlock
+)
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+. '$libEscaped'
+`$leftover = Resolve-NucleusArgument -Arguments `$RemainingArgs -CommandPath `$PSCommandPath -CommandName 'fixture'
+$body
+"@
+    Set-Content -Path $path -Value $content -Encoding UTF8
+    return $path
+  }
+
+  function Invoke-Fixture([string]$path, [string[]]$fixtureArgs) {
+    $out = & pwsh -NoProfile -File $path @fixtureArgs 2>&1 | ForEach-Object { $_.ToString() }
+    $rc = $LASTEXITCODE
+    return [pscustomobject]@{ Output = @($out); Rc = $rc; Text = (@($out) -join "`n") }
+  }
+
+  Write-Output "`n=== [1] kebab switch ==="
+  $f1 = Write-Fixture -name 'f1.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "DryRun=`$DryRun"
+Write-Output "Leftover=`$(`$leftover -join ',')"
+"@
+  $r1 = Invoke-Fixture $f1 @('--dry-run')
+  Assert-True -cond ($r1.Rc -eq 0) -name 'kebab switch exits 0' -detail $r1.Text
+  Assert-HasSubstring -haystack $r1.Text -needle 'DryRun=True' -name 'kebab switch binds DryRun'
+
+  Write-Output "`n=== [2] kebab value with space ==="
+  $f2 = Write-Fixture -name 'f2.ps1' -paramBlock @"
+  [string]`$LogMaxSize = '',
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "LogMaxSize=`$LogMaxSize"
+"@
+  $r2 = Invoke-Fixture $f2 @('--log-max-size', '5')
+  Assert-True -cond ($r2.Rc -eq 0) -name 'kebab value space exits 0' -detail $r2.Text
+  Assert-HasSubstring -haystack $r2.Text -needle 'LogMaxSize=5' -name 'kebab value space binds'
+
+  Write-Output "`n=== [3] kebab value with = ==="
+  $f3 = Write-Fixture -name 'f3.ps1' -paramBlock @"
+  [string]`$LogMaxSize = '',
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "LogMaxSize=`$LogMaxSize"
+"@
+  $r3 = Invoke-Fixture $f3 @('--log-max-size=5')
+  Assert-True -cond ($r3.Rc -eq 0) -name 'kebab value = exits 0' -detail $r3.Text
+  Assert-HasSubstring -haystack $r3.Text -needle 'LogMaxSize=5' -name 'kebab value = binds'
+
+  Write-Output "`n=== [4] acronym flags ==="
+  $f4 = Write-Fixture -name 'f4.ps1' -paramBlock @"
+  [switch]`$NoVMGc,
+  [switch]`$GCVMData,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "NoVMGc=`$NoVMGc"
+Write-Output "GCVMData=`$GCVMData"
+"@
+  $r4 = Invoke-Fixture $f4 @('--no-vm-gc', '--gc-vm-data')
+  Assert-True -cond ($r4.Rc -eq 0) -name 'acronym flags exit 0' -detail $r4.Text
+  Assert-HasSubstring -haystack $r4.Text -needle 'NoVMGc=True' -name 'no-vm-gc binds NoVMGc'
+  Assert-HasSubstring -haystack $r4.Text -needle 'GCVMData=True' -name 'gc-vm-data binds GCVMData'
+
+  Write-Output "`n=== [5] unknown flag throws and names flag ==="
+  $f5 = Write-Fixture -name 'f5.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "should-not-reach"
+"@
+  $r5 = Invoke-Fixture $f5 @('--bogus')
+  Assert-True -cond ($r5.Rc -ne 0) -name 'unknown flag exits non-zero' -detail $r5.Text
+  Assert-HasSubstring -haystack $r5.Text -needle 'bogus' -name 'unknown flag error names flag'
+
+  Write-Output "`n=== [6] missing value throws and names flag ==="
+  $f6 = Write-Fixture -name 'f6.ps1' -paramBlock @"
+  [string]`$LogMaxSize = '',
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "should-not-reach"
+"@
+  $r6 = Invoke-Fixture $f6 @('--log-max-size')
+  Assert-True -cond ($r6.Rc -ne 0) -name 'missing value exits non-zero' -detail $r6.Text
+  Assert-HasSubstring -haystack $r6.Text -needle 'log-max-size' -name 'missing value error names flag'
+
+  Write-Output "`n=== [7] duplicate normalization throws ==="
+  $f7 = Write-Fixture -name 'f7.ps1' -paramBlock @"
+  [switch]`$FooBar,
+  [Alias('foo-bar')][switch]`$Baz,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "should-not-reach"
+"@
+  $r7 = Invoke-Fixture $f7 @('--foo-bar')
+  Assert-True -cond ($r7.Rc -ne 0) -name 'duplicate normalization exits non-zero' -detail $r7.Text
+  Assert-HasSubstring -haystack $r7.Text -needle 'duplicate normalized' -name 'duplicate normalization error reports collision'
+
+  Write-Output "`n=== [8] throws rather than exits (caller survives) ==="
+  $f8 = Write-Fixture -name 'f8.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+try {
+  `$null = Resolve-NucleusArgument -Arguments @('--bogus') -CommandPath `$PSCommandPath -CommandName 'fixture'
+  Write-Output "NO-CATCH"
+} catch {
+  Write-Output "CAUGHT"
+}
+Write-Output "AFTER"
+"@
+  $r8 = Invoke-Fixture $f8 @()
+  Assert-True -cond ($r8.Rc -eq 0) -name 'caller survives throw' -detail $r8.Text
+  Assert-HasSubstring -haystack $r8.Text -needle 'CAUGHT' -name 'caller caught throw'
+  Assert-HasSubstring -haystack $r8.Text -needle 'AFTER' -name 'caller continued after catch'
+
+  Write-Output "`n=== [9] switch =value rejects unparseable boolean ==="
+  $f9 = Write-Fixture -name 'f9.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "DryRun=`$DryRun"
+"@
+  $r9a = Invoke-Fixture $f9 @('--dry-run=0')
+  Assert-True -cond ($r9a.Rc -ne 0) -name 'switch =0 exits non-zero' -detail $r9a.Text
+  Assert-HasSubstring -haystack $r9a.Text -needle 'dry-run' -name 'switch =0 error names flag'
+  Assert-HasSubstring -haystack $r9a.Text -needle '0' -name 'switch =0 error names value'
+  $r9b = Invoke-Fixture $f9 @('--dry-run=no')
+  Assert-True -cond ($r9b.Rc -ne 0) -name 'switch =no exits non-zero' -detail $r9b.Text
+  Assert-HasSubstring -haystack $r9b.Text -needle 'no' -name 'switch =no error names value'
+  $r9c = Invoke-Fixture $f9 @('--dry-run=false')
+  Assert-True -cond ($r9c.Rc -eq 0) -name 'switch =false exits 0' -detail $r9c.Text
+  Assert-HasSubstring -haystack $r9c.Text -needle 'DryRun=False' -name 'switch =false binds false'
+  $r9d = Invoke-Fixture $f9 @('--dry-run=True')
+  Assert-True -cond ($r9d.Rc -eq 0) -name 'switch =True exits 0' -detail $r9d.Text
+  Assert-HasSubstring -haystack $r9d.Text -needle 'DryRun=True' -name 'switch =True binds true'
+
+  Write-Output "`n=== [10] alias binding ==="
+  $f10 = Write-Fixture -name 'f10.ps1' -paramBlock @"
+  [Alias('list-logs')][switch]`$ListLogs,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "ListLogs=`$ListLogs"
+Write-Output "Leftover=`$(`$leftover -join ',')"
+"@
+  $r10 = Invoke-Fixture $f10 @('--list-logs')
+  Assert-True -cond ($r10.Rc -eq 0) -name 'alias flag exits 0' -detail $r10.Text
+  Assert-HasSubstring -haystack $r10.Text -needle 'ListLogs=True' -name 'alias flag binds target param'
+
+  Write-Output "`n=== [11] catch-all not addressable and excluded from duplicate normalization ==="
+  $f11a = Write-Fixture -name 'f11a.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "should-not-reach"
+"@
+  $r11a = Invoke-Fixture $f11a @('--remaining-args')
+  Assert-True -cond ($r11a.Rc -ne 0) -name 'catch-all param not addressable as flag' -detail $r11a.Text
+  Assert-HasSubstring -haystack $r11a.Text -needle 'remaining-args' -name 'catch-all unknown flag names flag'
+  $f11b = Write-Fixture -name 'f11b.ps1' -paramBlock @"
+  [Alias('remaining-args')][switch]`$Other,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "Other=`$Other"
+"@
+  $r11b = Invoke-Fixture $f11b @('--remaining-args')
+  Assert-True -cond ($r11b.Rc -eq 0) -name 'catch-all excluded from duplicate normalization' -detail $r11b.Text
+  Assert-HasSubstring -haystack $r11b.Text -needle 'Other=True' -name 'alias colliding with catch-all name binds'
+
+  Write-Output "`n=== [12] leftover non-flag tokens mixed with flags ==="
+  $f12 = Write-Fixture -name 'f12.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "DryRun=`$DryRun"
+Write-Output "Leftover=`$(`$leftover -join ',')"
+"@
+  $r12 = Invoke-Fixture $f12 @('--dry-run', 'foo', 'bar')
+  Assert-True -cond ($r12.Rc -eq 0) -name 'mixed flags and leftovers exit 0' -detail $r12.Text
+  Assert-HasSubstring -haystack $r12.Text -needle 'DryRun=True' -name 'mixed case binds flag'
+  Assert-HasSubstring -haystack $r12.Text -needle 'Leftover=foo,bar' -name 'mixed case returns leftover non-flags'
+
+  Write-Output "`n=== [13] end-of-options makes rest leftover ==="
+  $f13 = Write-Fixture -name 'f13.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "DryRun=`$DryRun"
+Write-Output "Leftover=`$(`$leftover -join ',')"
+"@
+  # Invoke in-process: PowerShell's native param binder rejects '--' as an ambiguous
+  # empty param name, so the subprocess fixture path cannot pass it through.
+  $DryRun = [switch]$false
+  $r13Leftover = Resolve-NucleusArgument -Arguments @('--dry-run', '--', '--not-a-flag', 'pos') -CommandPath $f13 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'end-of-options preserves parsed flag' -detail "DryRun=$DryRun"
+  Assert-True -cond (([string[]]$r13Leftover -join ',') -eq '--not-a-flag,pos') -name 'end-of-options returns remaining tokens as leftover' -detail (([string[]]$r13Leftover -join ','))
+
+} finally {
+  # check-suppress:suppression_doc: temp test dir cleanup must not mask test results
+  Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+}
+
+Write-Output "`n$passed passed, $failed failed"
+if ($failed -gt 0) { exit 1 }
+exit 0
