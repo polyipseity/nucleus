@@ -31,9 +31,21 @@
 .PARAMETER LogName
   Log name passed to nucleus-logs for the subcommands that take one.
 
+.PARAMETER Json
+  Emit JSON output for logs subcommands that support it.
+
+.PARAMETER Note
+  Free-text note forwarded to nucleus-logs label.
+
+.PARAMETER Scope
+  Log root scope forwarded to nucleus-logs (default: user).
+
 .PARAMETER GCVMData
   Collect orphaned VM data (default: $false). Runs vm.sh gc --gc-data, which is
   what gc.sh does when asked to.
+
+.PARAMETER NoVMDataGc
+  Do not collect orphaned VM data, even when -GCVMData or --vm-data-gc is set.
 
 .PARAMETER Expiry
   POSIX-only master expiry override, accepted and ignored on Windows.
@@ -108,17 +120,52 @@ param(
   [switch]$NoSccacheGc,
   [switch]$NoWallpaperGc,
   [switch]$NoVMGc,
+  [Alias('vm-data-gc')]
   [switch]$GCVMData,
+  [Alias('no-vm-data-gc')]
+  [switch]$NoVMDataGc,
   [switch]$NoLogGc,
   [switch]$NoJournaldGc,
   [switch]$NoSystemGc,
   [switch]$NoNixArtifactsGc,
   [switch]$NoDuperemoveGc,
+  [Alias('duperemove-gc')]
+  [switch]$DuperemoveGc,
+  [Alias('git-cache-gc')]
+  [switch]$GitCacheGc,
+  [Alias('hm-gc')]
+  [switch]$HmGc,
+  [Alias('journald-gc')]
+  [switch]$JournaldGc,
+  [Alias('log-gc')]
+  [switch]$LogGc,
+  [Alias('nix-artifacts-gc')]
+  [switch]$NixArtifactsGc,
+  [Alias('nix-gc')]
+  [switch]$NixGc,
+  [Alias('ollama-gc')]
+  [switch]$OllamaGc,
+  [Alias('sccache-gc')]
+  [switch]$SccacheGc,
+  [Alias('scoop-gc')]
+  [switch]$ScoopGc,
+  [Alias('system-gc')]
+  [switch]$SystemGc,
+  [Alias('tool-cache-gc')]
+  [switch]$ToolCacheGc,
+  [Alias('vm-gc')]
+  [switch]$VMGc,
+  [Alias('wallpaper-gc')]
+  [switch]$WallpaperGc,
+  [Alias('max-size')]
   [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
+  [Alias('max-files')]
   [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
+  [Alias('compress')]
   [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
   [ValidateSet('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')]
   [string]$LogsAction = 'gc',
+  [Alias('log')]
   [string]$LogName,
   [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
@@ -128,8 +175,11 @@ param(
   [string]$SystemGenerationsKeep = '',
   [switch]$NoDryRun,
   [string]$Harness = '',
+  [switch]$Json,
   [string]$Kind = '',
   [string]$Lines = '',
+  [string]$Note = '',
+  [string]$Scope = 'user',
   [string]$Since = '',
   [Alias('list-logs')]
   [switch]$ListLogs,
@@ -148,6 +198,8 @@ Import-Module $modulePath -Force -DisableNameChecking
 
 # check-suppress:suppression_doc: POSIX-only generation-count overrides, accepted and ignored on Windows
 $null = $GenerationsKeep, $HmGenerationsKeep, $SystemGenerationsKeep
+# check-suppress:suppression_doc: spec-symmetry positive GC toggles bound for CLI parity; behavior is controlled by the No* switches
+$null = $DuperemoveGc, $GitCacheGc, $HmGc, $JournaldGc, $LogGc, $NixArtifactsGc, $NixGc, $OllamaGc, $SccacheGc, $ScoopGc, $SystemGc, $ToolCacheGc, $VMGc, $WallpaperGc
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 $leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'gc') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -572,15 +624,18 @@ switch ($Action) {
   'logs' {
     # WHY the passthrough: gc.sh logs takes a nucleus-logs subcommand, so the twin
     # must accept the same vocabulary instead of pinning the action to gc.
-    $logsArguments = @('-Action', $LogsAction, '-Scope', 'user')
+    $logsArguments = @('-Action', $LogsAction, '-Scope', $Scope)
     if ($LogName) { $logsArguments += @('-Log', $LogName) }
     if ($DryRun) { $logsArguments += '-DryRun' }
     if ($LogMaxSize) { $logsArguments += @('-MaxSize', $LogMaxSize) }
     if ($LogMaxFiles) { $logsArguments += @('-MaxFiles', $LogMaxFiles) }
     if ($LogCompress) { $logsArguments += @('-Compress', $LogCompress) }
     if ($Harness) { $logsArguments += @('-Harness', $Harness) }
+    if ($Json.IsPresent) { $logsArguments += '-Json' }
     if ($Kind) { $logsArguments += @('-Kind', $Kind) }
     if ($Lines) { $logsArguments += @('-Lines', $Lines) }
+    if ($Note) { $logsArguments += @('-Note', $Note) }
+    if ($Expiry) { $logsArguments += @('-Expiry', $Expiry) }
     if ($Since) { $logsArguments += @('-Since', $Since) }
     Invoke-NucleusLogCommand -Arguments $logsArguments
     exit $LASTEXITCODE
@@ -715,7 +770,7 @@ if (-not $NoVMGc) {
       # WHY the switch is positive: gc.sh defaults vm_data_gc to false, and a
       # -NoVmDataGc spelling would default to $false, meaning do not skip.
       $vmGcArgs = @('gc')
-      if ($GCVMData) { $vmGcArgs += '--gc-data' }
+      if ($GCVMData -and -not $NoVMDataGc) { $vmGcArgs += '--gc-data' }
       if ($DryRun) {
         # WHY no second bash call: vm.sh accepts --dry-run, but previewing through a
         # script whose dry-run paths are not covered here would trade the point
