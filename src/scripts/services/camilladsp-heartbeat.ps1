@@ -35,6 +35,7 @@ param(
   [int]$Port = 1234,
 
   [Parameter(Mandatory = $false)]
+  [Alias('config')]
   [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml",
 
   [Parameter(Mandatory = $false)]
