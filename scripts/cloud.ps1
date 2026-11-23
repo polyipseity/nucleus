@@ -296,8 +296,8 @@ if ($ListReplicas) {
   exit 0
 }
 
-$validActions = @('setup', 'reset', 'sync', 'status', 'restart')
-Assert-NucleusCliAction -Action $Action -Valid $validActions -CommandName cloud.ps1
+$ValidActions = @('setup', 'reset', 'sync', 'status', 'restart')
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName cloud
 
 switch ($Action) {
   'setup' {

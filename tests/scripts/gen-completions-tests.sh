@@ -460,15 +460,16 @@ _completion_subcommand_labels() {
 # parameter, meaning the first one inside the script's top-level param block. Six
 # of the apps declare more than one ValidateSet (gc.ps1:67 and :89, logs.ps1:85
 # and :97, svc.ps1:40, :170, :430), so anchoring on the block keeps a nested
-# option list from answering for the subcommands. Scripts that dropped Action
-# ValidateSet for --list-* normalization validate via Assert-NucleusCliAction
-# -Valid @(...); prefer that authoritative action list when present.
+# option list from answering for the subcommands. Prefer a canonical
+# $ValidActions/$script:ValidActions declaration, then fall back to the
+# ValidateSet in the top-level param block.
 _validate_set_labels() {
   local _labels
   _labels="$(
-    grep -E 'Assert-NucleusCliAction\b' "$1" |
-      grep -oE "@\([^)]+\)" |
+    # shellcheck disable=SC2016 # check-suppress:suppression_doc: grep ERE literal dollar for PowerShell variable
+    grep -E '(^|[[:space:]])\$([sS]cript:)?ValidActions[[:space:]]*=[[:space:]]*@\(' "$1" |
       head -n 1 |
+      grep -oE "@\([^)]+\)" |
       grep -oE "'[^']+'" |
       tr -d "'"
   )"

@@ -46,7 +46,7 @@ let
     "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu" # Outbound network firewall
     "middleclick" # Three/four-finger middle-click gesture helper
-    "mounty" # NTFS auto-mounter for ntfs-3g drives
+    "mounty" # NTFS auto-mounter for ntfs-3g drives; depends on fuse-t
     "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec" # Low-latency remote gaming / desktop streaming
     "raycast" # Spotlight replacement and launcher

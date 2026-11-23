@@ -120,7 +120,8 @@ if ($Help) {
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 if ($Action -eq 'update') { $Action = 'all' }
 
-Assert-NucleusCliAction -Action $Action -Valid @('all','lockfile','update') -CommandName update
+$ValidActions = @('all', 'lockfile', 'update')
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName update
 
 # ---------------------------------------------------------------------------
 # Invoke-UpdateAll: flake input updates + SOPS recipient rewrap

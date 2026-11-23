@@ -122,7 +122,8 @@ if (-not $Action -and -not $ListServices -and -not $ListEndpoints) {
   exit 1
 }
 
-Assert-NucleusCliAction -Action $Action -Valid @('list','status','start','stop','restart','enable','disable','unblock','verify','endpoint','logs','log-paths','log-config') -CommandName svc
+$ValidActions = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'unblock', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName svc
 
 # WHY: a remedy switch on the wrong action is a mistake rather than an extra flag to
 # ignore, and rejecting it here means no elevation prompt and no service-manager call

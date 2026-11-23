@@ -736,7 +736,8 @@ if ([string]::IsNullOrWhiteSpace($Action)) {
   exit 1
 }
 
-Assert-NucleusCliAction -Action $Action -Valid @('append','expire','gc','label','rotate','show','stats','tail') -CommandName logs
+$ValidActions = @('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName logs
 
 $logDir = Get-LogsDir -ScopeName $Scope
 $userLogDir = Get-LogsDir -ScopeName 'user'

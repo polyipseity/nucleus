@@ -175,7 +175,8 @@ if ($ListLogs) {
   exit $LASTEXITCODE
 }
 
-Assert-NucleusCliAction -Action $Action -Valid @('cleanup-nix','graveyard','logs','preferences') -CommandName gc
+$ValidActions = @('cleanup-nix', 'graveyard', 'logs', 'preferences')
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName gc
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT

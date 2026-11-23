@@ -233,6 +233,8 @@ wallpaper_post_copy_teardown() {
       fi
       # macOS: desktoppr writes the desktop surface only, so the lock-screen
       # surface and any Space or display left on an older picture keep it.
+      # The pre-login FileVault wallpaper is exported by macOS; SIP protects
+      # Preboot, so nucleus does not write it.
       if [ ! -x "$_converge_python_bin" ]; then
         fail_wallpaper_provision "provision-wallpaper: python3 is not executable at $_converge_python_bin; cannot sync the macOS lock-screen wallpaper."
       else
