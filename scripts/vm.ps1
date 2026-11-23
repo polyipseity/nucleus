@@ -32,8 +32,6 @@
   General flags:
     --accept-gsi-license      Accept the Android GSI license.
     --no-accept-gsi-license   Do not accept the Android GSI license (default).
-    --mido-patch-file PATH    Override runtime Mido patch file path.
-    --mido-script PATH        Override the Mido script path.
 
 .PARAMETER Action
   The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
@@ -64,6 +62,10 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $null = $SubcommandArgs  # check-suppress:suppression_doc: splatting variable, declared for parameter binding
 
 $ErrorActionPreference = 'Stop'
+
+$cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
+. $cliFlagsModulePath
+$SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm' -PassThroughUnknownFlags)
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -463,8 +465,6 @@ function Invoke-VMReset {
     switch ($SubcommandArgs[$i]) {
       '--accept-gsi-license' { $acceptGsiLicense = $true }
       '--no-accept-gsi-license' { $acceptGsiLicense = $false }
-      '--mido-patch-file' { $i++ } # accepted for parity; not used on Windows
-      '--mido-script' { $i++ } # accepted for parity; not used on Windows
       default { Write-NucleusWarning "ignoring unknown flag for reset: $($SubcommandArgs[$i])" }
     }
   }

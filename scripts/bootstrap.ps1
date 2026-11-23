@@ -13,6 +13,18 @@
 .PARAMETER NoApply
   Install dependencies only; cancels -Apply.
 
+.PARAMETER NoAISync
+  Do not run AI model sync after apply when -Apply is used.
+
+.PARAMETER ForceAdmin
+  Override the guard that refuses to run as Administrator.
+
+.PARAMETER ReplicaSync
+  Run replica sync after apply when -Apply is used (default: from NUCLEUS_REPLICA_SYNC).
+
+.PARAMETER NoReplicaSync
+  Do not run replica sync after apply when -Apply is used.
+
 .PARAMETER TargetUser
   Accepted for cross-platform CLI parity. Only effective on the POSIX apply
   path (nix run .#apply -- --target-user=<name>). On Windows this flag is
@@ -54,10 +66,12 @@ param(
   [switch]$Help
 )
 
-. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+. (Join-Path $PSScriptRoot '../src/scripts/lib/pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
+$ApplyArgs = @(Resolve-NucleusArgument -Arguments $ApplyArgs -CommandPath $PSCommandPath -CommandName 'bootstrap' -PassThroughUnknownFlags)
 
 if ($NoApply) { $Apply = $false }
 if ($NoReplicaSync) { $ReplicaSync = $false }

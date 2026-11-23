@@ -134,23 +134,29 @@ param(
   [Alias('list-logs')]
   [switch]$ListLogs,
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
-. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
 
-$ErrorActionPreference = 'Stop'
-
-if ($NoDryRun) { $DryRun = $false }
 # check-suppress:suppression_doc: POSIX-only generation-count overrides, accepted and ignored on Windows
 $null = $GenerationsKeep, $HmGenerationsKeep, $SystemGenerationsKeep
 
-$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
-Import-Module $modulePath -Force -DisableNameChecking
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'gc') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($leftover.Count -gt 0) {
+  Write-NucleusError -CommandName 'gc' "unexpected argument '$($leftover[0])'"
+  exit 1
+}
+if ($NoDryRun) { $DryRun = $false }
+$ErrorActionPreference = 'Stop'
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed

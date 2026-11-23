@@ -107,14 +107,24 @@ param(
   [switch]$DryRun,
   [Alias('list-logs')]
   [switch]$ListLogs,
-  [switch]$Help
+  [switch]$Help,
+
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-logs' = 'ListLogs' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'logs') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+if ($leftover.Count -gt 0) {
+  Write-NucleusError -CommandName 'logs' "unexpected argument '$($leftover[0])'"
+  exit 1
+}
 
 # WHY: only the entry script changes its own session. A dot-sourcing caller
 # loads the functions and keeps its strict mode, its error preference, and its
@@ -125,12 +135,6 @@ if ($script:IsEntryScript) {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
 }
-
-# WHY the import stays unconditional: the writer's helpers come from this module
-# and the log-management module below, so the dot-source contract depends on
-# them being present.
-$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
-Import-Module $modulePath -Force -DisableNameChecking
 
 # WHY 4096: one bounded write of at most a page reaches the file as a single
 # operation, so concurrent appenders never interleave inside a line. The limit

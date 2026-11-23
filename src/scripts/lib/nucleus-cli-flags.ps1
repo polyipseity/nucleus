@@ -78,6 +78,10 @@ function Resolve-NucleusArgument {
     Path to the caller script; used to reflect declared parameters.
   .PARAMETER CommandName
     Command name used in error messages.
+  .PARAMETER PassThroughUnknownFlags
+    When set, unknown dash-prefixed tokens are appended to leftover instead of throwing.
+    For --unknown=value the whole token is passed through. For --unknown value only the
+    flag token is passed through; the next token is left for normal processing.
   #>
   [CmdletBinding()]
   param(
@@ -90,7 +94,9 @@ function Resolve-NucleusArgument {
     [string]$CommandPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$CommandName
+    [string]$CommandName,
+
+    [switch]$PassThroughUnknownFlags
   )
 
   if ($null -eq $Arguments) { $Arguments = [string[]]@() }
@@ -169,20 +175,36 @@ function Resolve-NucleusArgument {
 
     $key = (($rawName -replace '-', '')).ToLowerInvariant()
     if (-not $map.ContainsKey($key)) {
+      if ($PassThroughUnknownFlags) {
+        $leftover.Add($tok)
+        $i++
+        continue
+      }
       _throwNucleusCliError $CommandName "unknown flag '$tok'"
     }
 
     $entry = $map[$key]
     if ($entry.IsSwitch) {
+      $switchValue = [System.Management.Automation.SwitchParameter]::Present
       if ($hasValue) {
         $boolVal = $false
         if ([bool]::TryParse($value, [ref]$boolVal)) {
-          Set-Variable -Name $entry.Name -Value ([System.Management.Automation.SwitchParameter]$boolVal) -Scope 1
+          $switchValue = [System.Management.Automation.SwitchParameter]$boolVal
         } else {
           _throwNucleusCliError $CommandName "invalid boolean value '$value' for switch flag '$tok'"
         }
-      } else {
-        Set-Variable -Name $entry.Name -Value ([System.Management.Automation.SwitchParameter]::Present) -Scope 1
+      }
+      Set-Variable -Name $entry.Name -Value $switchValue -Scope 1
+      if ($switchValue.IsPresent) {
+        $entryName = [string]$entry.Name
+        $oppositeName = if ($entryName.StartsWith('No', [System.StringComparison]::Ordinal) -and $entryName.Length -gt 2) { $entryName.Substring(2) } else { "No$entryName" }
+        $oppositeKey = (($oppositeName -replace '-', '')).ToLowerInvariant()
+        if ($map.ContainsKey($oppositeKey)) {
+          $opposite = $map[$oppositeKey]
+          if ($opposite.IsSwitch -and $opposite.Name -ne $entry.Name) {
+            Set-Variable -Name $opposite.Name -Value ([System.Management.Automation.SwitchParameter]$false) -Scope 1
+          }
+        }
       }
       $i++
       continue
@@ -199,7 +221,9 @@ function Resolve-NucleusArgument {
     $i++
   }
 
-  Write-Output -NoEnumerate -InputObject ([string[]]$leftover.ToArray())
+  if ($leftover.Count -gt 0) {
+    Write-Output -InputObject ([string[]]$leftover.ToArray())
+  }
 }
 
 function Assert-NucleusCliAction {

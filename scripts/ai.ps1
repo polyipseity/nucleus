@@ -57,7 +57,10 @@ param(
   [string]$AiProfile,
   [switch]$Json,
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
@@ -74,6 +77,14 @@ Import-Module $fmtModulePath -Force -DisableNameChecking
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   exit 0
+}
+
+$cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
+. $cliFlagsModulePath
+$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'ai')
+if ($leftover.Count -gt 0) {
+  Write-NucleusError -CommandName 'ai' "unexpected argument '$($leftover[0])'"
+  exit 1
 }
 
 # A bare invocation prints the usage summary and succeeds, matching ai.sh
@@ -110,7 +121,7 @@ function Invoke-AiSync {
   $prevProfile = $env:NUCLEUS_AI_SYNC_PROFILE
   if ($AiProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $AiProfile }
   try {
-    $effectiveGcOnly = $GcOnly -and -not $NoGcOnly
+    $effectiveGcOnly = ([bool]$GcOnly) -and (-not [bool]$NoGcOnly)
     Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$effectiveGcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -Json:$Json
   } finally {
     if ($null -ne $prevProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $prevProfile } else { Remove-Item Env:NUCLEUS_AI_SYNC_PROFILE -ErrorAction SilentlyContinue } # check-suppress:suppression_doc: env var may not exist; cleanup is best-effort

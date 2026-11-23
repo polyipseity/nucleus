@@ -237,6 +237,62 @@ Write-Output "Leftover=`$(`$leftover -join ',')"
   Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'end-of-options preserves parsed flag' -detail "DryRun=$DryRun"
   Assert-True -cond (([string[]]$r13Leftover -join ',') -eq '--not-a-flag,pos') -name 'end-of-options returns remaining tokens as leftover' -detail (([string[]]$r13Leftover -join ','))
 
+  Write-Output "`n=== [14] PassThroughUnknownFlags ==="
+  $f14 = Write-Fixture -name 'f14.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "DryRun=`$DryRun"
+"@
+  $DryRun = [switch]$false
+  $r14a = @(Resolve-NucleusArgument -Arguments @('--bogus', '--dry-run') -CommandPath $f14 -CommandName 'fixture' -PassThroughUnknownFlags)
+  Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'PassThroughUnknownFlags binds known flag' -detail "DryRun=$DryRun"
+  Assert-True -cond (([string[]]$r14a -join ',') -eq '--bogus') -name 'PassThroughUnknownFlags leaves unknown flag as leftover' -detail (([string[]]$r14a -join ','))
+
+  $DryRun = [switch]$false
+  $r14b = @(Resolve-NucleusArgument -Arguments @('--unknown=value', '--dry-run') -CommandPath $f14 -CommandName 'fixture' -PassThroughUnknownFlags)
+  Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'PassThroughUnknownFlags binds known flag with unknown=value' -detail "DryRun=$DryRun"
+  Assert-True -cond (([string[]]$r14b -join ',') -eq '--unknown=value') -name 'PassThroughUnknownFlags leaves unknown=value as whole leftover token' -detail (([string[]]$r14b -join ','))
+
+  $DryRun = [switch]$false
+  $r14c = @(Resolve-NucleusArgument -Arguments @('--bogus', 'val', '--dry-run') -CommandPath $f14 -CommandName 'fixture' -PassThroughUnknownFlags)
+  Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'PassThroughUnknownFlags binds known flag after unknown+value' -detail "DryRun=$DryRun"
+  Assert-True -cond (([string[]]$r14c -join ',') -eq '--bogus,val') -name 'PassThroughUnknownFlags preserves unknown flag followed by value order' -detail (([string[]]$r14c -join ','))
+
+  Write-Output "`n=== [15] switch pair last-flag-wins ==="
+  $f15 = Write-Fixture -name 'f15.ps1' -paramBlock @"
+  [switch]`$DryRun,
+  [switch]`$NoDryRun,
+  [switch]`$GcOnly,
+  [switch]`$NoGcOnly,
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "ok"
+"@
+  $DryRun = [switch]$false; $NoDryRun = [switch]$false; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--dry-run', '--no-dry-run') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $false -and $NoDryRun.IsPresent -eq $true) -name 'last flag wins: --dry-run --no-dry-run' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
+
+  $DryRun = [switch]$false; $NoDryRun = [switch]$false; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--no-dry-run', '--dry-run') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $true -and $NoDryRun.IsPresent -eq $false) -name 'last flag wins: --no-dry-run --dry-run' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
+
+  $DryRun = [switch]$false; $NoDryRun = [switch]$false; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--Gc-Only', '--no-gc-only') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($GcOnly.IsPresent -eq $false -and $NoGcOnly.IsPresent -eq $true) -name 'last flag wins case-insensitive: --Gc-Only --no-gc-only' -detail "GcOnly=$GcOnly NoGcOnly=$NoGcOnly"
+
+  $DryRun = [switch]$false; $NoDryRun = [switch]$true; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--dry-run=false') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $false -and $NoDryRun.IsPresent -eq $true) -name 'explicit =false does not clear opposite: pre-set NoDryRun stays true' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
+
+  $DryRun = [switch]$false; $NoDryRun = [switch]$false; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--dry-run=false', '--no-dry-run') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $false -and $NoDryRun.IsPresent -eq $true) -name 'last flag wins with =false: --dry-run=false --no-dry-run => NoDryRun true' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
+
+  $DryRun = [switch]$false; $NoDryRun = [switch]$false; $GcOnly = [switch]$false; $NoGcOnly = [switch]$false
+  $null = Resolve-NucleusArgument -Arguments @('--no-dry-run', '--dry-run=false') -CommandPath $f15 -CommandName 'fixture'
+  Assert-True -cond ($DryRun.IsPresent -eq $false -and $NoDryRun.IsPresent -eq $true) -name 'last flag wins with =false: --no-dry-run --dry-run=false => NoDryRun preserved' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
+
 } finally {
   # check-suppress:suppression_doc: temp test dir cleanup must not mask test results
   Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue

@@ -32,14 +32,24 @@ param(
   [switch]$ListReplicas = $false,
 
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
+$fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $fmtModulePath -Force -DisableNameChecking
+
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-replicas' = 'ListReplicas' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'cloud')
+if ($leftover.Count -gt 0) {
+  Write-NucleusError -CommandName 'cloud' "unexpected argument '$($leftover[0])'"
+  exit 1
+}
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

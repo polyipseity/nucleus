@@ -49,6 +49,10 @@ param(
   [string[]]$ServiceName = @(),
 
   [switch]$Json,
+  [Alias('n')]
+  [int]$Lines = 10,
+  [string]$Since,
+  [switch]$Raw,
 
   # With stop: disable auto-start after stopping.
   [switch]$Disable,
@@ -78,8 +82,9 @@ param(
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
-. (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-services' = 'ListServices'; 'list-endpoints' = 'ListEndpoints' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+. (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
+# Normalize flags from ServiceName (ValueFromRemainingArguments)
+$ServiceName = @(Resolve-NucleusArgument -Arguments $ServiceName -CommandPath $PSCommandPath -CommandName 'svc')
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
@@ -99,6 +104,9 @@ if (-not $IsWindows) {
   if ($Disable) { $forward.Add('--disable') }
   if ($Enable) { $forward.Add('--enable') }
   if ($Unblock) { $forward.Add('--unblock') }
+  if ($Raw) { $forward.Add('--raw') }
+  if (-not [string]::IsNullOrWhiteSpace([string]$Since)) { $forward.Add('--since'); $forward.Add($Since) }
+  if ($Lines -ne 10) { $forward.Add('--lines'); $forward.Add($Lines.ToString()) }
   if ($Elevated) { $forward.Add('--elevated') }
   & bash $svcSh @forward
   exit $LASTEXITCODE
@@ -146,6 +154,9 @@ if (-not $Elevated -and -not $isAdmin) {
     Action      = $Action
     ServiceName = $ServiceName
     Json        = $Json.IsPresent
+    Lines       = $Lines
+    Since       = $Since
+    Raw         = $Raw.IsPresent
     Disable     = $Disable.IsPresent
     Enable      = $Enable.IsPresent
     Unblock     = $Unblock.IsPresent
@@ -1050,21 +1061,7 @@ switch ($Action) {
   }
 
   'logs' {
-    $logLines = 10
-    $logRaw = $false
-    $parsedServices = @()
-    $i = 0
-    while ($i -lt $ServiceName.Count) {
-      switch ($ServiceName[$i]) {
-        '-n' { $i++; $logLines = [int]::Parse($ServiceName[$i]) }
-        '--lines' { $i++; $logLines = [int]::Parse($ServiceName[$i]) }
-        '--raw' { $logRaw = $true }
-        '--' { $i++; while ($i -lt $ServiceName.Count) { $parsedServices += $ServiceName[$i]; $i++ }; break }
-        default { $parsedServices += $ServiceName[$i] }
-      }
-      $i++
-    }
-    if ($parsedServices.Count -eq 0) {
+    if ($ServiceName.Count -eq 0) {
       if ($Json) {
         $list = @()
         foreach ($row in (Resolve-ServiceName -Names @())) {
@@ -1080,7 +1077,7 @@ switch ($Action) {
       return
     }
     $hasError = $false
-    foreach ($row in (Resolve-ServiceName -Names $parsedServices)) {
+    foreach ($row in (Resolve-ServiceName -Names $ServiceName)) {
       if ($row.class -eq 'error') {
         Write-NucleusError "logs: $($row.displayName) — $($row.hostEntry.error)"
         $hasError = $true
@@ -1091,7 +1088,7 @@ switch ($Action) {
         Write-NucleusWarning "$($row.registryKey) — no instances found (prefix '$prefix')"
         continue
       }
-      Show-ServiceLog -ServiceKey $row.registryKey -Lines $logLines -Raw:$logRaw -InstanceId (Get-InstanceArgument -Row $row) -Configured:($row.class -eq 'configured')
+      Show-ServiceLog -ServiceKey $row.registryKey -Lines $Lines -Raw:$Raw -InstanceId (Get-InstanceArgument -Row $row) -Configured:($row.class -eq 'configured')
     }
     if ($hasError) { exit 1 }
   }

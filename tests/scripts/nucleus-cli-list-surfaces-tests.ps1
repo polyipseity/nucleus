@@ -129,6 +129,36 @@ try {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
 
+Write-Output "`n=== [6] kebab flag binding (param-block scripts) ==="
+$kebabCases = @(
+  @{ name='ai.ps1 --no-gc-only --help binds'; args=@('--no-gc-only','--help') ; cmd='scripts/ai.ps1' },
+  @{ name='bootstrap.ps1 --no-replica-sync --help binds'; args=@('--no-replica-sync','--help') ; cmd='scripts/bootstrap.ps1' },
+  @{ name='bootstrap.ps1 --no-apply --unknown-passthrough --help passes unknown flag through'; args=@('--no-apply','--unknown-passthrough','--help') ; cmd='scripts/bootstrap.ps1' },
+  @{ name='cloud.ps1 --dry-run --list-replicas binds'; args=@('--dry-run','--list-replicas') ; cmd='scripts/cloud.ps1' },
+  @{ name='gc.ps1 --dry-run --list-logs binds'; args=@('--dry-run','--list-logs') ; cmd='scripts/gc.ps1' },
+  @{ name='gc.ps1 --generations-keep 5 --dry-run --list-logs binds'; args=@('--generations-keep','5','--dry-run','--list-logs') ; cmd='scripts/gc.ps1' },
+  @{ name='logs.ps1 --list-logs binds'; args=@('--list-logs') ; cmd='scripts/logs.ps1' }
+)
+foreach ($k in $kebabCases) {
+  $out = & pwsh -NoProfile -File (Join-Path $repoRoot $k.cmd) @($k.args) 2>&1
+  $rc = $LASTEXITCODE
+  $txt = (($out | ForEach-Object { "$_" }) -join "`n")
+  $hasParamErr = $txt -match 'parameter cannot be found|A parameter cannot be found'
+  Assert-True -cond ($rc -eq 0 -and -not $hasParamErr) -name $k.name -detail ("rc={0}" -f $rc)
+}
+
+# svc regression: --lines must bind as a parameter, not cause a binding error.
+$svcOut = & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/svc.ps1') list --lines 5 2>&1
+$svcRc = $LASTEXITCODE
+$svcTxt = (($svcOut | ForEach-Object { "$_" }) -join "`n")
+$svcBindErr = $svcTxt -match 'parameter cannot be found|A parameter cannot be found'
+Assert-True -cond (-not $svcBindErr) -name 'svc.ps1 list --lines 5 binds --lines' -detail ("rc={0}" -f $svcRc)
+
+$vmOut = & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/vm.ps1') sync --dry-run 2>&1
+$vmTxt = (($vmOut | ForEach-Object { "$_" }) -join "`n")
+$vmBindErr = $vmTxt -match "unknown flag '--dry-run'|parameter cannot be found|A parameter cannot be found"
+Assert-True -cond (-not $vmBindErr) -name 'vm.ps1 sync --dry-run is not rejected as unknown normalizer flag' -detail ("rc={0} out={1}" -f $LASTEXITCODE, $vmTxt)
+
 Write-Output "`n$passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }
 exit 0
