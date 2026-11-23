@@ -12,7 +12,7 @@ Set-StepLibPath -Path $MyInvocation.MyCommand.Path
 
 $script:FAIL_FAST = $false
 $script:usageAction = {
-  Write-Output "Usage: check.ps1 [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [path ...]"
+  Write-Output "Usage: check.ps1 [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps] [--validate-only] [path ...]"
   Write-Output "  Run all Windows-compatible repository validation checks with parallel step dispatch."
   Write-Output "  Use --scoped to skip whole-repo checks (path-scoped mode), --full to force"
   Write-Output "  whole-repo checks even with paths. Default: scoped if paths given, full if not."
@@ -23,6 +23,7 @@ $script:usageAction = {
   Write-Output "  --verbose=<ids>  Stream only the specified comma-separated step IDs."
   Write-Output "  --no-verbose     Suppress step output streaming (default)."
   Write-Output "  --only-steps=<ids>  Run only steps with the given comma-separated IDs."
+  Write-Output "  --list-steps     Print registered step IDs and exit."
 }
 # Output helpers
 function Write-Message { Write-Output "check: $args" }

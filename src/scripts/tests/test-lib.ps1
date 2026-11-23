@@ -12,7 +12,7 @@ Set-StepLibPath -Path $MyInvocation.MyCommand.Path
 
 $script:FAIL_FAST = $true
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--scoped|--full] [--only-steps=<ids>]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--scoped|--full] [--only-steps=<ids>] [--list-steps]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
@@ -22,6 +22,7 @@ $script:usageAction = {
   Write-Output "  --no-verbose           Suppress step output streaming (default)."
   Write-Output "  --scoped|--full        Select scoped or full mode (accepted for parity)."
   Write-Output "  --only-steps=<ids>     Run only steps with the given comma-separated IDs."
+  Write-Output "  --list-steps           Print registered step IDs and exit."
 }
 
 function Write-Message { Write-Output "test: $args" }

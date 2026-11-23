@@ -200,19 +200,17 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   # WHY: preserve the proven .sh bidirectional help/spec check where the POSIX
   # help source runs, and fall back to the pwsh twin only when the .sh probe fails
   # on this host (for example svc.sh rejects non-MacBook/NixOS hosts on Windows).
-  # The pwsh fallback checks spec->help with '-' removed and lowercased because
-  # Get-Help Pascal parameters and custom usage differ from spec long flags.
+  # The pwsh fallback uses Get-Command reflection for bindability (declared
+  # parameter names/aliases), not source-text or help-text corpus matching.
   $driftScript = @'
-import json, os, re, subprocess, sys
+import json, os, re, shutil, subprocess, sys
 from pathlib import Path
 root = Path(sys.argv[1]); spec = json.loads(Path(sys.argv[2]).read_text())
-def help_path(name):
-    p = root / 'scripts' / f'{name}.sh'
-    if p.exists():
-        return p
-    if name == 'camilladsp-heartbeat':
-        return root / 'src/scripts/services/camilladsp-heartbeat.sh'
-    return root / 'scripts' / f'{name}.sh'
+def resolve_script(name, ext):
+    for rel in (Path('scripts') / f'{name}.{ext}', Path('src/scripts/services') / f'{name}.{ext}'):
+        p = root / rel
+        if p.exists(): return p
+    return root / 'scripts' / f'{name}.{ext}'
 def extract_long_flags(text):
     out=set()
     for line in text.splitlines():
@@ -235,22 +233,60 @@ def spec_flags(app):
     return out
 def norm(s):
     return s.replace('-', '').lower()
-def pwsh_spec_to_help(name, ps1, sf, env):
-    r=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-File', str(ps1), '--help'], capture_output=True, text=True, env=env)
-    text=(r.stdout or '')+'\n'+(r.stderr or '')
+def pwsh_declared_tokens(ps1, env):
+    # WHY: reflection via Get-Command is the bindability contract; source text is not.
+    if shutil.which('pwsh') is None:
+        raise RuntimeError('pwsh is required for pwsh bindability reflection')
+    ps1_q = str(ps1).replace("'", "''")
+    cmd = (
+        "$c=Get-Command -Name '" + ps1_q + "' -ErrorAction Stop; "
+        "@($c.Parameters.GetEnumerator() | ForEach-Object { "
+        "[pscustomobject]@{name=$_.Key; aliases=@($_.Value.Aliases)} }) | ConvertTo-Json -Compress -Depth 4"
+    )
+    r = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', cmd], capture_output=True, text=True, env=env)
     if r.returncode != 0:
-        return [f'{name}: pwsh --help failed (exit {r.returncode}): {text.strip()}']
-    gh=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', f"Get-Help -Full '{str(ps1).replace(chr(39), chr(39)*2)}'"], capture_output=True, text=True, env=env)
-    params=subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', f"try {{ (Get-Command '{str(ps1).replace(chr(39), chr(39)*2)}' -ErrorAction Stop).Parameters.Keys -join ' ' }} catch {{ '' }}"], capture_output=True, text=True, env=env)
+        raise RuntimeError(((r.stdout or '') + '\n' + (r.stderr or '')).strip())
+    raw = (r.stdout or '').strip()
+    if not raw or raw == 'null':
+        items = []
+    else:
+        data = json.loads(raw)
+        items = [data] if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    tokens = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        n = item.get('name')
+        if isinstance(n, str) and n:
+            tokens.add(norm(n))
+        aliases = item.get('aliases')
+        if isinstance(aliases, list):
+            for a in aliases:
+                if isinstance(a, str) and a:
+                    tokens.add(norm(a))
+        elif isinstance(aliases, str) and aliases:
+            tokens.add(norm(aliases))
+    return tokens, len(items)
+def pwsh_spec_to_reflection(name, ps1, sf, env):
     try:
-        src_text=ps1.read_text(encoding='utf-8', errors='replace')
-    except OSError:
-        src_text=''
-    corpus_norm=norm(text + '\n' + (gh.stdout or '') + '\n' + (gh.stderr or '') + '\n' + (params.stdout or '') + '\n' + (params.stderr or '') + '\n' + src_text)
-    errs=[]
+        tokens, param_count = pwsh_declared_tokens(ps1, env)
+    except Exception as e:
+        return [f'{name}: pwsh reflection failed: {e}']
+    if param_count == 0:
+        # Hand-parsed script with no param() block: Get-Command exposes no parameter
+        # metadata, so fall back to runtime help output (not source text).
+        r = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-File', str(ps1), '--help'], capture_output=True, text=True, env=env)
+        gh = subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', f"Get-Help -Full '{str(ps1).replace(chr(39), chr(39)*2)}' | Out-String -Width 4096"], capture_output=True, text=True, env=env)
+        corpus_norm = norm((r.stdout or '') + '\n' + (r.stderr or '') + '\n' + (gh.stdout or '') + '\n' + (gh.stderr or ''))
+        errs = []
+        for flag in sorted(sf):
+            if norm(flag) not in corpus_norm:
+                errs.append(f'{name}: spec flag {flag} missing from pwsh help (no param metadata)')
+        return errs
+    errs = []
     for flag in sorted(sf):
-        if norm(flag) not in corpus_norm:
-            errs.append(f'{name}: spec flag {flag} missing from pwsh help')
+        if norm(flag) not in tokens:
+            errs.append(f'{name}: spec flag {flag} not bindable in pwsh (missing declared parameter/alias)')
     return errs
 errors=[]
 env = dict(os.environ)
@@ -259,13 +295,8 @@ for app in spec.get('apps') or []:
     name=app.get('name')
     if not name: continue
     sf=spec_flags(app)
-    hp=help_path(name)
-    ps1=root / 'scripts' / f'{name}.ps1'
-    if not ps1.exists():
-        for candidate in (hp.with_suffix('.ps1'), root / 'src' / 'scripts' / 'services' / f'{name}.ps1'):
-            if candidate.exists():
-                ps1=candidate
-                break
+    hp=resolve_script(name, 'sh')
+    ps1=resolve_script(name, 'ps1')
     bash_err=None
     if hp.exists():
         r=subprocess.run(['bash', str(hp), '--help'], capture_output=True, text=True, env=env)
@@ -277,7 +308,7 @@ for app in spec.get('apps') or []:
             continue
         bash_err=((r.stdout or '')+'\n'+(r.stderr or '')).strip()
     if ps1.exists():
-        errors.extend(pwsh_spec_to_help(name, ps1, sf, env))
+        errors.extend(pwsh_spec_to_reflection(name, ps1, sf, env))
         continue
     if bash_err is not None:
         errors.append(f'{name}: --help failed (exit non-zero): {bash_err}')
