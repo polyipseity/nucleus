@@ -46,9 +46,65 @@ param(
 
   [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
 
-  [int]$History,
+  [Alias('h')]
+  [switch]$Help,
 
   [switch]$Json,
+
+  [int]$History,
+
+  [Alias('ai-sync')]
+  [switch]$AiSync,
+
+  [Alias('no-ai-sync')]
+  [switch]$NoAiSync,
+
+  [Alias('replica-sync')]
+  [switch]$ReplicaSync,
+
+  [Alias('no-replica-sync')]
+  [switch]$NoReplicaSync,
+
+  [Alias('store-audit')]
+  [switch]$StoreAudit,
+
+  [Alias('no-store-audit')]
+  [switch]$NoStoreAudit,
+
+  [Alias('target-user')]
+  [string]$TargetUser,
+
+  [string]$Username,
+
+  [Alias('vm-sync')]
+  [switch]$VmSync,
+
+  [Alias('no-vm-sync')]
+  [switch]$NoVmSync,
+
+  [Alias('vm-setup')]
+  [switch]$VmSetup,
+
+  [Alias('no-vm-setup')]
+  [switch]$NoVmSetup,
+
+  [Alias('health-check')]
+  [switch]$HealthCheck,
+
+  [Alias('no-health-check')]
+  [switch]$NoHealthCheck,
+
+  [Alias('min-free-bytes')]
+  [string]$MinFreeBytes,
+
+  [Alias('secret-health')]
+  [switch]$SecretHealth,
+
+  [Alias('no-secret-health')]
+  [switch]$NoSecretHealth,
+
+  [Alias('log-health')]
+  [switch]$LogHealth,
 
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$RemainingArgs = @()
@@ -183,68 +239,164 @@ function Invoke-ApplyStatus {
   }
 }
 
-function Assert-ApplyKnownFlagSet {
+function Get-ApplyFlagParameterMap {
+  # Ordered map: param name -> flag string for error reporting.
+  return @(
+    @{ Name = 'Help'; Flag = '--help'; Kind = 'switch' }
+    @{ Name = 'Json'; Flag = '--json'; Kind = 'switch' }
+    @{ Name = 'History'; Flag = '--history'; Kind = 'value' }
+    @{ Name = 'AiSync'; Flag = '--ai-sync'; Kind = 'switch' }
+    @{ Name = 'NoAiSync'; Flag = '--no-ai-sync'; Kind = 'switch' }
+    @{ Name = 'ReplicaSync'; Flag = '--replica-sync'; Kind = 'switch' }
+    @{ Name = 'NoReplicaSync'; Flag = '--no-replica-sync'; Kind = 'switch' }
+    @{ Name = 'StoreAudit'; Flag = '--store-audit'; Kind = 'switch' }
+    @{ Name = 'NoStoreAudit'; Flag = '--no-store-audit'; Kind = 'switch' }
+    @{ Name = 'TargetUser'; Flag = '--target-user'; Kind = 'value' }
+    @{ Name = 'Username'; Flag = '--username'; Kind = 'value' }
+    @{ Name = 'VmSync'; Flag = '--vm-sync'; Kind = 'switch' }
+    @{ Name = 'NoVmSync'; Flag = '--no-vm-sync'; Kind = 'switch' }
+    @{ Name = 'VmSetup'; Flag = '--vm-setup'; Kind = 'switch' }
+    @{ Name = 'NoVmSetup'; Flag = '--no-vm-setup'; Kind = 'switch' }
+    @{ Name = 'HealthCheck'; Flag = '--health-check'; Kind = 'switch' }
+    @{ Name = 'NoHealthCheck'; Flag = '--no-health-check'; Kind = 'switch' }
+    @{ Name = 'MinFreeBytes'; Flag = '--min-free-bytes'; Kind = 'value' }
+    @{ Name = 'SecretHealth'; Flag = '--secret-health'; Kind = 'switch' }
+    @{ Name = 'NoSecretHealth'; Flag = '--no-secret-health'; Kind = 'switch' }
+    @{ Name = 'LogHealth'; Flag = '--log-health'; Kind = 'switch' }
+  )
+}
+
+function Test-ApplyFlagBound {
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string]$Kind,
+    [Parameter(Mandatory)][System.Collections.IDictionary]$BoundParameters
+  )
+  if ($Kind -eq 'switch') {
+    $var = Get-Variable -Name $Name -Scope Script -ErrorAction SilentlyContinue # check-suppress:suppression_doc: param variable may not exist as a script-scope variable when not bound; absence means not bound
+    return ($null -ne $var -and $var.Value -is [System.Management.Automation.SwitchParameter] -and $var.Value.IsPresent)
+  }
+  return $BoundParameters.ContainsKey($Name)
+}
+
+function Assert-ApplyBoundFlagSet {
+  param(
+    [Parameter(Mandatory)][string]$CommandName,
+    [Parameter(Mandatory)][string[]]$AllowedParams,
+    [Parameter(Mandatory)][System.Collections.IDictionary]$BoundParameters
+  )
+  $allowed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($name in $AllowedParams) {
+    $null = $allowed.Add($name) # check-suppress:suppression_doc: HashSet.Add returns bool, intentionally discarded
+  }
+  foreach ($entry in @(Get-ApplyFlagParameterMap)) {
+    if ($allowed.Contains([string]$entry.Name)) { continue }
+    if (Test-ApplyFlagBound -Name ([string]$entry.Name) -Kind ([string]$entry.Kind) -BoundParameters $BoundParameters) {
+      Write-NucleusError -CommandName $CommandName "${CommandName}: unsupported argument '$($entry.Flag)'"
+      exit 1
+    }
+  }
+}
+
+function Get-ApplyRemainingArgList {
   param(
     [Parameter(Mandatory)][string]$CommandName,
     [string[]]$ArgList,
-    [string[]]$KnownSwitches,
-    [string[]]$KnownValueFlags
+    [Parameter(Mandatory)]
+    [AllowEmptyCollection()]
+    [string[]]$AllowedValueFlags
   )
-  $i = 0
-  while ($i -lt @($ArgList).Count) {
-    $arg = $ArgList[$i]
-    if ($arg -eq '-h' -or $arg -eq '--help') {
-      Get-Help $PSCommandPath -Detailed
-      exit 0
+  $allowed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($flag in $AllowedValueFlags) {
+    $null = $allowed.Add($flag) # check-suppress:suppression_doc: HashSet.Add returns bool, intentionally discarded
+  }
+  $knownValueFlags = @(
+    @(Get-ApplyFlagParameterMap) | Where-Object { $_.Kind -eq 'value' } | ForEach-Object {
+      @{ Flag = [string]$_.Flag; Name = [string]$_.Name }
     }
-    $matchedValueFlag = $false
-    foreach ($vf in $KnownValueFlags) {
-      if ($arg -eq $vf) {
-        if ($i + 1 -ge @($ArgList).Count) {
-          Write-NucleusError -CommandName $CommandName "${CommandName}: $vf requires a value"
+  )
+  $remaining = [System.Collections.Generic.List[string]]::new()
+  foreach ($arg in @($ArgList)) {
+    $consumed = $false
+    foreach ($entry in $knownValueFlags) {
+      $flag = [string]$entry.Flag
+      if ($arg -like "$flag=*") {
+        if (-not $allowed.Contains($flag)) {
+          Write-NucleusError -CommandName $CommandName "${CommandName}: unsupported argument '$arg'"
           exit 1
         }
-        $i += 2
-        $matchedValueFlag = $true
-        break
-      }
-      if ($arg -like "$vf=*") {
-        $i++
-        $matchedValueFlag = $true
+        $value = ([string]$arg).Substring($flag.Length + 1)
+        Set-Variable -Name ([string]$entry.Name) -Scope Script -Value $value
+        $consumed = $true
         break
       }
     }
-    if ($matchedValueFlag) { continue }
-    if ($KnownSwitches -contains $arg) {
-      $i++
-      continue
+    if (-not $consumed) {
+      $null = $remaining.Add([string]$arg) # check-suppress:suppression_doc: List.Add result intentionally discarded
     }
-    Write-NucleusError -CommandName $CommandName "${CommandName}: unsupported argument '$arg'"
-    exit 1
   }
+  return @($remaining.ToArray())
 }
 
 switch ($Action) {
   'health-check' {
-    Assert-ApplyKnownFlagSet -CommandName health-check -ArgList $RemainingArgs `
-      -KnownSwitches @('--secret-health', '--no-secret-health', '--log-health', '--store-audit', '--no-store-audit') `
-      -KnownValueFlags @('--min-free-bytes')
+    Assert-ApplyBoundFlagSet -CommandName health-check -BoundParameters $PSBoundParameters -AllowedParams @(
+      'Help', 'MinFreeBytes', 'SecretHealth', 'NoSecretHealth', 'LogHealth', 'StoreAudit', 'NoStoreAudit'
+    )
+    if ($Help.IsPresent) {
+      Get-Help $PSCommandPath -Detailed
+      exit 0
+    }
+    $remainingHealthCheckArgs = @(Get-ApplyRemainingArgList -CommandName health-check -ArgList $RemainingArgs -AllowedValueFlags @('--min-free-bytes'))
+    if ($remainingHealthCheckArgs.Count -gt 0) {
+      Write-NucleusError -CommandName health-check "health-check: unsupported argument '$($remainingHealthCheckArgs[0])'"
+      exit 1
+    }
     Write-NucleusInfo -CommandName health-check "health-check is not yet implemented for Windows; exiting 0"
     exit 0
   }
   'audit-store' {
-    Assert-ApplyKnownFlagSet -CommandName audit-store -ArgList $RemainingArgs -KnownSwitches @() -KnownValueFlags @()
+    Assert-ApplyBoundFlagSet -CommandName audit-store -BoundParameters $PSBoundParameters -AllowedParams @(
+      'Help'
+    )
+    if ($Help.IsPresent) {
+      Get-Help $PSCommandPath -Detailed
+      exit 0
+    }
+    $remainingAuditStoreArgs = @(Get-ApplyRemainingArgList -CommandName audit-store -ArgList $RemainingArgs -AllowedValueFlags @())
+    if ($remainingAuditStoreArgs.Count -gt 0) {
+      Write-NucleusError -CommandName audit-store "audit-store: unsupported argument '$($remainingAuditStoreArgs[0])'"
+      exit 1
+    }
     Write-NucleusInfo -CommandName audit-store "audit-store is not yet implemented for Windows; exiting 0"
     exit 0
   }
   'status' {
+    Assert-ApplyBoundFlagSet -CommandName status -BoundParameters $PSBoundParameters -AllowedParams @(
+      'Help', 'History', 'Json'
+    )
+    if ($Help.IsPresent) {
+      Get-Help $PSCommandPath -Detailed
+      exit 0
+    }
     $statusExit = Invoke-ApplyStatus -ExplicitHistory $statusHistorySpecified -Count $statusHistoryCount -AsJson $statusJson
     exit [int]$statusExit
   }
   'apply' {
-    Assert-ApplyKnownFlagSet -CommandName apply -ArgList $RemainingArgs `
-      -KnownSwitches @('--ai-sync', '--no-ai-sync', '--replica-sync', '--no-replica-sync', '--store-audit', '--no-store-audit', '--health-check', '--no-health-check', '--vm-sync', '--no-vm-sync', '--vm-setup', '--no-vm-setup') `
-      -KnownValueFlags @('--min-free-bytes', '--target-user', '--username')
+    Assert-ApplyBoundFlagSet -CommandName apply -BoundParameters $PSBoundParameters -AllowedParams @(
+      'Help', 'AiSync', 'NoAiSync', 'ReplicaSync', 'NoReplicaSync', 'StoreAudit', 'NoStoreAudit',
+      'HealthCheck', 'NoHealthCheck', 'VmSync', 'NoVmSync', 'VmSetup', 'NoVmSetup',
+      'MinFreeBytes', 'TargetUser', 'Username'
+    )
+    if ($Help.IsPresent) {
+      Get-Help $PSCommandPath -Detailed
+      exit 0
+    }
+    $remainingApplyArgs = @(Get-ApplyRemainingArgList -CommandName apply -ArgList $RemainingArgs -AllowedValueFlags @('--min-free-bytes', '--target-user', '--username'))
+    if ($remainingApplyArgs.Count -gt 0) {
+      Write-NucleusError -CommandName apply "apply: unsupported argument '$($remainingApplyArgs[0])'"
+      exit 1
+    }
     Write-NucleusInfo -CommandName apply "apply is handled by the Windows host orchestrator (src/hosts/Windows/apply.ps1); exiting 0"
     exit 0
   }
