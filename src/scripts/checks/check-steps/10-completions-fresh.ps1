@@ -261,8 +261,8 @@ for app in spec.get('apps') or []:
     sf=spec_flags(app)
     hp=help_path(name)
     ps1=root / 'scripts' / f'{name}.ps1'
-    if not ps1.exists() and name == 'camilladsp-heartbeat':
-        ps1=root / 'src/scripts/services/camilladsp-heartbeat.ps1'
+    if not ps1.exists():
+        ps1=hp.with_suffix('.ps1')
     bash_err=None
     if hp.exists():
         r=subprocess.run(['bash', str(hp), '--help'], capture_output=True, text=True, env=env)
