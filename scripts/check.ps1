@@ -1,33 +1,75 @@
-# check.ps1: consolidated repository validation script (Windows).
-#
-# Thin orchestrator: sources check-lib.ps1 for the framework and check-steps.ps1 for
-# step registration, then runs the pipeline.
-#
-# Arguments:
-#   -Action <all|packer|sh|pwsh>  Which check to run (default: all).
-#                     all    Run every check via the step pipeline.
-#                     packer Run the Packer template validation.
-#                     sh     Run the shell script lint (ShellCheck).
-#                     pwsh   Run check-pwsh.ps1.
-#   --full           Run all checks including whole-repo checks (default).
-#   --scoped         Run only path-scopable checks.
-#   --fail-fast      Exit immediately on first failure.
-#   --no-fail-fast   Accumulate all failures (default).
-#   --online         Run online determinism checks.
-#   --verbose        Stream all step output (default: headers + summaries only).
-#   --verbose=<ids>  Stream only the specified comma-separated step IDs.
-#   --no-verbose     Suppress step output streaming (default).
-#   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
-#   --list-steps     Print registered step IDs and exit.
-#   (paths)          Files to check; restricts --scoped to matching files.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on any check failure.
-
 #Requires -Version 7.4
+<#
+.SYNOPSIS
+  Consolidated repository validation script (Windows).
+
+.DESCRIPTION
+  Thin orchestrator: sources check-lib.ps1 for the framework and check-steps.ps1 for
+  step registration, then runs the pipeline.
+
+.PARAMETER Action
+  Which check to run: all, packer, sh, or pwsh (default: all).
+
+.PARAMETER FailFast
+  Exit immediately on first failure.
+
+.PARAMETER Full
+  Run all checks including whole-repo checks (default).
+
+.PARAMETER Help
+  Show usage.
+
+.PARAMETER ListSteps
+  Print registered step IDs and exit.
+
+.PARAMETER NoFailFast
+  Accumulate all failures (default).
+
+.PARAMETER NoVerbose
+  Suppress step output streaming (default).
+
+.PARAMETER Online
+  Run online determinism checks.
+
+.PARAMETER OnlySteps
+  Run only steps with the given comma-separated IDs.
+
+.PARAMETER Scoped
+  Run only path-scopable checks.
+
+.PARAMETER ValidateOnly
+  Skip formatting phase in packer validation.
+
+.PARAMETER Verbose
+  Stream step output; optional comma-separated step IDs.
+
+.PARAMETER WindowsTemplateOverride
+  Test seam: point the packer_validate annotation check at a different template file.
+
+.PARAMETER AnnotationCheckOnly
+  Internal: only run packer annotation check.
+
+.NOTES
+  Environment variables:
+    NUCLEUS_REPO_ROOT  Override the detected repository root path.
+#>
+param(
+  [string]$Action = 'all',
+  [switch]$FailFast,
+  [switch]$Full,
+  [Alias('h')]
+  [switch]$Help,
+  [switch]$ListSteps,
+  [switch]$NoFailFast,
+  [switch]$NoVerbose,
+  [switch]$Online,
+  [string]$OnlySteps = '',
+  [switch]$Scoped,
+  [switch]$ValidateOnly,
+  [switch]$Verbose,
+  [string]$WindowsTemplateOverride = '',
+  [switch]$AnnotationCheckOnly
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -39,22 +81,33 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-# Manual argument parsing: accepts PowerShell-style and POSIX-style flags.
-# Bare flags mean no action word was given (B10/E4).
-$Action = 'all'
-$Paths = @()
-$WindowsTemplateOverride = ''
-$AnnotationCheckOnly = $false
-$ValidateOnly = $false
-$ListSteps = $false
+# WHY: with plain param() positional binding, stray positionals can be captured by string params.
+# Reclassify any value-param that was not explicitly named as --name/--name= in raw args.
+$rawArgs = @($args)
+function Test-NamedArg {
+  param([string]$Name, [string[]]$Raw)
+  foreach ($r in $Raw) {
+    $_r = [string]$r
+    if ($_r -ieq "--$Name" -or $_r -ilike "--$Name=*") { return $true }
+    if ($_r -ieq "-$Name" -or $_r -ilike "-$Name=*") { return $true }
+  }
+  return $false
+}
 $ValidActions = @('all', 'packer', 'sh', 'pwsh')
 
-# --list-steps is handled by the hand-rolled loop below.
+$misbound = @()
+if ($Action -and $Action -ne 'all' -and ($Action -notin $ValidActions) -and -not (Test-NamedArg -Name 'action' -Raw $rawArgs)) {
+  $misbound += $Action
+  $Action = 'all'
+}
+if ($OnlySteps -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += $OnlySteps; $OnlySteps = '' }
+if ($WindowsTemplateOverride -and -not (Test-NamedArg -Name 'windows-template-override' -Raw $rawArgs)) { $misbound += $WindowsTemplateOverride; $WindowsTemplateOverride = '' }
 
-$_ua = @($args)
-$i = 0
+$cliArgs = @($args) + @($misbound)
+
 # Top-level help request (matches check.sh).
-if ($_ua.Count -gt 0 -and $_ua[0] -in @('help', '-h', '--help', '-Help')) {
+$_firstRaw = if ($cliArgs.Count -gt 0) { [string]$cliArgs[0] } else { '' }
+if ($_firstRaw -in @('help', '-h', '--help', '-Help') -or ($Help -and $Action -eq 'all' -and $cliArgs.Count -eq 0)) {
   Write-Output "Usage: check.ps1 [-h|--help] [all|packer|sh|pwsh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps] [--validate-only] [path ...]"
   Write-Output "  Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch."
   Write-Output "  Subcommands: all, packer, sh, pwsh."
@@ -62,38 +115,26 @@ if ($_ua.Count -gt 0 -and $_ua[0] -in @('help', '-h', '--help', '-Help')) {
   Write-Output "  --validate-only  Skip formatting phase in packer validation."
   exit 0
 }
-# First token may be an action word.
-if ($_ua.Count -gt 0 -and $_ua[0] -in $ValidActions) {
-  $Action = [string]$_ua[0]
-  $i = 1
+
+# WHY: --verbose is value-optional; capture =form ids before Resolve-NucleusArgument would reject them for a switch.
+$verboseIds = ''
+for ($_vi = 0; $_vi -lt $cliArgs.Count; $_vi++) {
+  $_arg = [string]$cliArgs[$_vi]
+  if ($_arg -eq '--verbose') { $Verbose = $true; continue }
+  if ($_arg -like '--verbose=*') { $Verbose = $true; $verboseIds = $_arg.Substring('--verbose='.Length); $cliArgs[$_vi] = '--verbose' }
 }
-while ($i -lt $_ua.Count) {
-  $a = [string]$_ua[$i]
-  switch -Regex ($a) {
-    '^(-h|--help|-Help)$' {
-      if ($Action -eq 'all') { $Action = 'all'; $ListSteps = $false } # handled by pipeline/help
-      # Let pipeline/subcommand handle help where possible; for --help at top level show usage.
-      $Paths += $a; $i++; continue
-    }
-    '^(-ListSteps|--list-steps)$' { $ListSteps = $true; $i++; continue }
-    '^(-WindowsTemplateOverride|--windows-template-override)$' {
-      if ($i + 1 -ge $_ua.Count) { throw "nucleus: check: $a requires a value" }
-      $WindowsTemplateOverride = [string]$_ua[$i + 1]; $i += 2; continue
-    }
-    '^--windows-template-override=(.+)$' { $WindowsTemplateOverride = $Matches[1]; $i++; continue }
-    '^(-AnnotationCheckOnly|--annotation-check-only)$' { $AnnotationCheckOnly = $true; $i++; continue }
-    '^(-ValidateOnly|--validate-only)$' { $ValidateOnly = $true; $i++; continue }
-    '^(-Action|--action)$' {
-      if ($i + 1 -ge $_ua.Count) { throw "nucleus: check: $a requires a value" }
-      $Action = [string]$_ua[$i + 1]; $i += 2; continue
-    }
-    '^--paths$' { $i++; continue } # consume marker; remaining are paths
-    default {
-      $Paths += $a
-      $i++; continue
-    }
-  }
+# WHY: --paths is a marker consumed by the hand-rolled parser; drop it so Resolve-NucleusArgument does not reject it.
+$cliArgs = @($cliArgs | Where-Object { $_ -ne '--paths' })
+
+$leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'check' -PassThroughUnknownFlags) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+# First leftover token may be an action word.
+if ($leftover.Count -gt 0 -and $leftover[0] -in $ValidActions) {
+  if ($Action -eq 'all') { $Action = [string]$leftover[0] }
+  $leftover = @($leftover | Select-Object -Skip 1)
 }
+
+$Paths = @($leftover)
 
 # Reject unknown non-flag tokens that are neither valid actions nor existing paths.
 # Inspects every non-flag token (not only the first) so `--validate-only bogus` is caught.
@@ -110,6 +151,11 @@ foreach ($_pt in $Paths) {
 }
 
 if ($ListSteps) {
+  $_lsPaths = @($Paths | Where-Object { $_ -notmatch '^-' -and $_ -notin @('help') })
+  if ($_lsPaths.Count -gt 0) {
+    Write-NucleusError -CommandName check "--list-steps does not accept path arguments ('$($_lsPaths[0])')"
+    exit 1
+  }
   Set-Location -Path $RepoRoot
   $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
   $CheckDir = Join-Path $RepoRoot "src/scripts/checks"
@@ -131,12 +177,9 @@ function Invoke-CheckPacker {
   param(
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Paths = @(),
-
     # Test seam: point the packer_validate annotation check at a different template file.
     [string]$WindowsTemplateOverride = '',
-
     [switch]$AnnotationCheckOnly,
-
     [switch]$ValidateOnly
   )
 
@@ -366,11 +409,28 @@ function Invoke-CheckSh {
 Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName check
 
 if ($Action -in @('packer', 'sh', 'pwsh')) {
-  $subcmdHelp = @($Paths | Where-Object { $_ -in @('-h', '--help', '-Help', 'help') }).Count -gt 0
-  if (-not $subcmdHelp) {
-    . (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
-    Write-BundleFreshnessNotice
+  $subcmdHelp = $Help -or (@($Paths | Where-Object { $_ -in @('-h', '--help', '-Help', 'help') }).Count -gt 0)
+  if ($subcmdHelp) {
+    Write-Output "Usage: check.ps1 [all|packer|sh|pwsh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps] [--validate-only] [path ...]"
+    exit 0
   }
+  . (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
+  Write-BundleFreshnessNotice
+}
+
+# Rebuild pipeline-flag args for the 'all' path (Read-Argument expects --kebab-case flags).
+$pipelineForwardArgs = [System.Collections.Generic.List[string]]::new()
+if ($FailFast) { $pipelineForwardArgs.Add('--fail-fast') }
+if ($NoFailFast) { $pipelineForwardArgs.Add('--no-fail-fast') }
+if ($Full) { $pipelineForwardArgs.Add('--full') }
+if ($Scoped) { $pipelineForwardArgs.Add('--scoped') }
+if ($Online) { $pipelineForwardArgs.Add('--online') }
+if ($NoVerbose) { $pipelineForwardArgs.Add('--no-verbose') }
+if ($Help) { $pipelineForwardArgs.Add('--help') }
+if ($OnlySteps) { $pipelineForwardArgs.Add("--only-steps=$OnlySteps") }
+if ($Verbose) {
+  if ($verboseIds) { $pipelineForwardArgs.Add("--verbose=$verboseIds") }
+  else { $pipelineForwardArgs.Add('--verbose') }
 }
 
 switch ($Action) {
@@ -401,7 +461,7 @@ switch ($Action) {
     . (Join-Path $CheckDir "check-steps.ps1")
     . (Join-Path $RepoRoot "src/scripts/lib/bundle-freshness.ps1")
 
-    Read-Argument $Paths
+    Read-Argument @($pipelineForwardArgs + $Paths)
     Test-Prerequisite
     Write-BundleFreshnessNotice
     Invoke-StepPipeline
