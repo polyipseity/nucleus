@@ -24,6 +24,9 @@
 
 .PARAMETER Probe
   Print the device selection state and exit. Exits 1 when no target device can be bound.
+
+.PARAMETER Help
+  Show detailed help.
 #>
 
 
@@ -35,13 +38,22 @@ param(
   [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml",
 
   [Parameter(Mandatory = $false)]
-  [switch]$Probe
+  [switch]$Probe,
+
+  [Alias("h")]
+  [Parameter(Mandatory = $false)]
+  [switch]$Help
 )
 
 . (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
+
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  exit 0
+}
 
 # WHY: messages reach stderr.log through the scheduled-task wrapper, so they go
 # through the shared formatter to keep the F1 "camilladsp-heartbeat: warning:"
