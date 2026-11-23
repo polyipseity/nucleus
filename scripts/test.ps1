@@ -26,9 +26,6 @@
 .PARAMETER OnlySteps
   Run only steps with the given comma-separated IDs.
 
-.PARAMETER Quiet
-  No-op (--quiet is POSIX-only; accepted for CLI parity).
-
 .PARAMETER Verbose
   Stream step output; optional comma-separated step IDs.
 
@@ -44,8 +41,6 @@ param(
   [switch]$NoFailFast,
   [switch]$NoVerbose,
   [string]$OnlySteps = '',
-  [Alias('q')]
-  [switch]$Quiet,
   [switch]$Verbose,
   [switch]$Scoped,
   [switch]$Full
@@ -89,7 +84,7 @@ for ($_vi = 0; $_vi -lt $cliArgs.Count; $_vi++) {
   if ($_arg -like '--verbose=*') { $Verbose = $true; $verboseIds = $_arg.Substring('--verbose='.Length); $cliArgs[$_vi] = '--verbose' }
 }
 
-$leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'test' -PassThroughUnknownFlags) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'test' -PassThroughUnknownFlags -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($leftover.Count -gt 0) {
   $_bad = [string]$leftover[0]
   if ($_bad -match '^-') {
@@ -110,7 +105,6 @@ if ($ListSteps) {
 $forwardArgs = [System.Collections.Generic.List[string]]::new()
 if ($FailFast) { $forwardArgs.Add('--fail-fast') }
 if ($NoFailFast) { $forwardArgs.Add('--no-fail-fast') }
-if ($Quiet) { $forwardArgs.Add('--quiet') }
 if ($NoVerbose) { $forwardArgs.Add('--no-verbose') }
 if ($Help) { $forwardArgs.Add('--help') }
 if ($OnlySteps) { $forwardArgs.Add("--only-steps=$OnlySteps") }

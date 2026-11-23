@@ -125,6 +125,10 @@ function Resolve-NucleusArgument {
   .PARAMETER Subcommand
     Optional subcommand name. When provided, flag platform checks prefer that subcommand's
     flag definition over a same-named global flag.
+  .PARAMETER BoundParameters
+    Native PowerShell-bound parameters, typically $PSBoundParameters. Platform-restricted
+    flags that PowerShell bound directly (bypassing the remaining-args loop) are rejected
+    here with the same error format.
   #>
   [CmdletBinding()]
   param(
@@ -141,7 +145,9 @@ function Resolve-NucleusArgument {
 
     [switch]$PassThroughUnknownFlags,
 
-    [string]$Subcommand = ''
+    [string]$Subcommand = '',
+
+    [System.Collections.IDictionary]$BoundParameters = @{}
   )
 
   if ($null -eq $Arguments) { $Arguments = [string[]]@() }
@@ -273,6 +279,18 @@ function Resolve-NucleusArgument {
     }
     Set-Variable -Name $entry.Name -Value $value -Scope 1
     $i++
+  }
+
+  foreach ($bp in $BoundParameters.GetEnumerator()) {
+    $bpKey = (($([string]$bp.Key) -replace '-', '')).ToLowerInvariant()
+    $bpFlagInfo = Get-NucleusCliFlagSpecPlatformList -CommandName $CommandName -NormalizedKey $bpKey -Subcommand $Subcommand
+    if ($bpFlagInfo.Found -and $null -ne $bpFlagInfo.Platforms) {
+      $bpAllowedPlatforms = @($bpFlagInfo.Platforms)
+      if ($bpAllowedPlatforms.Count -gt 0 -and $bpAllowedPlatforms -notcontains $currentPlatform) {
+        $bpBelongs = ($bpAllowedPlatforms -join ', ')
+        _throwNucleusCliError $CommandName "flag '-$($bp.Key)' is not supported on $currentPlatform (belongs to $bpBelongs)"
+      }
+    }
   }
 
   if ($leftover.Count -gt 0) {

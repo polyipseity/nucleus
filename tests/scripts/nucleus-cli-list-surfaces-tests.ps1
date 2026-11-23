@@ -136,7 +136,7 @@ $kebabCases = @(
   @{ name='bootstrap.ps1 --no-apply --unknown-passthrough --help passes unknown flag through'; args=@('--no-apply','--unknown-passthrough','--help') ; cmd='scripts/bootstrap.ps1' },
   @{ name='cloud.ps1 --dry-run --list-replicas binds'; args=@('--dry-run','--list-replicas') ; cmd='scripts/cloud.ps1' },
   @{ name='gc.ps1 --dry-run --list-logs binds'; args=@('--dry-run','--list-logs') ; cmd='scripts/gc.ps1' },
-  @{ name='gc.ps1 --generations-keep 5 --dry-run --list-logs binds'; args=@('--generations-keep','5','--dry-run','--list-logs') ; cmd='scripts/gc.ps1' },
+  @{ name='gc.ps1 --log-max-size 1000000 --dry-run --list-logs binds'; args=@('--log-max-size','1000000','--dry-run','--list-logs') ; cmd='scripts/gc.ps1' },
   @{ name='logs.ps1 --list-logs binds'; args=@('--list-logs') ; cmd='scripts/logs.ps1' }
 )
 foreach ($k in $kebabCases) {

@@ -435,6 +435,72 @@ Write-Output "Expiry=`$Expiry"
     $script:_NucleusCliSpecCache = $null
   }
 
+  Write-Output "`n=== [19] natively-bound platform-restricted param rejected via BoundParameters ==="
+  $specRoot19 = New-CliSpecRepoRoot -spec ([ordered]@{
+    apps = @(
+      [ordered]@{
+        name = 'fixture'
+        globalFlags = @([ordered]@{ long = '--expiry'; takesValue = $true; platforms = @('posix') })
+        subcommands = @(
+          [ordered]@{
+            name = 'logs'
+            flags = @([ordered]@{ long = '--expiry'; takesValue = $true })
+          }
+        )
+      }
+    )
+  })
+  $specRoots.Add($specRoot19)
+  $savedRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $specRoot19
+
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = '30d'
+    $threw19a = $false
+    $err19a = ''
+    try {
+      $null = Resolve-NucleusArgument -Arguments @() -CommandPath $fExpiry -CommandName 'fixture' -Subcommand 'logs' -BoundParameters @{ Expiry = '30d' }
+    } catch { $threw19a = $true; $err19a = $_.Exception.Message }
+    Assert-True -cond (-not $threw19a) -name 'bound param allowed when subcommand platform permits' -detail $err19a
+
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = '30d'
+    if ($IsWindows) {
+      $threw19b = $false
+      $err19b = ''
+      try {
+        $null = Resolve-NucleusArgument -Arguments @() -CommandPath $fExpiry -CommandName 'fixture' -BoundParameters @{ Expiry = '30d' }
+      } catch { $threw19b = $true; $err19b = $_.Exception.Message }
+      Assert-True -cond $threw19b -name 'natively-bound platform-restricted param rejected on windows' -detail $err19b
+      Assert-HasSubstring -haystack $err19b -needle 'not supported on windows' -name 'bound param rejection names platform'
+      Assert-HasSubstring -haystack $err19b -needle 'Expiry' -name 'bound param rejection names flag'
+    } else {
+      $threw19b = $false
+      $err19b = ''
+      try {
+        $null = Resolve-NucleusArgument -Arguments @() -CommandPath $fExpiry -CommandName 'fixture' -BoundParameters @{ Expiry = '30d' }
+      } catch { $threw19b = $true; $err19b = $_.Exception.Message }
+      Assert-True -cond (-not $threw19b) -name 'natively-bound platform-restricted param accepted on posix host' -detail $err19b
+    }
+
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = '30d'
+    $threw19c = $false
+    $err19c = ''
+    try {
+      $null = Resolve-NucleusArgument -Arguments @() -CommandPath $fExpiry -CommandName 'fixture'
+    } catch { $threw19c = $true; $err19c = $_.Exception.Message }
+    Assert-True -cond (-not $threw19c) -name 'BoundParameters default is backward compatible when omitted' -detail $err19c
+  } finally {
+    if ($null -eq $savedRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $savedRoot }
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+  }
+
 } finally {
   # check-suppress:suppression_doc: temp test dir cleanup must not mask test results
   Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue

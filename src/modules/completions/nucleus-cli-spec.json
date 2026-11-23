@@ -327,7 +327,10 @@
           "long": "--target-user",
           "takesValue": true,
           "valueType": "string",
-          "description": "Target user"
+          "description": "Target user",
+          "platforms": [
+            "posix"
+          ]
         }
       ],
       "subcommands": []
@@ -646,52 +649,82 @@
         {
           "long": "--hm-gc",
           "takesValue": false,
-          "description": "Control home-manager generation expiration"
+          "description": "Control home-manager generation expiration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-hm-gc",
           "takesValue": false,
-          "description": "Disable home-manager generation expiration"
+          "description": "Disable home-manager generation expiration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--system-gc",
           "takesValue": false,
-          "description": "Control system profile generation expiration"
+          "description": "Control system profile generation expiration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-system-gc",
           "takesValue": false,
-          "description": "Disable system profile generation expiration"
+          "description": "Disable system profile generation expiration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--nix-artifacts-gc",
           "takesValue": false,
-          "description": "Control stale result symlink cleanup"
+          "description": "Control stale result symlink cleanup",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-nix-artifacts-gc",
           "takesValue": false,
-          "description": "Disable stale result symlink cleanup"
+          "description": "Disable stale result symlink cleanup",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--nix-gc",
           "takesValue": false,
-          "description": "Control nix-collect-garbage"
+          "description": "Control nix-collect-garbage",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-nix-gc",
           "takesValue": false,
-          "description": "Disable nix-collect-garbage"
+          "description": "Disable nix-collect-garbage",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--duperemove-gc",
           "takesValue": false,
-          "description": "Control btrfs duperemove on /nix/store"
+          "description": "Control btrfs duperemove on /nix/store",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-duperemove-gc",
           "takesValue": false,
-          "description": "Disable btrfs duperemove on /nix/store"
+          "description": "Disable btrfs duperemove on /nix/store",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--ollama-gc",
@@ -756,12 +789,18 @@
         {
           "long": "--journald-gc",
           "takesValue": false,
-          "description": "Control journald log vacuum"
+          "description": "Control journald log vacuum",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--no-journald-gc",
           "takesValue": false,
-          "description": "Disable journald log vacuum"
+          "description": "Disable journald log vacuum",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--scoop-gc",
@@ -799,37 +838,55 @@
           "long": "--expiry",
           "takesValue": true,
           "valueType": "string",
-          "description": "Master expiry override"
+          "description": "Master expiry override",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--generations-keep",
           "takesValue": true,
           "valueType": "count",
-          "description": "Master generation-count override"
+          "description": "Master generation-count override",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--hm-expiry",
           "takesValue": true,
           "valueType": "string",
-          "description": "Home Manager generation expiry duration"
+          "description": "Home Manager generation expiry duration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--hm-generations-keep",
           "takesValue": true,
           "valueType": "count",
-          "description": "Home Manager generations to keep"
+          "description": "Home Manager generations to keep",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--nix-expiry",
           "takesValue": true,
           "valueType": "string",
-          "description": "Nix store GC --delete-older-than duration"
+          "description": "Nix store GC --delete-older-than duration",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--system-generations-keep",
           "takesValue": true,
           "valueType": "count",
-          "description": "System profile generations to keep"
+          "description": "System profile generations to keep",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--dry-run",
@@ -1580,7 +1637,10 @@
           "long": "--quiet",
           "takesValue": false,
           "short": "-q",
-          "description": "Suppress success/progress output across applicable steps"
+          "description": "Suppress success/progress output across applicable steps",
+          "platforms": [
+            "posix"
+          ]
         },
         {
           "long": "--fail-fast",

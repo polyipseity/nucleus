@@ -28,13 +28,8 @@
 .PARAMETER NoReplicaSync
   Do not run replica sync after apply when -Apply is used.
 
-.PARAMETER TargetUser
-  Accepted for cross-platform CLI parity. Only effective on the POSIX apply
-  path (nix run .#apply -- --target-user=<name>). On Windows this flag is
-  accepted but ignored (default: none).
-
 .NOTES
-  Environment variables: NUCLEUS_APPLY, NUCLEUS_AI_SYNC, NUCLEUS_REPLICA_SYNC, NUCLEUS_TARGET_USER.
+  Environment variables: NUCLEUS_APPLY, NUCLEUS_AI_SYNC, NUCLEUS_REPLICA_SYNC.
 #>
 
 [CmdletBinding()]
@@ -65,9 +60,6 @@ param(
   [Parameter()]
   [switch]$NoReplicaSync,
 
-  [Parameter()]
-  [string]$TargetUser = $(if ($env:NUCLEUS_TARGET_USER) { $env:NUCLEUS_TARGET_USER } else { '' }),
-
   [Alias("h")]
   [Parameter()]
   [switch]$Help
@@ -78,10 +70,14 @@ Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
-$ApplyArgs = @(Resolve-NucleusArgument -Arguments $ApplyArgs -CommandPath $PSCommandPath -CommandName 'bootstrap' -PassThroughUnknownFlags)
+$ApplyArgs = @(Resolve-NucleusArgument -Arguments $ApplyArgs -CommandPath $PSCommandPath -CommandName 'bootstrap' -PassThroughUnknownFlags -BoundParameters $PSBoundParameters)
 
 if ($NoApply) { $Apply = $false }
 if ($NoReplicaSync) { $ReplicaSync = $false }
+if ($PSBoundParameters.ContainsKey('AISync') -and $PSBoundParameters.ContainsKey('NoAISync')) {
+  Write-NucleusError -CommandName 'bootstrap' 'cannot pass both -AISync and -NoAISync'
+  exit 1
+}
 if ($AISync) { $NoAISync = $false }
 
 if ($Help -or ($ApplyArgs -contains '--help') -or ($ApplyArgs -contains '-h')) {
@@ -565,11 +561,6 @@ if ($Apply) {
   # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
   if ($NoAISync) { $effectiveApplyArgs += "-NoAISync" }
   if ($ReplicaSync) { $effectiveApplyArgs += "-ReplicaSync" }
-  # TargetUser is POSIX-only (nix apply --target-user) and apply.ps1 has no such
-  # parameter, so it is not forwarded.
-  if ($TargetUser) {
-    Write-Debug "bootstrap: -TargetUser accepted but ignored on Windows (POSIX-only)"
-  }
 
   $healthCheckPath = Join-Path -Path $PSScriptRoot -ChildPath "health-check.ps1"
   if (Test-Path -Path $healthCheckPath) {

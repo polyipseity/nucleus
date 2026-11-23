@@ -48,40 +48,7 @@
   Do not collect orphaned VM data, even when -GCVMData or --vm-data-gc is set.
 
 .PARAMETER Expiry
-  POSIX-only master expiry override, accepted and ignored on Windows.
-
-.PARAMETER HmExpiry
-  POSIX-only Home Manager generation expiry, accepted and ignored on Windows.
-
-.PARAMETER NixExpiry
-  POSIX-only nix store GC expiry, accepted and ignored on Windows.
-
-.PARAMETER NoDuperemoveGc
-  POSIX-only btrfs duperemove on /nix/store skip, accepted and ignored on Windows.
-
-.PARAMETER NoHmGc
-  POSIX-only home-manager generation expiration skip, accepted and ignored on Windows.
-
-.PARAMETER NoJournaldGc
-  POSIX-only journald log vacuum skip, accepted and ignored on Windows.
-
-.PARAMETER NoNixArtifactsGc
-  POSIX-only stale result symlink cleanup skip, accepted and ignored on Windows.
-
-.PARAMETER NoNixGc
-  POSIX-only nix-collect-garbage skip, accepted and ignored on Windows.
-
-.PARAMETER NoSystemGc
-  POSIX-only system profile generation expiration skip, accepted and ignored on Windows.
-
-.PARAMETER GenerationsKeep
-  POSIX-only master generation-count override, accepted and ignored on Windows.
-
-.PARAMETER HmGenerationsKeep
-  POSIX-only Home Manager generations to keep, accepted and ignored on Windows.
-
-.PARAMETER SystemGenerationsKeep
-  POSIX-only system profile generations to keep, accepted and ignored on Windows.
+  Expiry override forwarded to nucleus-logs. The gc-global --expiry flag is POSIX-only; gc logs --expiry is cross-platform.
 
 .PARAMETER NoDryRun
   Disable dry-run mode (default on Windows).
@@ -102,7 +69,7 @@
   Print known nucleus-logs names, one per line.
 
 .NOTES
-  Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
 #>
 
 [CmdletBinding()]
@@ -111,8 +78,6 @@ param(
   [string]$Action = '',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
-  [switch]$NoNixGc,
-  [switch]$NoHmGc,
   [switch]$NoToolCacheGc,
   [switch]$NoGitCacheGc,
   [switch]$NoOllamaGc,
@@ -125,32 +90,16 @@ param(
   [Alias('no-vm-data-gc')]
   [switch]$NoVMDataGc,
   [switch]$NoLogGc,
-  [switch]$NoJournaldGc,
-  [switch]$NoSystemGc,
-  [switch]$NoNixArtifactsGc,
-  [switch]$NoDuperemoveGc,
-  [Alias('duperemove-gc')]
-  [switch]$DuperemoveGc,
   [Alias('git-cache-gc')]
   [switch]$GitCacheGc,
-  [Alias('hm-gc')]
-  [switch]$HmGc,
-  [Alias('journald-gc')]
-  [switch]$JournaldGc,
   [Alias('log-gc')]
   [switch]$LogGc,
-  [Alias('nix-artifacts-gc')]
-  [switch]$NixArtifactsGc,
-  [Alias('nix-gc')]
-  [switch]$NixGc,
   [Alias('ollama-gc')]
   [switch]$OllamaGc,
   [Alias('sccache-gc')]
   [switch]$SccacheGc,
   [Alias('scoop-gc')]
   [switch]$ScoopGc,
-  [Alias('system-gc')]
-  [switch]$SystemGc,
   [Alias('tool-cache-gc')]
   [switch]$ToolCacheGc,
   [Alias('vm-gc')]
@@ -168,11 +117,6 @@ param(
   [Alias('log')]
   [string]$LogName,
   [string]$Expiry,
-  [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
-  [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
-  [string]$GenerationsKeep = '',
-  [string]$HmGenerationsKeep = '',
-  [string]$SystemGenerationsKeep = '',
   [switch]$NoDryRun,
   [string]$Harness = '',
   [switch]$Json,
@@ -196,13 +140,11 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-# check-suppress:suppression_doc: POSIX-only generation-count overrides, accepted and ignored on Windows
-$null = $GenerationsKeep, $HmGenerationsKeep, $SystemGenerationsKeep
 # check-suppress:suppression_doc: spec-symmetry positive GC toggles bound for CLI parity; behavior is controlled by the No* switches
-$null = $DuperemoveGc, $GitCacheGc, $HmGc, $JournaldGc, $LogGc, $NixArtifactsGc, $NixGc, $OllamaGc, $SccacheGc, $ScoopGc, $SystemGc, $ToolCacheGc, $VMGc, $WallpaperGc
+$null = $GitCacheGc, $LogGc, $OllamaGc, $SccacheGc, $ScoopGc, $ToolCacheGc, $VMGc, $WallpaperGc
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'gc') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'gc' -Subcommand $Action -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'gc' "unexpected argument '$($leftover[0])'"
   exit 1
@@ -252,39 +194,6 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
   $ModuleDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 }
 
-# WHY accepted: cross-platform CLI parity with gc.sh, which carries the same
-# flags for nix, system GC, nix artifacts, duperemove and the expiry values.
-if ($NoNixGc) {
-  Write-NucleusWarning "-NoNixGc accepted but ignored on Windows (POSIX-only)"
-}
-if ($NoHmGc) {
-  Write-NucleusWarning "-NoHmGc accepted but ignored on Windows (POSIX-only)"
-}
-if ($NoJournaldGc) {
-  Write-NucleusWarning "-NoJournaldGc accepted but ignored on Windows (POSIX-only)"
-}
-
-if ($NoSystemGc) {
-  Write-NucleusWarning "-NoSystemGc accepted but ignored on Windows (POSIX-only)"
-}
-
-if ($NoNixArtifactsGc) {
-  Write-NucleusWarning "-NoNixArtifactsGc accepted but ignored on Windows (POSIX-only)"
-}
-
-if ($NoDuperemoveGc) {
-  Write-NucleusWarning "-NoDuperemoveGc accepted but ignored on Windows (POSIX-only)"
-}
-
-if ($Expiry) {
-  Write-NucleusWarning "-Expiry accepted but ignored on Windows (POSIX-only)"
-}
-if ($HmExpiry) {
-  Write-NucleusWarning "-HmExpiry accepted but ignored on Windows (POSIX-only)"
-}
-if ($NixExpiry) {
-  Write-NucleusWarning "-NixExpiry accepted but ignored on Windows (POSIX-only)"
-}
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path

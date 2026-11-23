@@ -120,7 +120,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'logs') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'logs' -Subcommand $Action -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'logs' "unexpected argument '$($leftover[0])'"
   exit 1

@@ -148,7 +148,7 @@ $ErrorActionPreference = 'Stop'
 
 $cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
 . $cliFlagsModulePath
-$SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm')
+$SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm' -Subcommand $Action -BoundParameters $PSBoundParameters)
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking

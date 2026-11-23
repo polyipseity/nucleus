@@ -81,7 +81,7 @@ if ($Help) {
 
 $cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
 . $cliFlagsModulePath
-$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'ai')
+$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'ai' -Subcommand $Action -BoundParameters $PSBoundParameters)
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'ai' "unexpected argument '$($leftover[0])'"
   exit 1

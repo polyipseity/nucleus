@@ -45,7 +45,7 @@ $fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Forma
 Import-Module $fmtModulePath -Force -DisableNameChecking
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'cloud')
+$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'cloud' -Subcommand $Action -BoundParameters $PSBoundParameters)
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'cloud' "unexpected argument '$($leftover[0])'"
   exit 1

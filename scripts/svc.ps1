@@ -84,7 +84,7 @@ Assert-NucleusPowerShell -Minimum '7.0'
 
 . (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
 # Normalize flags from ServiceName (ValueFromRemainingArguments)
-$ServiceName = @(Resolve-NucleusArgument -Arguments $ServiceName -CommandPath $PSCommandPath -CommandName 'svc')
+$ServiceName = @(Resolve-NucleusArgument -Arguments $ServiceName -CommandPath $PSCommandPath -CommandName 'svc' -Subcommand $Action -BoundParameters $PSBoundParameters)
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed

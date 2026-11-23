@@ -126,7 +126,7 @@ for ($_vi = 0; $_vi -lt $cliArgs.Count; $_vi++) {
 # WHY: --paths is a marker consumed by the hand-rolled parser; drop it so Resolve-NucleusArgument does not reject it.
 $cliArgs = @($cliArgs | Where-Object { $_ -ne '--paths' })
 
-$leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'check' -PassThroughUnknownFlags) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'check' -Subcommand $Action -PassThroughUnknownFlags -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
 # First leftover token may be an action word.
 if ($leftover.Count -gt 0 -and $leftover[0] -in $ValidActions) {

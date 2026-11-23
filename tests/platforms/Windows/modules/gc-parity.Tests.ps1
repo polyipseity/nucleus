@@ -5,32 +5,16 @@
 .DESCRIPTION
     scripts/gc.sh and scripts/gc.ps1 are the two halves of one user-visible
     command, so a capability present on one side and missing on the other is a
-    defect on whichever host lacks it.  This suite reads the capability list out
-    of gc.sh's own argument parser and asserts that every capability has a
-    Windows counterpart, so the next gap surfaces as a failing test rather than
-    as a discovery during a real garbage collection.
+    defect on whichever host lacks it. This suite reads the capability list out
+    of gc.sh's own argument parser and asserts that every cross-platform
+    capability has a Windows counterpart. POSIX-only capabilities are tagged
+    platforms=["posix"] in the CLI spec and must be absent from gc.ps1.
 
-    Three groups are declared here rather than inferred, because each one is a
-    deliberate design decision:
+    The POSIX-only set is derived from nucleus-cli-spec.json so the test follows
+    the spec. Generation-retention values are POSIX-only nix-store concepts with
+    no Windows counterpart; their absence from gc.ps1 is pinned here.
 
-      * The six POSIX-only capabilities -- accepted and ignored.  Five of them
-        because Windows has no nix store, no journald and no btrfs
-        /nix/store; nix-artifacts-gc because the all action never calls
-        Invoke-CleanupNix, so the switch has nothing to gate.  The set is
-        cross-checked against gc.ps1's own help text, so a switch cannot
-        quietly stop documenting itself as POSIX-only.
-
-      * --vm-data-gc -- gc.ps1 spells its counterpart GCVMData, positively.
-        A No-switch defaults to false, which on a "No" switch means "do not
-        skip", so every weekly Windows run would collect VM data while POSIX
-        did not.
-
-      * The generation-retention values -- consumed only by
-        src/scripts/services/nix-store-gc.sh on POSIX.  Their absence from
-        gc.ps1 is correct, and this suite pins it so nobody closes the dry-run
-        gap and then closes this one too.
-
-    Neither script is executed.  A successful gc.ps1 invocation falls through
+    Neither script is executed. A successful gc.ps1 invocation falls through
     into real garbage collection, and gc.sh needs bash plus the POSIX tree, so
     every assertion here reads file text or the parse tree instead.
 
@@ -57,7 +41,7 @@ BeforeAll {
     $Script:GcPs1ParamText = $Script:GcPs1Ast.ParamBlock.Extent.Text
 
     # The capability list is the set of paired --x-gc|--no-x-gc case labels of
-    # gc.sh's argument parser.  The -gc suffix is what separates a capability
+    # gc.sh's argument parser. The -gc suffix is what separates a capability
     # flag from a value flag such as --log-max-size or --hm-expiry.
     $Script:GcShCapabilities = @(
         [regex]::Matches($Script:GcSh, '(?m)^  --(?:no-)?([a-z0-9-]+-gc)\)$') |
@@ -66,36 +50,37 @@ BeforeAll {
     )
 
     # Capabilities with no No-switch on the Windows side, mapped to the switch
-    # that implements them instead.  See .DESCRIPTION for why the sign differs.
+    # that implements them instead.
     $Script:PositiveCounterparts = @{
         'vm-data-gc' = 'GCVMData'
     }
 
-    # The POSIX-only set, spelled as gc.sh flag names so the comparison against
-    # gc.sh is direct.  Each is verified against gc.ps1's help text below.
-    # ref: allow-and-deny-lists.instructions.md#D6 -- these switches exist in
-    # gc.ps1 only for CLI parity with gc.sh, and gc.ps1's own help text is the
-    # cross-check, so the list must name exactly the switches that document
-    # themselves POSIX-only. T2 (self-prune): a stale entry breaks the equality
-    # against $Script:DocumentedIgnoredSwitches.
-    $Script:PosixOnlyCapabilities = @(
-        'duperemove-gc'
-        'hm-gc'
-        'journald-gc'
-        'nix-artifacts-gc'
-        'nix-gc'
-        'system-gc'
+    # POSIX-only gc capabilities are declared in the CLI spec. They must not be
+    # accepted on Windows.
+    $specPath = Join-Path -Path $Script:RepoRoot -ChildPath 'src\modules\completions\nucleus-cli-spec.json'
+    $spec = Get-Content -LiteralPath $specPath -Raw | ConvertFrom-Json
+    $gcApp = @($spec.apps | Where-Object { $_.name -eq 'gc' })[0]
+    $Script:PosixOnlyGcCapabilities = @(
+        $gcApp.globalFlags |
+            Where-Object {
+                $platforms = @($_.platforms)
+                ($platforms -contains 'posix') -and (-not ($platforms -contains 'windows')) -and ($_.long -match '-gc$')
+            } |
+            ForEach-Object { ([string]$_.long) -replace '^--(?:no-)?', '' } |
+            Sort-Object -Unique
     )
 
-    # Generation retention is a nix-store concept.  src/scripts/services/nix-store-gc.sh
-    # is the only consumer on POSIX; Windows has nowhere to keep generations.
-    $Script:PosixOnlyValues = @(
+    # Generation retention and POSIX-only duration values configure nix-store GC
+    # on POSIX only. Windows has no counterpart.
+    $Script:PosixOnlyValueFlags = @(
+        'hm-expiry'
+        'nix-expiry'
         'generations-keep'
         'hm-generations-keep'
         'system-generations-keep'
     )
 
-    # Every command in gc.ps1 that removes or rewrites state.  git is absent on
+    # Every command in gc.ps1 that removes or rewrites state. git is absent on
     # purpose: gc.ps1 shells out to it for both reads and removals, and only the
     # removals live inside the dry-run-aware helpers.
     # Invoke-NucleusLogCommand is absent for a third reason: the logs action forwards
@@ -130,17 +115,6 @@ BeforeAll {
             ForEach-Object { $_.Groups['name'].Value }
     )
 
-    # The switches and values gc.ps1 itself promises to accept and ignore.  Read
-    # from the comment-based help rather than from a second hand-written list, so
-    # the two cannot drift apart unnoticed.
-    $Script:DocumentedIgnored = @(
-        [regex]::Matches($Script:GcPs1, '(?ms)^\.PARAMETER\s+(?<name>[A-Za-z]+)\r?\n(?<body>[^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*)') |
-            Where-Object { $_.Groups['body'].Value -match 'POSIX-only' } |
-            ForEach-Object { $_.Groups['name'].Value } |
-            Sort-Object -Unique
-    )
-    $Script:DocumentedIgnoredSwitches = @($Script:DocumentedIgnored | Where-Object { $_ -like 'No*' })
-
     # A function counts as dry-run aware when it either tests $DryRun itself or
     # reports through Write-NucleusDryRun, which is how Invoke-CleanupNix opts
     # into ShouldProcess via -WhatIf rather than via a switch.
@@ -155,8 +129,8 @@ BeforeAll {
             ForEach-Object { $_.Name }
     )
 
-    # The commands the destructive list matches, guarded or not.  Split out of
-    # the guard walk so the total is assertable: a walk that matches nothing is
+    # The commands the destructive list matches, guarded or not. Split out of
+    # the guard walk so the total is assertable: a walk that matched nothing is
     # indistinguishable from a script in which nothing is unguarded.
     function Get-DestructiveCallNodeList {
         $commandNodes = $Script:GcPs1Ast.FindAll(
@@ -218,7 +192,7 @@ BeforeAll {
 
 Describe 'gc.sh capability discovery' {
     It 'reads a non-empty capability list out of gc.sh' {
-        # WHY: every assertion below iterates this list.  A regex that stopped
+        # WHY: every assertion below iterates this list. A regex that stopped
         # matching would leave them vacuously true, so the list is proved
         # non-empty and proved to contain a known flag first.
         $Script:GcShCapabilities.Count | Should -BeGreaterThan 10
@@ -233,8 +207,9 @@ Describe 'nucleus-gc surface parity' {
         $Script:GcPs1ParamText | Should -Match '\[switch\]\$DryRun'
     }
 
-    It 'gives every gc.sh capability a Windows counterpart' {
+    It 'gives every cross-platform gc.sh capability a Windows counterpart' {
         $missing = foreach ($capability in $Script:GcShCapabilities) {
+            if ($Script:PosixOnlyGcCapabilities -contains $capability) { continue }
             if ($Script:PositiveCounterparts.ContainsKey($capability)) {
                 $switch = $Script:PositiveCounterparts[$capability]
             } else {
@@ -247,34 +222,36 @@ Describe 'nucleus-gc surface parity' {
         $missing | Should -BeNullOrEmpty
     }
 
-    It 'documents exactly the POSIX-only capabilities as accepted and ignored' {
-        $expected = @(
-            foreach ($capability in $Script:PosixOnlyCapabilities) {
-                'No' + (ConvertTo-PascalCapabilityName -Capability $capability)
+    It 'does not accept POSIX-only gc capabilities on Windows' {
+        $Script:PosixOnlyGcCapabilities | Should -Not -BeNullOrEmpty -Because 'spec must declare POSIX-only gc capabilities or this test proves nothing'
+        $present = foreach ($capability in $Script:PosixOnlyGcCapabilities) {
+            $names = @('No' + (ConvertTo-PascalCapabilityName -Capability $capability))
+            $names += (ConvertTo-PascalCapabilityName -Capability $capability)
+            foreach ($name in $names) {
+                if ($Script:DeclaredParamNames -contains $name) { $name }
             }
-        ) | Sort-Object -Unique
-        $expected | Should -Not -BeNullOrEmpty -Because 'the POSIX-only set must not be empty, or the test proves nothing'
-        $Script:DocumentedIgnoredSwitches | Should -Be $expected
+        }
+        $present | Should -BeNullOrEmpty -Because 'POSIX-only gc capabilities must be rejected on Windows, not accepted and ignored'
     }
 
-    It 'documents the POSIX-only duration values as accepted and ignored' {
-        # WHY: the nix-store durations are string parameters rather than skip
-        # switches, so they are ignored by the same promise and belong to the
-        # same set; dropping either half would make the parity claim partial.
-        $Script:DocumentedIgnored | Should -Contain 'Expiry'
-        $Script:DocumentedIgnored | Should -Contain 'HmExpiry'
-        $Script:DocumentedIgnored | Should -Contain 'NixExpiry'
-        $Script:DocumentedIgnored | Should -Not -Contain 'LogMaxSize'
+    It 'does not accept POSIX-only gc duration and generation-retention values on Windows' {
+        $present = foreach ($value in $Script:PosixOnlyValueFlags) {
+            $pascal = ConvertTo-PascalCapabilityName -Capability $value
+            if ($Script:DeclaredParamNames -contains $pascal) { $pascal }
+        }
+        $present | Should -BeNullOrEmpty -Because 'POSIX-only gc values have no Windows counterpart and must not be bound as params'
+        $Script:DeclaredParamNames | Should -Contain 'Expiry' -Because 'gc logs --expiry is cross-platform and the param must remain for logs forwarding'
+        $Script:GcPs1 | Should -Match 'Resolve-NucleusArgument\b[^\r\n]*-BoundParameters\s+\$PSBoundParameters' -Because 'gc.ps1 must forward bound parameters so the shared normalizer can reject platform-restricted native bindings'
+        $Script:GcPs1 | Should -Not -Match '\$IsWindows\s*-and\s*\$Expiry' -Because 'gc-root --expiry platform rejection must use the general normalizer mechanism, not a command-specific guard'
+        $Script:GcPs1 | Should -Not -Match 'accepted but ignored on Windows \(POSIX-only\)' -Because 'accepted-and-ignored POSIX-only debt is removed'
     }
 
     It 'keeps the generation-retention values out of gc.ps1' {
         # WHY: they configure nix-store generations, which exist only on POSIX.
         # Adding them to gc.ps1 would be a parity fix in name only: no Windows
         # code would read them.
-        foreach ($value in $Script:PosixOnlyValues) {
+        foreach ($value in @('generations-keep', 'hm-generations-keep', 'system-generations-keep')) {
             $Script:GcSh | Should -Match ('--' + $value + '\b') -Because "gc.sh must still expose --$value"
-        }
-        foreach ($value in $Script:PosixOnlyValues) {
             $pascal = ConvertTo-PascalCapabilityName -Capability $value
             $Script:DeclaredParamNames | Should -Not -Contain $pascal -Because "$value is POSIX-only and has no Windows counterpart"
             $Script:DeclaredParamNames | Should -Not -Contain ('No' + $pascal) -Because "$value is POSIX-only and needs no skip switch"
