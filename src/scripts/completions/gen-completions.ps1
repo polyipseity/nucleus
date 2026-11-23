@@ -75,6 +75,20 @@ function Get-NucleusCommandList {
   return $names
 }
 
+function Test-NucleusSpecFlagPlatform {
+  param(
+    [Parameter(Mandatory)]
+    [object]$Flag,
+    [Parameter(Mandatory)]
+    [string]$Platform
+  )
+  $platforms = $Flag.platforms
+  if ($null -eq $platforms) { return $true }
+  $values = @($platforms)
+  if ($values.Count -eq 0) { return $true }
+  return $values -contains $Platform
+}
+
 function Get-NucleusSpecMap {
   $map = @{}
   if (-not $specAvailable) {
@@ -86,11 +100,15 @@ function Get-NucleusSpecMap {
     if ($null -eq $app -or [string]::IsNullOrWhiteSpace([string]$app.name)) { continue }
     $flags = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($f in @($app.globalFlags)) {
-      if ($null -ne $f -and $null -ne $f.long) { $null = $flags.Add([string]$f.long) } # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+      if ($null -ne $f -and $null -ne $f.long -and (Test-NucleusSpecFlagPlatform -Flag $f -Platform 'windows')) {
+        $null = $flags.Add([string]$f.long) # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+      }
     }
     foreach ($sc in @($app.subcommands)) {
       foreach ($f in @($sc.flags)) {
-        if ($null -ne $f -and $null -ne $f.long) { $null = $flags.Add([string]$f.long) } # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+        if ($null -ne $f -and $null -ne $f.long -and (Test-NucleusSpecFlagPlatform -Flag $f -Platform 'windows')) {
+          $null = $flags.Add([string]$f.long) # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+        }
       }
     }
     # Every app supports --help at the CLI surface; ensure it is present in inventory.

@@ -758,4 +758,119 @@ else
 fi
 rm -rf "$_extra_repo"
 
+# 17. Platform-scoped flags: a flag annotated ["posix"] is absent from the pwsh
+#     inventory and present in the zsh one; passing it on Windows errors, and on
+#     POSIX a windows-only flag errors (same mechanism).
+_platform_repo="$(mktemp -d)"
+mkdir -p "$_platform_repo/src/modules/completions" "$_platform_repo/src/scripts/shell" "$_platform_repo/scripts"
+cat >"$_platform_repo/src/modules/completions/nucleus-apps.json" <<'JSON'
+{"$schema":"./nucleus-apps.schema.json","commands":["demo"]}
+JSON
+cat >"$_platform_repo/src/modules/completions/nucleus-cli-spec.json" <<'JSON'
+{
+  "$schema": "./nucleus-cli-spec.schema.json",
+  "apps": [
+    {
+      "name": "demo",
+      "summary": "Platform fixture.",
+      "globalFlags": [
+        {"long":"--help","takesValue":false,"short":"-h","description":"Show usage"},
+        {"long":"--posix-only","takesValue":false,"platforms":["posix"],"description":"POSIX only flag"},
+        {"long":"--windows-only","takesValue":false,"platforms":["windows"],"description":"Windows only flag"},
+        {"long":"--both","takesValue":false,"description":"Both platforms"}
+      ],
+      "subcommands": []
+    }
+  ]
+}
+JSON
+cat >"$_platform_repo/scripts/demo.sh" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in --help) echo "usage: nucleus-demo [--help] [--posix-only] [--both]";; esac
+EOF
+chmod +x "$_platform_repo/scripts/demo.sh"
+cat >"$_platform_repo/src/scripts/shell/profile.ps1" <<'EOF'
+# --- BEGIN GENERATED completer flag inventory ---
+# --- END GENERATED ---
+EOF
+
+_platform_zsh_rc=0
+NUCLEUS_REPO_ROOT="$_platform_repo" NUCLEUS_COMPLETIONS_COMMANDS="demo" bash "$_gen_script" >/dev/null 2>&1 || _platform_zsh_rc=$?
+_platform_zsh="$_platform_repo/src/modules/completions/zsh/_nucleus-demo"
+if [ "$_platform_zsh_rc" -eq 0 ] && [ -f "$_platform_zsh" ] &&
+  grep -qF -- '--posix-only' "$_platform_zsh" &&
+  ! grep -qF -- '--windows-only' "$_platform_zsh" &&
+  grep -qF -- '--both' "$_platform_zsh"; then
+  assert_pass "gen-completions: posix-only flag present in zsh, windows-only absent"
+else
+  assert_fail "gen-completions: posix-only flag present in zsh, windows-only absent" "rc=$_platform_zsh_rc posix=$(grep -cF -- '--posix-only' "$_platform_zsh" 2>/dev/null || echo 0) windows=$(grep -cF -- '--windows-only' "$_platform_zsh" 2>/dev/null || echo 0)"
+fi
+
+_platform_pwsh_rc=0
+NUCLEUS_REPO_ROOT="$_platform_repo" pwsh -NoLogo -NoProfile -NonInteractive -File "$REPO_ROOT/$_ps_gen_script" >/dev/null 2>&1 || _platform_pwsh_rc=$?
+_platform_profile="$_platform_repo/src/scripts/shell/profile.ps1"
+if [ "$_platform_pwsh_rc" -eq 0 ] &&
+  ! grep -qF -- '--posix-only' "$_platform_profile" &&
+  grep -qF -- '--windows-only' "$_platform_profile" &&
+  grep -qF -- '--both' "$_platform_profile"; then
+  assert_pass "gen-completions: posix-only flag absent from pwsh inventory, windows-only present"
+else
+  assert_fail "gen-completions: posix-only flag absent from pwsh inventory, windows-only present" "rc=$_platform_pwsh_rc posix=$(grep -cF -- '--posix-only' "$_platform_profile" 2>/dev/null || echo 0) windows=$(grep -cF -- '--windows-only' "$_platform_profile" 2>/dev/null || echo 0)"
+fi
+
+_platform_cmd="$_platform_repo/scripts/demo.ps1"
+cat >"$_platform_cmd" <<'PWSH'
+[CmdletBinding()]
+param(
+  [switch]$Help,
+  [switch]$PosixOnly,
+  [switch]$WindowsOnly,
+  [switch]$Both,
+  [Parameter(ValueFromRemainingArguments)][string[]]$RemainingArgs
+)
+. (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
+$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'demo')
+if ($leftover.Count -gt 0) { throw "leftover: $($leftover -join ',')" }
+if ($PosixOnly) { Write-Output 'POSIX-ONLY' }
+if ($WindowsOnly) { Write-Output 'WINDOWS-ONLY' }
+if ($Both) { Write-Output 'BOTH' }
+PWSH
+# The fixture demo.ps1 dotsources the real lib by relative path from the fixture;
+# create that path.
+mkdir -p "$_platform_repo/src/scripts/lib"
+cp "$REPO_ROOT/src/scripts/lib/nucleus-cli-flags.ps1" "$_platform_repo/src/scripts/lib/nucleus-cli-flags.ps1"
+
+# shellcheck disable=SC2016 # check-suppress:suppression_doc: pwsh variable, not bash expansion
+_platform_is_windows="$(pwsh -NoLogo -NoProfile -NonInteractive -Command 'if ($IsWindows) { "1" } else { "0" }' | tr -d '\r')"
+if [ "$_platform_is_windows" = "1" ]; then
+  _platform_reject_out=""
+  _platform_reject_rc=0
+  _platform_reject_out="$(NUCLEUS_REPO_ROOT="$_platform_repo" pwsh -NoLogo -NoProfile -NonInteractive -File "$_platform_cmd" --posix-only 2>&1)" || _platform_reject_rc=$?
+  if [ "$_platform_reject_rc" -ne 0 ] && printf '%s\n' "$_platform_reject_out" | grep -qF -- '--posix-only' && printf '%s\n' "$_platform_reject_out" | grep -q 'windows' && printf '%s\n' "$_platform_reject_out" | grep -q 'posix'; then
+    assert_pass "Resolve-NucleusArgument: posix-only flag rejected on Windows naming flag and host"
+  else
+    assert_fail "Resolve-NucleusArgument: posix-only flag rejected on Windows naming flag and host" "rc=$_platform_reject_rc output=${_platform_reject_out//$'\n'/ | }"
+  fi
+else
+  _platform_reject_out=""
+  _platform_reject_rc=0
+  _platform_reject_out="$(NUCLEUS_REPO_ROOT="$_platform_repo" pwsh -NoLogo -NoProfile -NonInteractive -File "$_platform_cmd" --windows-only 2>&1)" || _platform_reject_rc=$?
+  if [ "$_platform_reject_rc" -ne 0 ] && printf '%s\n' "$_platform_reject_out" | grep -qF -- '--windows-only' && printf '%s\n' "$_platform_reject_out" | grep -q 'posix' && printf '%s\n' "$_platform_reject_out" | grep -q 'windows'; then
+    assert_pass "Resolve-NucleusArgument: windows-only flag rejected on POSIX naming flag and host"
+  else
+    assert_fail "Resolve-NucleusArgument: windows-only flag rejected on POSIX naming flag and host" "rc=$_platform_reject_rc output=${_platform_reject_out//$'\n'/ | }"
+  fi
+  # Brief asks for "passing it on Windows errors"; on POSIX verify posix-only is accepted.
+  _platform_accept_out=""
+  _platform_accept_rc=0
+  _platform_accept_out="$(NUCLEUS_REPO_ROOT="$_platform_repo" pwsh -NoLogo -NoProfile -NonInteractive -File "$_platform_cmd" --posix-only 2>&1)" || _platform_accept_rc=$?
+  if [ "$_platform_accept_rc" -eq 0 ] && printf '%s\n' "$_platform_accept_out" | grep -qF 'POSIX-ONLY'; then
+    assert_pass "Resolve-NucleusArgument: posix-only flag accepted on POSIX"
+  else
+    assert_fail "Resolve-NucleusArgument: posix-only flag accepted on POSIX" "rc=$_platform_accept_rc output=${_platform_accept_out//$'\n'/ | }"
+  fi
+fi
+
+rm -rf "$_platform_repo"
+
 finish_tests

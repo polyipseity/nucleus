@@ -272,8 +272,8 @@ app_needs_stateful() {
   local _sc_count _has_sc_flags _has_sc_payload
   _sc_count="$(jq -r '.subcommands | length' <<<"$_app")"
   [ "$_sc_count" -eq 0 ] && return 1
-  _has_sc_flags="$(jq -r '[.subcommands[] | (.flags | length) + (.positionals | length)] | add // 0' <<<"$_app")"
-  _has_sc_payload="$(jq -r '[.subcommands[] | select((.values != null) or ((.flags // [])[]? | .valueSource != null) or ((.positionals // [])[]? | .valueSource != null))] | length' <<<"$_app")"
+  _has_sc_flags="$(jq -r '[.subcommands[] | ([.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))] | length) + (.positionals | length)] | add // 0' <<<"$_app")"
+  _has_sc_payload="$(jq -r '[.subcommands[] | select((.values != null) or ((.flags // [])[]? | select(.platforms == null or (.platforms | index("posix") != null)) | .valueSource != null) or ((.positionals // [])[]? | .valueSource != null))] | length' <<<"$_app")"
   # Any per-subcommand flags, positionals, or dynamic providers => stateful.
   if [ "$_has_sc_flags" -gt 0 ] || [ "$_has_sc_payload" -gt 0 ]; then
     return 0
@@ -341,7 +341,7 @@ generate_command_file() {
     local _gs=""
     emit_flag_spec "$_cmd" "-" "$_f" _gs _dyn_states _dyn_actions
     if [ -n "$_gs" ]; then append_line _global_specs "$_gs"; fi
-  done < <(jq -c '.globalFlags[]?' <<<"$_app")
+  done < <(jq -c '.globalFlags[]? | select(.platforms == null or (.platforms | index("posix") != null))' <<<"$_app")
 
   # Subcommand names and descriptions
   while IFS= read -r _sc; do
@@ -410,7 +410,7 @@ generate_command_file() {
         while IFS= read -r _sf; do
           [ -n "$_sf" ] || continue
           emit_flag_spec "$_cmd" "$_s" "$_sf" _sc_specs _dyn_states _dyn_actions
-        done < <(jq -c '.flags[]?' <<<"$_sc")
+        done < <(jq -c '.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))' <<<"$_sc")
         # positionals
         local _pi=1 _p
         while IFS= read -r _p; do

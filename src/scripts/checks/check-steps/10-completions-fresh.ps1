@@ -223,13 +223,22 @@ def extract_long_flags(text):
             for tok in re.findall(r'--[a-z0-9][a-z0-9-]*', m.group(1)):
                 out.add(tok)
     return out
-def spec_flags(app):
+def spec_flag_applies(flag, platform):
+    platforms = flag.get('platforms')
+    if platforms is None:
+        return True
+    if not isinstance(platforms, list) or len(platforms) == 0:
+        return True
+    return platform in platforms
+def spec_flags(app, platform):
     out=set()
     for f in app.get('globalFlags') or []:
-        if f.get('long'): out.add(f['long'])
+        if f.get('long') and spec_flag_applies(f, platform):
+            out.add(f['long'])
     for sc in app.get('subcommands') or []:
         for f in sc.get('flags') or []:
-            if f.get('long'): out.add(f['long'])
+            if f.get('long') and spec_flag_applies(f, platform):
+                out.add(f['long'])
     return out
 def norm(s):
     return s.replace('-', '').lower()
@@ -294,7 +303,8 @@ env['NUCLEUS_REPO_ROOT'] = str(root)
 for app in spec.get('apps') or []:
     name=app.get('name')
     if not name: continue
-    sf=spec_flags(app)
+    sf_posix=spec_flags(app, 'posix')
+    sf_windows=spec_flags(app, 'windows')
     hp=resolve_script(name, 'sh')
     ps1=resolve_script(name, 'ps1')
     bash_err=None
@@ -303,12 +313,14 @@ for app in spec.get('apps') or []:
         if r.returncode == 0:
             text=(r.stdout or '')+'\n'+(r.stderr or '')
             hf=extract_long_flags(text)
-            for flag in sorted(hf-sf): errors.append(f'{name}: help flag {flag} missing from spec')
-            for flag in sorted(sf-hf): errors.append(f'{name}: spec flag {flag} missing from help')
+            for flag in sorted(hf-sf_posix): errors.append(f'{name}: help flag {flag} missing from spec')
+            for flag in sorted(sf_posix-hf): errors.append(f'{name}: spec flag {flag} missing from help')
+            if ps1.exists():
+                errors.extend(pwsh_spec_to_reflection(name, ps1, sf_windows, env))
             continue
         bash_err=((r.stdout or '')+'\n'+(r.stderr or '')).strip()
     if ps1.exists():
-        errors.extend(pwsh_spec_to_reflection(name, ps1, sf, env))
+        errors.extend(pwsh_spec_to_reflection(name, ps1, sf_windows, env))
         continue
     if bash_err is not None:
         errors.append(f'{name}: --help failed (exit non-zero): {bash_err}')

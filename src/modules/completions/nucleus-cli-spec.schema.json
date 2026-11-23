@@ -74,6 +74,25 @@
         },
         "description": {
           "type": "string"
+        },
+        "platforms": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "posix",
+                  "windows"
+                ]
+              },
+              "uniqueItems": true,
+              "minItems": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "allOf": [

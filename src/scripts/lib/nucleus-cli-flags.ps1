@@ -64,6 +64,57 @@ function Resolve-NucleusCliFlag {
   Write-Output -NoEnumerate -InputObject ([string[]]$remaining.ToArray())
 }
 
+$script:_NucleusCliSpecCacheTried = $false
+$script:_NucleusCliSpecCache = $null
+$script:_NucleusCliFlagsLibDir = $PSScriptRoot
+
+function Get-NucleusCliFlagSpecPlatformList {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CommandName,
+    [Parameter(Mandatory)][string]$NormalizedKey
+  )
+  if (-not $script:_NucleusCliSpecCacheTried) {
+    $script:_NucleusCliSpecCacheTried = $true
+    $script:_NucleusCliSpecCache = $null
+    $specPath = $null
+    $repoRoot = $env:NUCLEUS_REPO_ROOT
+    if (-not [string]::IsNullOrWhiteSpace($repoRoot)) {
+      $candidate = Join-Path $repoRoot 'src/modules/completions/nucleus-cli-spec.json'
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) { $specPath = $candidate }
+    }
+    if ($null -eq $specPath -and -not [string]::IsNullOrWhiteSpace($script:_NucleusCliFlagsLibDir)) {
+      $candidate = Join-Path $script:_NucleusCliFlagsLibDir '../../modules/completions/nucleus-cli-spec.json'
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) { $specPath = $candidate }
+    }
+    if ($null -ne $specPath) {
+      try {
+        $script:_NucleusCliSpecCache = Get-Content -Raw -LiteralPath $specPath | ConvertFrom-Json
+      } catch {
+        $script:_NucleusCliSpecCache = $null
+      }
+    }
+  }
+  $spec = $script:_NucleusCliSpecCache
+  if ($null -eq $spec) { return $null }
+  $app = @($spec.apps | Where-Object { $_ -and [string]$_.name -eq $CommandName })
+  if ($app.Count -eq 0) { return $null }
+  $appObj = $app[0]
+  foreach ($f in @($appObj.globalFlags)) {
+    if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
+    $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
+    if ($key -eq $NormalizedKey) { return $f.platforms }
+  }
+  foreach ($sc in @($appObj.subcommands)) {
+    foreach ($f in @($sc.flags)) {
+      if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
+      $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
+      if ($key -eq $NormalizedKey) { return $f.platforms }
+    }
+  }
+  return $null
+}
+
 function Resolve-NucleusArgument {
   <#
   .SYNOPSIS
@@ -150,6 +201,7 @@ function Resolve-NucleusArgument {
   }
 
   $leftover = [System.Collections.Generic.List[string]]::new()
+  $currentPlatform = if ($IsWindows) { 'windows' } else { 'posix' }
   $i = 0
   while ($i -lt $Arguments.Count) {
     $tok = [string]$Arguments[$i]
@@ -174,6 +226,14 @@ function Resolve-NucleusArgument {
     }
 
     $key = (($rawName -replace '-', '')).ToLowerInvariant()
+    $flagPlatforms = Get-NucleusCliFlagSpecPlatformList -CommandName $CommandName -NormalizedKey $key
+    if ($null -ne $flagPlatforms) {
+      $allowedPlatforms = @($flagPlatforms)
+      if ($allowedPlatforms.Count -gt 0 -and $allowedPlatforms -notcontains $currentPlatform) {
+        $belongs = ($allowedPlatforms -join ', ')
+        _throwNucleusCliError $CommandName "flag '$tok' is not supported on $currentPlatform (belongs to $belongs)"
+      }
+    }
     if (-not $map.ContainsKey($key)) {
       if ($PassThroughUnknownFlags) {
         $leftover.Add($tok)
