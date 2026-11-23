@@ -51,7 +51,82 @@ param(
   [string[]]$SubcommandArgs = @(),
 
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+
+  [Alias('windows-iso')]
+  [string]$WindowsIso,
+
+  [Alias('windows-iso-source')]
+  [string]$WindowsIsoSource,
+
+  [Alias('windows-iso-retries')]
+  [string]$WindowsIsoRetries,
+
+  [string]$Accelerator,
+
+  [Alias('vm-dir-override')]
+  [string]$VmDirOverride,
+
+  [Alias('mido-patch-file')]
+  [string]$MidoPatchFile,
+
+  [Alias('mido-script')]
+  [string]$MidoScript,
+
+  [string]$RepoRoot,
+
+  [switch]$Json,
+
+  [Alias('dry-run')]
+  [switch]$DryRun,
+
+  [switch]$Gc,
+
+  [Alias('no-gc')]
+  [switch]$NoGc,
+
+  [Alias('gc-disabled')]
+  [switch]$GcDisabled,
+
+  [Alias('no-gc-disabled')]
+  [switch]$NoGcDisabled,
+
+  [Alias('gc-data')]
+  [switch]$GcData,
+
+  [Alias('no-gc-data')]
+  [switch]$NoGcData,
+
+  [switch]$Force,
+
+  [Alias('allow-shrink')]
+  [switch]$AllowShrink,
+
+  [Alias('accept-gsi-license')]
+  [switch]$AcceptGsiLicense,
+
+  [Alias('no-accept-gsi-license')]
+  [switch]$NoAcceptGsiLicense,
+
+  [switch]$Headful,
+
+  [Alias('no-headful')]
+  [switch]$NoHeadful,
+
+  [switch]$Gapps,
+
+  [Alias('adb-keys')]
+  [switch]$AdbKeys,
+
+  [switch]$Magisk,
+
+  [switch]$Root,
+
+  [Alias('fake-wifi')]
+  [switch]$FakeWifi,
+
+  [Alias('fake-wifi-revert')]
+  [switch]$FakeWifiRevert
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
@@ -60,12 +135,20 @@ Assert-NucleusPowerShell -Minimum '7.0'
 # Suppress false positive PSReviewUnusedParameter: $SubcommandArgs IS used below
 # (setup flag parsing, status/stop/reset actions).
 $null = $SubcommandArgs  # check-suppress:suppression_doc: splatting variable, declared for parameter binding
+# check-suppress:suppression_doc: script-scope params read inside subcommand functions; PSSA PSReviewUnusedParameter cannot see nested-function reads.
+$null = @(
+  $WindowsIso, $WindowsIsoSource, $WindowsIsoRetries, $Accelerator,
+  $MidoPatchFile, $MidoScript, $Json, $DryRun, $Gc, $NoGc, $GcDisabled,
+  $NoGcDisabled, $GcData, $NoGcData, $Force, $AllowShrink, $AcceptGsiLicense,
+  $NoAcceptGsiLicense, $Headful, $NoHeadful, $Gapps, $AdbKeys, $Magisk, $Root,
+  $FakeWifi, $FakeWifiRevert
+)
 
 $ErrorActionPreference = 'Stop'
 
 $cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
 . $cliFlagsModulePath
-$SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm' -PassThroughUnknownFlags)
+$SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm')
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -84,9 +167,16 @@ if (-not $Action) {
   exit 1
 }
 
-$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
+if (-not [string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot -ErrorAction Stop).Path
+} elseif ($env:NUCLEUS_REPO_ROOT) {
+  $RepoRoot = $env:NUCLEUS_REPO_ROOT
+} else {
+  $RepoRoot = (Get-Item $PSScriptRoot).Parent.FullName
+}
 $ManifestPath = Join-Path $RepoRoot 'src\modules\vms\VMs.json'
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
+if (-not [string]::IsNullOrWhiteSpace($VmDirOverride)) { $env:VM_DIR_OVERRIDE = $VmDirOverride }
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\SizeStrings.ps1')
 
@@ -106,27 +196,13 @@ function Invoke-VMSync {
   }
 
   $invokeArgs = @{ RepoRoot = $RepoRoot }
-  $i = 0
-  while ($i -lt $SubcommandArgs.Length) {
-    switch ($SubcommandArgs[$i]) {
-      '--vm-dir-override' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--vm-dir-override requires a path argument'
-          exit 1
-        }
-        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
-      }
-      '--dry-run' { $invokeArgs['DryRun'] = $true }
-      '--help' {
-        Get-Help $PSCommandPath -Detailed
-        exit 0
-      }
-      default {
-        Write-NucleusWarning "ignoring unknown flag for sync: $($SubcommandArgs[$i])"
-      }
-    }
-    $i++
+  if (-not [string]::IsNullOrWhiteSpace($VmDirOverride)) {
+    $env:VM_DIR_OVERRIDE = $VmDirOverride
+  }
+  if ($DryRun.IsPresent) { $invokeArgs['DryRun'] = $true }
+  if ($Help.IsPresent) {
+    Get-Help $PSCommandPath -Detailed
+    exit 0
   }
 
   & {
@@ -154,28 +230,13 @@ function Invoke-VMBuildSystem {
 
   $invokeArgs = @{ RepoRoot = $RepoRoot; Type = $vmType }
 
-  # Parse build-system flags (type is the first positional arg, flags follow).
-  $i = 1
-  while ($i -lt $SubcommandArgs.Length) {
-    switch ($SubcommandArgs[$i]) {
-      '--vm-dir-override' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--vm-dir-override requires a path argument'
-          exit 1
-        }
-        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
-      }
-      '--dry-run' { $invokeArgs['DryRun'] = $true }
-      '--help' {
-        Get-Help $PSCommandPath -Detailed
-        exit 0
-      }
-      default {
-        Write-NucleusWarning "ignoring unknown flag for build-system: $($SubcommandArgs[$i])"
-      }
-    }
-    $i++
+  if (-not [string]::IsNullOrWhiteSpace($VmDirOverride)) {
+    $env:VM_DIR_OVERRIDE = $VmDirOverride
+  }
+  if ($DryRun.IsPresent) { $invokeArgs['DryRun'] = $true }
+  if ($Help.IsPresent) {
+    Get-Help $PSCommandPath -Detailed
+    exit 0
   }
 
   & {
@@ -194,13 +255,7 @@ function Invoke-VMInject {
     exit 1
   }
   $vmName = $SubcommandArgs[0]
-  $force = $false
-  for ($i = 1; $i -lt $SubcommandArgs.Length; $i++) {
-    switch ($SubcommandArgs[$i]) {
-      '--force' { $force = $true }
-      default { Write-NucleusWarning "ignoring unknown flag for inject: $($SubcommandArgs[$i])" }
-    }
-  }
+  $force = $Force.IsPresent
 
   $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
@@ -234,66 +289,21 @@ function Invoke-VMSetup {
 
   $invokeArgs = @{ RepoRoot = $RepoRoot }
 
-  # Parse SubcommandArgs for setup-specific flags
-  $i = 0
-  while ($i -lt $SubcommandArgs.Length) {
-    switch ($SubcommandArgs[$i]) {
-      '--windows-iso' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--windows-iso requires a path argument'
-          exit 1
-        }
-        $invokeArgs['WindowsIso'] = $SubcommandArgs[$i]
-      }
-      '--windows-iso-source' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--windows-iso-source requires an argument'
-          exit 1
-        }
-        $invokeArgs['WindowsIsoSource'] = $SubcommandArgs[$i]
-      }
-      '--windows-iso-retries' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--windows-iso-retries requires a number argument'
-          exit 1
-        }
-        $invokeArgs['WindowsIsoRetries'] = [int]$SubcommandArgs[$i]
-      }
-      '--accelerator' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--accelerator requires an argument'
-          exit 1
-        }
-        $invokeArgs['Accelerator'] = $SubcommandArgs[$i]
-      }
-      '--headful' { $invokeArgs['Headful'] = $true }
-      '--no-headful' { $invokeArgs['Headful'] = $false }
-      '--vm-dir-override' {
-        $i++
-        if ($i -ge $SubcommandArgs.Length) {
-          Write-NucleusError '--vm-dir-override requires a path argument'
-          exit 1
-        }
-        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
-      }
-      '--dry-run' { $invokeArgs['DryRun'] = $true }
-      '--gc' { $invokeArgs['Gc'] = $true }
-      '--no-gc' { $invokeArgs['Gc'] = $false }
-      '--gc-disabled' { $invokeArgs['GcDisabled'] = $true }
-      '--no-gc-disabled' { $invokeArgs['GcDisabled'] = $false }
-      '--help' {
-        Get-Help $PSCommandPath -Detailed
-        exit 0
-      }
-      default {
-        Write-NucleusWarning "ignoring unknown flag for setup: $($SubcommandArgs[$i])"
-      }
-    }
-    $i++
+  if (-not [string]::IsNullOrWhiteSpace($WindowsIso)) { $invokeArgs['WindowsIso'] = $WindowsIso }
+  if (-not [string]::IsNullOrWhiteSpace($WindowsIsoSource)) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
+  if (-not [string]::IsNullOrWhiteSpace($WindowsIsoRetries)) { $invokeArgs['WindowsIsoRetries'] = [int]$WindowsIsoRetries }
+  if (-not [string]::IsNullOrWhiteSpace($Accelerator)) { $invokeArgs['Accelerator'] = $Accelerator }
+  if ($Headful.IsPresent) { $invokeArgs['Headful'] = $true }
+  elseif ($NoHeadful.IsPresent) { $invokeArgs['Headful'] = $false }
+  if (-not [string]::IsNullOrWhiteSpace($VmDirOverride)) { $env:VM_DIR_OVERRIDE = $VmDirOverride }
+  if ($DryRun.IsPresent) { $invokeArgs['DryRun'] = $true }
+  if ($Gc.IsPresent) { $invokeArgs['Gc'] = $true }
+  elseif ($NoGc.IsPresent) { $invokeArgs['Gc'] = $false }
+  if ($GcDisabled.IsPresent) { $invokeArgs['GcDisabled'] = $true }
+  elseif ($NoGcDisabled.IsPresent) { $invokeArgs['GcDisabled'] = $false }
+  if ($Help.IsPresent) {
+    Get-Help $PSCommandPath -Detailed
+    exit 0
   }
 
   & {
@@ -326,7 +336,7 @@ function Invoke-VMList {
     $_.enabled -eq $true -and $_.hosts -contains $hostName
   })
 
-  if ($SubcommandArgs -contains '--json') {
+  if ($Json.IsPresent) {
     $out = @($vms | ForEach-Object {
       $state = if ($_.id -in $runningNameList) { 'running' } else { 'stopped' }
       $props = [ordered]@{}
@@ -460,14 +470,8 @@ function Invoke-VMReset {
   }
 
   $vmName = $SubcommandArgs[0]
-  $acceptGsiLicense = $false
-  for ($i = 1; $i -lt $SubcommandArgs.Length; $i++) {
-    switch ($SubcommandArgs[$i]) {
-      '--accept-gsi-license' { $acceptGsiLicense = $true }
-      '--no-accept-gsi-license' { $acceptGsiLicense = $false }
-      default { Write-NucleusWarning "ignoring unknown flag for reset: $($SubcommandArgs[$i])" }
-    }
-  }
+  $acceptGsiLicense = $AcceptGsiLicense.IsPresent
+  if ($NoAcceptGsiLicense.IsPresent) { $acceptGsiLicense = $false }
 
   $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
@@ -510,8 +514,14 @@ function Invoke-VMAndroidConfig {
 
   $vmName = $SubcommandArgs[0]
   $configFlags = @()
+  if ($Gapps.IsPresent) { $configFlags += '--gapps' }
+  if ($AdbKeys.IsPresent) { $configFlags += '--adb-keys' }
+  if ($Magisk.IsPresent) { $configFlags += '--magisk' }
+  if ($Root.IsPresent) { $configFlags += '--root' }
+  if ($FakeWifi.IsPresent) { $configFlags += '--fake-wifi' }
+  if ($FakeWifiRevert.IsPresent) { $configFlags += '--fake-wifi-revert' }
   if ($SubcommandArgs.Length -gt 1) {
-    $configFlags = $SubcommandArgs[1..($SubcommandArgs.Length - 1)]
+    $configFlags += @($SubcommandArgs[1..($SubcommandArgs.Length - 1)])
   }
 
   $manifest = Get-VMManifest
@@ -546,13 +556,7 @@ function Invoke-VMResize {
 
   $vmName = $SubcommandArgs[0]
   $sizeArg = $SubcommandArgs[1]
-  $allowShrink = $false
-  for ($i = 2; $i -lt $SubcommandArgs.Length; $i++) {
-    switch ($SubcommandArgs[$i]) {
-      '--allow-shrink' { $allowShrink = $true }
-      default { Write-NucleusWarning "ignoring unknown flag for resize: $($SubcommandArgs[$i])" }
-    }
-  }
+  $allowShrink = $AllowShrink.IsPresent
 
   $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
@@ -610,17 +614,8 @@ function Invoke-VMResize {
 }
 
 function Invoke-VMGc {
-  $gcDisabled = $false
-  $gcData = $false
-  foreach ($arg in $SubcommandArgs) {
-    switch ($arg) {
-      '--gc-disabled' { $gcDisabled = $true }
-      '--no-gc-disabled' { $gcDisabled = $false }
-      '--gc-data' { $gcData = $true }
-      '--no-gc-data' { $gcData = $false }
-      default { Write-NucleusWarning "ignoring unknown flag for gc: $arg" }
-    }
-  }
+  $gcDisabled = $GcDisabled.IsPresent
+  $gcData = $GcData.IsPresent
 
   $vmSh = Join-Path $RepoRoot 'scripts\vm.sh'
   if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
@@ -635,13 +630,7 @@ function Invoke-VMGc {
 }
 
 function Invoke-VMPack {
-  $perform = $false
-  foreach ($arg in $SubcommandArgs) {
-    switch ($arg) {
-      '--force' { $perform = $true }
-      default { Write-NucleusWarning "ignoring unknown flag for pack: $arg" }
-    }
-  }
+  $perform = $Force.IsPresent
 
   if (@(Get-VMRunningIdList).Count -gt 0) {
     Write-NucleusError 'cannot pack while a VM is running; stop all VMs first'
@@ -691,13 +680,7 @@ function Invoke-VMPack {
 }
 
 function Invoke-VMUnpack {
-  $perform = $true
-  foreach ($arg in $SubcommandArgs) {
-    switch ($arg) {
-      '--dry-run' { $perform = $false }
-      default { Write-NucleusWarning "ignoring unknown flag for unpack: $arg" }
-    }
-  }
+  $perform = -not $DryRun.IsPresent
 
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
   $templatesDir = Join-Path $RepoRoot 'src\vms\templates'
