@@ -97,7 +97,7 @@ Never suppress; rename. Words ending in `s` that are inherently singular (Status
 
 **Root cause:** under `pwsh -Command "& script.ps1 --list-logs"`, PowerShell binds the token as a positional argument before the script body normalizes it. `[ValidateSet]` rejects the token and the script never runs. `[Alias('list-logs')]` catches only single-dash forms.
 
-**Fix:** remove `[ValidateSet]` from the positional Action parameter; keep `[Alias(...)]` on switch parameters; normalize through `Resolve-NucleusCliFlag` from `src/scripts/lib/nucleus-cli-flags.ps1`; validate with `Assert-NucleusCliAction` after normalization. Keep other parameter `[ValidateSet]` attributes.
+**Fix:** remove `[ValidateSet]` from the positional Action parameter; keep `[Alias(...)]` on switch parameters; normalize through `Resolve-NucleusArgument` from `src/scripts/lib/nucleus-cli-flags.ps1` (or handle the flag in a hand-parsed loop); validate with `Assert-NucleusCliAction` after normalization. Keep other parameter `[ValidateSet]` attributes.
 
 **Suppression policy:** do not suppress; fix.
 
@@ -111,7 +111,7 @@ Never suppress; rename. Words ending in `s` that are inherently singular (Status
 | `PSAvoidUsingPositionalParameters` | Positional command arguments | Name them (`Join-Path -Path ... -ChildPath ...`) |
 | `PSUseDeclaredVarsMoreThanAssignments` | Variable assigned but never read | Read it where it is needed, or delete it; `> $null` when the output is deliberately discarded |
 | `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` instead, else annotate |
-| Positional Action `[ValidateSet]` with `--list-*` | `[ValidateSet]` on a positional Action that also accepts `--list-*` flags | Remove `[ValidateSet]`, normalize with `Resolve-NucleusCliFlag`, validate with `Assert-NucleusCliAction` |
+| Positional Action `[ValidateSet]` with `--list-*` | `[ValidateSet]` on a positional Action that also accepts `--list-*` flags | Remove `[ValidateSet]`, normalize with `Resolve-NucleusArgument`, validate with `Assert-NucleusCliAction` |
 
 ## Adding a new rule policy
 

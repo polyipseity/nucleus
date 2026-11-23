@@ -49,8 +49,7 @@ $ValidateOnly = $false
 $ListSteps = $false
 $ValidActions = @('all', 'packer', 'sh', 'pwsh')
 
-# Normalize --list-* before the hand-rolled loop (the loop also handles it).
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-steps' = 'ListSteps' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
+# --list-steps is handled by the hand-rolled loop below.
 
 $_ua = @($args)
 $i = 0

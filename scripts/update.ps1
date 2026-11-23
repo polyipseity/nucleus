@@ -109,8 +109,10 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-$null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-sections' = 'ListSections' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
-if ($ListSections) { $Action = 'lockfile' }
+if ($ListSections -or $args -contains '--list-sections' -or $args -contains '-ListSections') {
+  $ListSections = $true
+  $Action = 'lockfile'
+}
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
