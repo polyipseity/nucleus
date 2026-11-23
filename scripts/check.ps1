@@ -47,14 +47,24 @@ $WindowsTemplateOverride = ''
 $AnnotationCheckOnly = $false
 $ValidateOnly = $false
 $ListSteps = $false
+$ValidActions = @('all', 'packer', 'sh', 'pwsh')
 
 # Normalize --list-* before the hand-rolled loop (the loop also handles it).
 $null = Resolve-NucleusCliFlag -Action ([ref]$Action) -Flags @{ 'list-steps' = 'ListSteps' } # check-suppress:suppression_doc: helper returns remaining args when -Arguments is passed; this call normalizes Action only
 
 $_ua = @($args)
 $i = 0
+# Top-level help request (matches check.sh).
+if ($_ua.Count -gt 0 -and $_ua[0] -in @('help', '-h', '--help', '-Help')) {
+  Write-Output "Usage: check.ps1 [-h|--help] [all|packer|sh|pwsh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps] [--validate-only] [path ...]"
+  Write-Output "  Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch."
+  Write-Output "  Subcommands: all, packer, sh, pwsh."
+  Write-Output "  --list-steps     Print registered step IDs and exit."
+  Write-Output "  --validate-only  Skip formatting phase in packer validation."
+  exit 0
+}
 # First token may be an action word.
-if ($_ua.Count -gt 0 -and $_ua[0] -in @('all', 'packer', 'sh', 'pwsh', 'nix', 'yaml')) {
+if ($_ua.Count -gt 0 -and $_ua[0] -in $ValidActions) {
   $Action = [string]$_ua[0]
   $i = 1
 }
@@ -86,18 +96,17 @@ while ($i -lt $_ua.Count) {
   }
 }
 
-# A first positional token that is not a known action, not a flag, and not an
-# existing path is a typo (e.g. `check.ps1 bogus`); reject it instead of silently
-# running the full pipeline. Known actions and flags are already handled above;
-# real paths (scoped check) must keep working.
-if ($_ua.Count -gt 0) {
-  $_firstToken = [string]$_ua[0]
-  if ($_firstToken -notin @('all', 'packer', 'sh', 'pwsh', 'nix', 'yaml') -and $_firstToken -notmatch '^-') {
-    $_tokenExists = (Test-Path -LiteralPath $_firstToken) -or (Test-Path -LiteralPath (Join-Path $RepoRoot $_firstToken))
-    if (-not $_tokenExists) {
-      Write-NucleusError -CommandName check "unknown action or path '$_firstToken'"
-      exit 1
-    }
+# Reject unknown non-flag tokens that are neither valid actions nor existing paths.
+# Inspects every non-flag token (not only the first) so `--validate-only bogus` is caught.
+foreach ($_pt in $Paths) {
+  $_ptStr = [string]$_pt
+  if ($_ptStr -match '^-') { continue }
+  if ($_ptStr -in $ValidActions) { continue }
+  if ($_ptStr -in @('help', '-h', '--help', '-Help')) { continue }
+  $_tokenExists = (Test-Path -LiteralPath $_ptStr) -or (Test-Path -LiteralPath (Join-Path $RepoRoot $_ptStr))
+  if (-not $_tokenExists) {
+    Write-NucleusError -CommandName check "unknown action or path '$_ptStr'"
+    exit 1
   }
 }
 
@@ -355,8 +364,7 @@ function Invoke-CheckSh {
   }
 }
 
-if ([string]::IsNullOrWhiteSpace($Action)) { $Action = 'all' }
-Assert-NucleusCliAction -Action $Action -Valid @('all','packer','sh','pwsh','nix','yaml') -CommandName check
+Assert-NucleusCliAction -Action $Action -Valid $ValidActions -CommandName check
 
 if ($Action -in @('packer', 'sh', 'pwsh')) {
   $subcmdHelp = @($Paths | Where-Object { $_ -in @('-h', '--help', '-Help', 'help') }).Count -gt 0
