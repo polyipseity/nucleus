@@ -24,7 +24,8 @@ param(
   [Parameter(Position = 0)]
   [string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$Arguments,
+  [string[]]$Arguments = @(),
+  [switch]$Json,
   [Alias('h')]
   [switch]$Help
 )
@@ -157,8 +158,12 @@ function Set-ConfigValue {
 }
 
 function Out-ConfigValueList {
-  param([string[]]$Arguments = @())
-  $asJson = $false
+  param(
+    [string[]]$Arguments = @(),
+    [switch]$Json
+  )
+  $Arguments = @($Arguments | Where-Object { $_ -ne $null })
+  $asJson = $Json.IsPresent
   foreach ($arg in @($Arguments)) {
     switch ($arg) {
       '--json' { $asJson = $true }
@@ -201,7 +206,7 @@ function Out-ConfigValueList {
 switch ($Command) {
   'get' { Get-ConfigValue $Arguments }
   'set' { Set-ConfigValue $Arguments }
-  'list' { Out-ConfigValueList $Arguments }
+  'list' { Out-ConfigValueList -Arguments $Arguments -Json:$Json }
   default {
     Write-NucleusError "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list [--json]"
     exit 1

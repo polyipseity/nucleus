@@ -55,20 +55,50 @@
   Exit codes: 0 on success; non-zero on failure.
 #>
 
+param(
+  [Parameter(Position = 0)]
+  [string]$Action = 'all',
+
+  [switch]$Flake,
+  [Alias('no-flake')]
+  [switch]$NoFlake,
+  [switch]$Sops,
+  [Alias('no-sops')]
+  [switch]$NoSops,
+  [switch]$Force,
+  [string]$Sections = '',
+  [switch]$Verify,
+  [Alias('verify-installed')]
+  [switch]$VerifyInstalled,
+  [Alias('list-sections')]
+  [switch]$ListSections,
+  [Alias('h')]
+  [switch]$Help,
+
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
+)
+
 # Manual argument parsing: accepts PowerShell-style named params and POSIX
 # spellings (--list-sections, --sections, --verify, --verify-installed, lockfile
 # subcommand, action words). Bare flags mean no action word was given (B10).
-$Action = 'all'
-$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false })
-$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false })
-$Help = $false
-$Sections = ''
-$Verify = $false
-$VerifyInstalled = $false
-$ListSections = $false
+if (-not $PSBoundParameters.ContainsKey('Action')) { $Action = 'all' }
+if (-not $PSBoundParameters.ContainsKey('NoFlake')) {
+  $NoFlake = ($env:NUCLEUS_NO_FLAKE -eq 'true')
+}
+if (-not $PSBoundParameters.ContainsKey('NoSops')) {
+  $NoSops = ($env:NUCLEUS_NO_SOPS -eq 'true')
+}
+if (-not $PSBoundParameters.ContainsKey('Sections')) { $Sections = '' }
+if (-not $PSBoundParameters.ContainsKey('Verify')) { $Verify = $false }
+if (-not $PSBoundParameters.ContainsKey('VerifyInstalled')) { $VerifyInstalled = $false }
+if (-not $PSBoundParameters.ContainsKey('ListSections')) { $ListSections = $false }
+if (-not $PSBoundParameters.ContainsKey('Help')) { $Help = $false }
+if ($Flake) { $NoFlake = $false }
+if ($Sops) { $NoSops = $false }
 
 # Prefer raw invocation args so POSIX --flags are not rejected by parameter binding.
-$_ua = @($args)
+$_ua = @($RemainingArgs)
 $i = 0
 while ($i -lt $_ua.Count) {
   $a = [string]$_ua[$i]
@@ -109,8 +139,11 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-if ($ListSections -or $args -contains '--list-sections' -or $args -contains '-ListSections') {
+if ($ListSections -or $RemainingArgs -contains '--list-sections' -or $RemainingArgs -contains '-ListSections') {
   $ListSections = $true
+  $Action = 'lockfile'
+}
+if ($Verify -or $VerifyInstalled -or $PSBoundParameters.ContainsKey('Sections')) {
   $Action = 'lockfile'
 }
 
@@ -207,7 +240,7 @@ function Invoke-LockfileBump {
     foreach ($s in ($validSectionsCsv -split ',')) {
       Write-Output $s
     }
-    return
+    exit 0
   }
 
   $lockfileRel = 'src/lockfiles/lockfile.json'

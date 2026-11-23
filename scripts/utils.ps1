@@ -46,6 +46,7 @@ param(
   [string]$Preset = "default",
 
   [Parameter()]
+  [Alias('rm-bak')]
   [switch]$RemoveBackup,
 
   [Parameter()]
@@ -54,8 +55,25 @@ param(
   [Parameter()]
   [switch]$Plain,
 
+  [Parameter()]
+  [string]$Format,
+
+  [Parameter()]
+  [Alias('session-id')]
+  [string]$SessionId,
+
+  [Parameter()]
+  [string]$Settings,
+
+  [Parameter()]
+  [Alias('command')]
+  [string]$TargetCommand,
+
+  [Parameter()]
+  [switch]$Hook,
+
   [Parameter(Position = 1, ValueFromRemainingArguments)]
-  [string[]]$File,
+  [string[]]$File = @(),
 
   [Alias("h")]
   [switch]$Help
@@ -681,12 +699,21 @@ switch ($Action) {
   }
 
   'sandbox-context' {
-    Invoke-NucleusSandboxContext -ArgumentList $File
+    $scArgs = @()
+    if ($PSBoundParameters.ContainsKey('Format')) { $scArgs += @('--format', $Format) }
+    if ($PSBoundParameters.ContainsKey('SessionId')) { $scArgs += @('--session-id', $SessionId) }
+    if ($File) { $scArgs += @($File) }
+    Invoke-NucleusSandboxContext -ArgumentList $scArgs
   }
 
   'safe-delete-guard' {
     $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\filters\safe-delete.ts'
-    & bun $scriptPath @File
+    $sdgArgs = @()
+    if ($PSBoundParameters.ContainsKey('Settings')) { $sdgArgs += @('--settings', $Settings) }
+    if ($PSBoundParameters.ContainsKey('TargetCommand')) { $sdgArgs += @('--command', $TargetCommand) }
+    if ($Hook) { $sdgArgs += '--hook' }
+    if ($File) { $sdgArgs += @($File) }
+    & bun $scriptPath @sdgArgs
     exit $LASTEXITCODE
   }
 }

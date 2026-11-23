@@ -13,6 +13,9 @@
 .PARAMETER NoApply
   Install dependencies only; cancels -Apply.
 
+.PARAMETER AISync
+  Run AI model sync after apply when -Apply is used.
+
 .PARAMETER NoAISync
   Do not run AI model sync after apply when -Apply is used.
 
@@ -44,7 +47,11 @@ param(
   [switch]$NoApply,
 
   [Parameter(ValueFromRemainingArguments)]
-  [string[]]$ApplyArgs,
+  [string[]]$ApplyArgs = @(),
+
+  [Alias('ai-sync')]
+  [Parameter()]
+  [switch]$AISync,
 
   [Parameter()]
   [switch]$NoAISync = $(if ($env:NUCLEUS_AI_SYNC -eq 'false') { $true } else { $false }),
@@ -75,6 +82,7 @@ $ApplyArgs = @(Resolve-NucleusArgument -Arguments $ApplyArgs -CommandPath $PSCom
 
 if ($NoApply) { $Apply = $false }
 if ($NoReplicaSync) { $ReplicaSync = $false }
+if ($AISync) { $NoAISync = $false }
 
 if ($Help -or ($ApplyArgs -contains '--help') -or ($ApplyArgs -contains '-h')) {
   Get-Help $PSCommandPath -Detailed
