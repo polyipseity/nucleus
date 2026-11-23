@@ -12,7 +12,8 @@ function Get-NucleusCliFlagSpecPlatformList {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)][string]$CommandName,
-    [Parameter(Mandatory)][string]$NormalizedKey
+    [Parameter(Mandatory)][string]$NormalizedKey,
+    [string]$Subcommand = ''
   )
   if (-not $script:_NucleusCliSpecCacheTried) {
     $script:_NucleusCliSpecCacheTried = $true
@@ -36,23 +37,71 @@ function Get-NucleusCliFlagSpecPlatformList {
     }
   }
   $spec = $script:_NucleusCliSpecCache
-  if ($null -eq $spec) { return $null }
+  if ($null -eq $spec) { return [pscustomobject]@{ Found = $false; Platforms = $null } }
   $app = @($spec.apps | Where-Object { $_ -and [string]$_.name -eq $CommandName })
-  if ($app.Count -eq 0) { return $null }
+  if ($app.Count -eq 0) { return [pscustomobject]@{ Found = $false; Platforms = $null } }
   $appObj = $app[0]
+
+  $hasSubcommand = -not [string]::IsNullOrWhiteSpace($Subcommand)
+  if ($hasSubcommand) {
+    foreach ($sc in @($appObj.subcommands)) {
+      if ($null -eq $sc -or -not ([string]$sc.name).Equals($Subcommand, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+      foreach ($f in @($sc.flags)) {
+        if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
+        $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
+        if ($key -eq $NormalizedKey) {
+          $platformsProp = $f.PSObject.Properties['platforms']
+          if ($null -eq $platformsProp) { return [pscustomobject]@{ Found = $true; Platforms = $null } }
+          return [pscustomobject]@{ Found = $true; Platforms = $platformsProp.Value }
+        }
+      }
+      break
+    }
+    foreach ($f in @($appObj.globalFlags)) {
+      if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
+      $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
+      if ($key -eq $NormalizedKey) {
+        $platformsProp = $f.PSObject.Properties['platforms']
+        if ($null -eq $platformsProp) { return [pscustomobject]@{ Found = $true; Platforms = $null } }
+        return [pscustomobject]@{ Found = $true; Platforms = $platformsProp.Value }
+      }
+    }
+    foreach ($sc in @($appObj.subcommands)) {
+      if ($null -ne $sc -and ([string]$sc.name).Equals($Subcommand, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+      foreach ($f in @($sc.flags)) {
+        if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
+        $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
+        if ($key -eq $NormalizedKey) {
+          $platformsProp = $f.PSObject.Properties['platforms']
+          if ($null -eq $platformsProp) { return [pscustomobject]@{ Found = $true; Platforms = $null } }
+          return [pscustomobject]@{ Found = $true; Platforms = $platformsProp.Value }
+        }
+      }
+    }
+    return [pscustomobject]@{ Found = $false; Platforms = $null }
+  }
+
   foreach ($f in @($appObj.globalFlags)) {
     if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
     $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
-    if ($key -eq $NormalizedKey) { return $f.platforms }
+    if ($key -eq $NormalizedKey) {
+      $platformsProp = $f.PSObject.Properties['platforms']
+      if ($null -eq $platformsProp) { return [pscustomobject]@{ Found = $true; Platforms = $null } }
+      return [pscustomobject]@{ Found = $true; Platforms = $platformsProp.Value }
+    }
   }
   foreach ($sc in @($appObj.subcommands)) {
     foreach ($f in @($sc.flags)) {
       if ($null -eq $f -or [string]::IsNullOrWhiteSpace([string]$f.long)) { continue }
       $key = (($([string]$f.long).TrimStart('-') -replace '-', '')).ToLowerInvariant()
-      if ($key -eq $NormalizedKey) { return $f.platforms }
+      if ($key -eq $NormalizedKey) {
+        $platformsProp = $f.PSObject.Properties['platforms']
+        if ($null -eq $platformsProp) { return [pscustomobject]@{ Found = $true; Platforms = $null } }
+        return [pscustomobject]@{ Found = $true; Platforms = $platformsProp.Value }
+      }
     }
   }
-  return $null
+  return [pscustomobject]@{ Found = $false; Platforms = $null }
 }
 
 function Resolve-NucleusArgument {
@@ -73,6 +122,9 @@ function Resolve-NucleusArgument {
     When set, unknown dash-prefixed tokens are appended to leftover instead of throwing.
     For --unknown=value the whole token is passed through. For --unknown value only the
     flag token is passed through; the next token is left for normal processing.
+  .PARAMETER Subcommand
+    Optional subcommand name. When provided, flag platform checks prefer that subcommand's
+    flag definition over a same-named global flag.
   #>
   [CmdletBinding()]
   param(
@@ -87,7 +139,9 @@ function Resolve-NucleusArgument {
     [Parameter(Mandatory = $true)]
     [string]$CommandName,
 
-    [switch]$PassThroughUnknownFlags
+    [switch]$PassThroughUnknownFlags,
+
+    [string]$Subcommand = ''
   )
 
   if ($null -eq $Arguments) { $Arguments = [string[]]@() }
@@ -166,9 +220,9 @@ function Resolve-NucleusArgument {
     }
 
     $key = (($rawName -replace '-', '')).ToLowerInvariant()
-    $flagPlatforms = Get-NucleusCliFlagSpecPlatformList -CommandName $CommandName -NormalizedKey $key
-    if ($null -ne $flagPlatforms) {
-      $allowedPlatforms = @($flagPlatforms)
+    $flagInfo = Get-NucleusCliFlagSpecPlatformList -CommandName $CommandName -NormalizedKey $key -Subcommand $Subcommand
+    if ($flagInfo.Found -and $null -ne $flagInfo.Platforms) {
+      $allowedPlatforms = @($flagInfo.Platforms)
       if ($allowedPlatforms.Count -gt 0 -and $allowedPlatforms -notcontains $currentPlatform) {
         $belongs = ($allowedPlatforms -join ', ')
         _throwNucleusCliError $CommandName "flag '$tok' is not supported on $currentPlatform (belongs to $belongs)"

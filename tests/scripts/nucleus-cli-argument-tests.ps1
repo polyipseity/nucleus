@@ -29,6 +29,7 @@ function Assert-HasSubstring([string]$haystack, [string]$needle, [string]$name) 
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-arg-test-" + [Guid]::NewGuid().ToString('n'))
 New-Item -ItemType Directory -Path $tempRoot -Force > $null
+$specRoots = [System.Collections.Generic.List[string]]::new()
 
 try {
   . $libPath
@@ -54,6 +55,15 @@ $body
     $out = & pwsh -NoProfile -File $path @fixtureArgs 2>&1 | ForEach-Object { $_.ToString() }
     $rc = $LASTEXITCODE
     return [pscustomobject]@{ Output = @($out); Rc = $rc; Text = (@($out) -join "`n") }
+  }
+
+  function New-CliSpecRepoRoot([object]$spec) {
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-spec-test-" + [Guid]::NewGuid().ToString('n'))
+    $specDir = Join-Path $root 'src/modules/completions'
+    New-Item -ItemType Directory -Path $specDir -Force > $null
+    $specPath = Join-Path $specDir 'nucleus-cli-spec.json'
+    $spec | ConvertTo-Json -Depth 20 | Set-Content -Path $specPath -Encoding UTF8
+    return $root
   }
 
   Write-Output "`n=== [1] kebab switch ==="
@@ -293,9 +303,145 @@ Write-Output "ok"
   $null = Resolve-NucleusArgument -Arguments @('--no-dry-run', '--dry-run=false') -CommandPath $f15 -CommandName 'fixture'
   Assert-True -cond ($DryRun.IsPresent -eq $false -and $NoDryRun.IsPresent -eq $true) -name 'last flag wins with =false: --no-dry-run --dry-run=false => NoDryRun preserved' -detail "DryRun=$DryRun NoDryRun=$NoDryRun"
 
+  Write-Output "`n=== [16] no-platforms flag normalizes under StrictMode ==="
+  $specRoot16 = New-CliSpecRepoRoot -spec ([ordered]@{
+    apps = @(
+      [ordered]@{
+        name = 'fixture'
+        globalFlags = @([ordered]@{ long = '--dry-run'; takesValue = $false })
+        subcommands = @()
+      }
+    )
+  })
+  $specRoots.Add($specRoot16)
+  $savedRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $specRoot16
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $DryRun = [switch]$false
+    $null = Resolve-NucleusArgument -Arguments @('--dry-run') -CommandPath $f15 -CommandName 'fixture'
+    Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'no-platforms flag binds under StrictMode' -detail "DryRun=$DryRun"
+  } finally {
+    if ($null -eq $savedRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $savedRoot }
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+  }
+
+  Write-Output "`n=== [17] platform mismatch rejects, match passes ==="
+  $specRoot17 = New-CliSpecRepoRoot -spec ([ordered]@{
+    apps = @(
+      [ordered]@{
+        name = 'fixture'
+        globalFlags = @([ordered]@{ long = '--dry-run'; takesValue = $false; platforms = @('posix') })
+        subcommands = @()
+      }
+    )
+  })
+  $specRoots.Add($specRoot17)
+  $savedRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $specRoot17
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $DryRun = [switch]$false
+    if ($IsWindows) {
+      $threw = $false
+      $errText = ''
+      try {
+        $null = Resolve-NucleusArgument -Arguments @('--dry-run') -CommandPath $f15 -CommandName 'fixture'
+      } catch {
+        $threw = $true
+        $errText = $_.Exception.Message
+      }
+      Assert-True -cond $threw -name 'posix-only flag rejected on windows' -detail $errText
+      Assert-HasSubstring -haystack $errText -needle 'not supported on windows' -name 'posix-only rejection names platform'
+    } else {
+      $null = Resolve-NucleusArgument -Arguments @('--dry-run') -CommandPath $f15 -CommandName 'fixture'
+      Assert-True -cond ($DryRun.IsPresent -eq $true) -name 'posix-only flag accepted on posix host' -detail "DryRun=$DryRun"
+    }
+  } finally {
+    if ($null -eq $savedRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $savedRoot }
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+  }
+
+  Write-Output "`n=== [18] subcommand wins over global ==="
+  $fExpiry = Write-Fixture -name 'fExpiry.ps1' -paramBlock @"
+  [string]`$Expiry = '',
+  [Parameter(ValueFromRemainingArguments)][string[]]`$RemainingArgs
+"@ -body @"
+Write-Output "Expiry=`$Expiry"
+"@
+  $specRoot18 = New-CliSpecRepoRoot -spec ([ordered]@{
+    apps = @(
+      [ordered]@{
+        name = 'fixture'
+        globalFlags = @([ordered]@{ long = '--expiry'; takesValue = $true; platforms = @('posix') })
+        subcommands = @(
+          [ordered]@{
+            name = 'logs'
+            flags = @([ordered]@{ long = '--expiry'; takesValue = $true })
+          }
+        )
+      }
+    )
+  })
+  $specRoots.Add($specRoot18)
+  $savedRoot = $env:NUCLEUS_REPO_ROOT
+  try {
+    $env:NUCLEUS_REPO_ROOT = $specRoot18
+
+    # Subcommand 'logs' wins: no platforms on subcommand flag, so accepted on any host.
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = ''
+    $null = Resolve-NucleusArgument -Arguments @('--expiry', '30d') -CommandPath $fExpiry -CommandName 'fixture' -Subcommand 'logs'
+    Assert-True -cond ($Expiry -eq '30d') -name 'subcommand wins over global: logs expiry binds' -detail "Expiry=$Expiry"
+
+    # No subcommand / different subcommand: global posix-only applies.
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = ''
+    if ($IsWindows) {
+      $threw = $false
+      $errText = ''
+      try {
+        $null = Resolve-NucleusArgument -Arguments @('--expiry', '30d') -CommandPath $fExpiry -CommandName 'fixture'
+      } catch { $threw = $true; $errText = $_.Exception.Message }
+      Assert-True -cond $threw -name 'global posix-only applies without subcommand on windows' -detail $errText
+    } else {
+      $null = Resolve-NucleusArgument -Arguments @('--expiry', '30d') -CommandPath $fExpiry -CommandName 'fixture'
+      Assert-True -cond ($Expiry -eq '30d') -name 'global posix-only applies without subcommand on posix host' -detail "Expiry=$Expiry"
+    }
+
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+    $Expiry = ''
+    if ($IsWindows) {
+      $threw = $false
+      $errText = ''
+      try {
+        $null = Resolve-NucleusArgument -Arguments @('--expiry', '30d') -CommandPath $fExpiry -CommandName 'fixture' -Subcommand 'other'
+      } catch { $threw = $true; $errText = $_.Exception.Message }
+      Assert-True -cond $threw -name 'global posix-only applies for different subcommand on windows' -detail $errText
+    } else {
+      $null = Resolve-NucleusArgument -Arguments @('--expiry', '30d') -CommandPath $fExpiry -CommandName 'fixture' -Subcommand 'other'
+      Assert-True -cond ($Expiry -eq '30d') -name 'global posix-only applies for different subcommand on posix host' -detail "Expiry=$Expiry"
+    }
+  } finally {
+    if ($null -eq $savedRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $savedRoot }
+    $script:_NucleusCliSpecCacheTried = $false
+    $script:_NucleusCliSpecCache = $null
+  }
+
 } finally {
   # check-suppress:suppression_doc: temp test dir cleanup must not mask test results
   Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+  foreach ($sr in $specRoots) {
+    # check-suppress:suppression_doc: temp test dir cleanup must not mask test results
+    Remove-Item -Recurse -Force $sr -ErrorAction SilentlyContinue
+  }
 }
 
 Write-Output "`n$passed passed, $failed failed"
