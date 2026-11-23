@@ -246,17 +246,18 @@ svc_mount_table_contains() {
 svc_run_bounded() {
   local bound="$1"
   shift
-  local pid ticks=0 max_ticks _sleep _tick_interval
+  local pid ticks=0 max_ticks _sleep _tick_interval _had_monitor
   _tick_interval="${NUCLEUS_TEST_POLL_INTERVAL:-0.2}"
   max_ticks="$(awk -v b="$bound" -v i="$_tick_interval" 'BEGIN { if (i <= 0) i = 0.2; print int((b / i) + 0.999999) }')"
   _sleep="${REAL_SLEEP:-sleep}"
 
   # Run in its own process group so timeout kills can reap children that keep
   # stdout/stderr open and would otherwise block command substitutions.
+  case $- in *m*) _had_monitor=1 ;; *) _had_monitor= ;; esac
   set -m
   "$@" &
-  set +m
   pid=$!
+  if [ -n "$_had_monitor" ]; then set -m; else set +m; fi
 
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$ticks" -ge "$max_ticks" ]; then
