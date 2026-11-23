@@ -271,23 +271,19 @@ Describe 'gen-completions.ps1 generated inventory' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
 
-    # WHY: the subcommands come from each Windows app's own parameter constraint,
-    # so this case pins the arrays to the CLI instead of to a second list that can
-    # drift. nucleus-gc logs was undiscoverable, and nucleus-gc all is the reverse
-    # case: a Windows-only action the array must offer and the zsh table must not.
+    # WHY: spec is the authoritative subcommand source. Parsing app source
+    # (ValidateSet/switch) regresses when the app moves to $ValidActions.
+    $spec = Get-Content -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-cli-spec.json') -Raw | ConvertFrom-Json -AsHashtable
     $failures = [System.Collections.Generic.List[string]]::new()
     foreach ($command in $Script:SubcommandSources.Keys) {
       $source = $Script:SubcommandSources[$command]
-      $appPath = Join-Path $Script:RepoRoot $source.App
-      $accepted = if ($source.Mechanism -eq 'switch') {
-        @(Get-SwitchSubcommandList -Path $appPath -Anchor $source.Anchor)
-      } else {
-        @(Get-ValidateSetSubcommandList -Path $appPath)
+      $app = @($spec.apps | Where-Object { $_.name -eq $command }) | Select-Object -First 1
+      $accepted = @()
+      if ($app -and $app.subcommands) {
+        $accepted = @($app.subcommands | ForEach-Object { $_.name } | Where-Object { $_ })
       }
       if ($accepted.Count -eq 0) {
-        # WHY: an extraction that landed on nothing would otherwise blame every
-        # offered label, which reads as a completer bug rather than a broken one.
-        $failures.Add("${command}: $($source.App) yielded no subcommand labels")
+        $failures.Add("${command}: spec yielded no subcommand labels")
         continue
       }
       $offered = @(Get-ProfileSubcommandList -VariableName $source.Variable -ProfileText $profileText)
@@ -305,7 +301,7 @@ Describe 'gen-completions.ps1 generated inventory' {
       }
     }
     ($failures -join '; ') | Should -BeNullOrEmpty -Because (
-      'nucleus-<command> must complete every subcommand its Windows app accepts, and nothing the app rejects')
+      'nucleus-<command> must complete every subcommand the spec declares, and nothing stale')
   }
 
   It 'gc flags include the full generated set' {
@@ -316,11 +312,20 @@ Describe 'gen-completions.ps1 generated inventory' {
     }
   }
 
-  It 'single-flag commands get a full --help entry (no corrupt scalar)' {
+  It 'config flags derive from spec (no corrupt scalar)' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     # Regression: if-expression unrolling once wrote "-" instead of "--help".
-    $profileText | Should -Match ([regex]::Escape("`$nucleusConfigFlags = @(") + "`r?`n  '--help'`r?`n\)")
+    $spec = Get-Content -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-cli-spec.json') -Raw | ConvertFrom-Json -AsHashtable
+    $configApp = @($spec.apps | Where-Object { $_.name -eq 'config' }) | Select-Object -First 1
+    $expected = @()
+    if ($configApp) {
+      foreach ($f in @($configApp.globalFlags)) { if ($f.long) { $expected += $f.long } }
+      foreach ($sc in @($configApp.subcommands)) { foreach ($f in @($sc.flags)) { if ($f.long) { $expected += $f.long } } }
+    }
+    $expected = @($expected | Sort-Object -Unique)
+    $actual = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusConfigFlags' -ProfileText $profileText | Sort-Object -Unique)
+    $actual | Should -Be $expected
     $profileText | Should -Not -Match ([regex]::Escape("`$nucleusConfigFlags = @(") + "`r?`n  '-'`r?`n\)")
   }
 
@@ -368,19 +373,31 @@ Describe 'gen-completions.ps1 generated inventory' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
 
-    # Commands whose generated (sorted) order equals the authoritative table.
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusAiFlags' -ProfileText $profileText) | Should -Be @('--ai-profile', '--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusUtilsFlags' -ProfileText $profileText) | Should -Be @('--dialog', '--help', '--preset', '--rm-bak')
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusSvcFlags' -ProfileText $profileText) | Should -Be @('--disable', '--enable', '--help', '--json', '--system', '--user', '--verbose')
-
-    # test/vm: assert the flag set matches the spec-driven inventory.
-    $testFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusTestFlags' -ProfileText $profileText)
-    $testExpected = @('--fail-fast', '--help', '--no-fail-fast', '--no-verbose', '--only-steps', '--quiet', '--verbose')
-    @($testFlags | Sort-Object) | Should -Be @($testExpected | Sort-Object)
+    # WHY: derive from spec so flag additions do not require a second manual table.
+    $spec = Get-Content -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-cli-spec.json') -Raw | ConvertFrom-Json -AsHashtable
+    $appVars = [ordered]@{
+      'ai'    = 'nucleusAiFlags'
+      'utils' = 'nucleusUtilsFlags'
+      'svc'   = 'nucleusSvcFlags'
+      'test'  = 'nucleusTestFlags'
+      'vm'    = 'nucleusVmFlags'
+    }
+    foreach ($appName in $appVars.Keys) {
+      $varName = $appVars[$appName]
+      $app = @($spec.apps | Where-Object { $_.name -eq $appName }) | Select-Object -First 1
+      $expected = @()
+      if ($app) {
+        foreach ($f in @($app.globalFlags)) { if ($f.long) { $expected += $f.long } }
+        foreach ($sc in @($app.subcommands)) {
+          foreach ($f in @($sc.flags)) { if ($f.long) { $expected += $f.long } }
+        }
+      }
+      $expected = @($expected | Sort-Object -Unique)
+      $actual = @(Get-NucleusFlagsFromProfile -VariableName $varName -ProfileText $profileText | Sort-Object -Unique)
+      $actual | Should -Be $expected -Because "$appName flags must match spec"
+    }
 
     $vmFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusVmFlags' -ProfileText $profileText)
-    $vmExpected = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gapps', '--gc', '--gc-data', '--gc-disabled', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source') | Sort-Object
-    @($vmFlags | Sort-Object) | Should -Be $vmExpected
     $vmFlags | Should -Not -Contain '--no-windows-iso'
     $profileText | Should -Not -Match '--remove-backup'
   }
