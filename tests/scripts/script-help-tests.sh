@@ -281,10 +281,9 @@ else
     "expected unknown action or path, got $(printf '%s' "$PS_STDERR" | one_line | cut -c1-160)"
 fi
 
-# WHY --list-steps: the full pipeline runs Test-Prerequisite (pack/packer/etc.),
-# which the nix test env does not carry. --list-steps exits early before prereqs
-# but still exercises the guard, so a real path must not be rejected.
-run_ps check.ps1 src/scripts/lib/lib.sh --list-steps
+# WHY service-registry: full mode + path arg is not applicable everywhere, so the
+# guard is exercised without running prereqs or platform-specific steps.
+run_ps check.ps1 src/scripts/lib/lib.sh --only-steps=service-registry
 if [ "$PS_EXIT" -eq 0 ]; then
   assert_pass "check.ps1 existing path: exits 0 (guard does not reject real path)"
 else

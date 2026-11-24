@@ -40,7 +40,7 @@ param(
   [switch]$ListSteps,
   [switch]$NoFailFast,
   [switch]$NoVerbose,
-  [string]$OnlySteps = '',
+  [string[]]$OnlySteps = @(),
   [switch]$Verbose,
   [switch]$Scoped,
   [switch]$Full
@@ -60,7 +60,7 @@ function Test-NamedArg {
   return $false
 }
 $misbound = @()
-if ($OnlySteps -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += $OnlySteps; $OnlySteps = '' }
+if ($OnlySteps.Count -gt 0 -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += @($OnlySteps); $OnlySteps = @() }
 $cliArgs = @($args) + @($misbound)
 
 Set-StrictMode -Version Latest
@@ -107,7 +107,7 @@ if ($FailFast) { $forwardArgs.Add('--fail-fast') }
 if ($NoFailFast) { $forwardArgs.Add('--no-fail-fast') }
 if ($NoVerbose) { $forwardArgs.Add('--no-verbose') }
 if ($Help) { $forwardArgs.Add('--help') }
-if ($OnlySteps) { $forwardArgs.Add("--only-steps=$OnlySteps") }
+if ($OnlySteps.Count -gt 0) { $forwardArgs.Add("--only-steps=$($OnlySteps -join ',')") }
 if ($Scoped) { $forwardArgs.Add('--scoped') }
 if ($Full) { $forwardArgs.Add('--full') }
 if ($Verbose) {

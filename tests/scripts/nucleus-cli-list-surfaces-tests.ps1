@@ -5,6 +5,8 @@ $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
+$prevNucleusRepoRoot = $env:NUCLEUS_REPO_ROOT
+$env:NUCLEUS_REPO_ROOT = $repoRoot
 $passed = 0
 $failed = 0
 
@@ -159,6 +161,7 @@ $vmTxt = (($vmOut | ForEach-Object { "$_" }) -join "`n")
 $vmBindErr = $vmTxt -match "unknown flag '--dry-run'|parameter cannot be found|A parameter cannot be found"
 Assert-True -cond (-not $vmBindErr) -name 'vm.ps1 sync --dry-run is not rejected as unknown normalizer flag' -detail ("rc={0} out={1}" -f $LASTEXITCODE, $vmTxt)
 
+if ($null -eq $prevNucleusRepoRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $prevNucleusRepoRoot }
 Write-Output "`n$passed passed, $failed failed"
 if ($failed -gt 0) { exit 1 }
 exit 0

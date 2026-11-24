@@ -63,7 +63,7 @@ param(
   [switch]$NoFailFast,
   [switch]$NoVerbose,
   [switch]$Online,
-  [string]$OnlySteps = '',
+  [string[]]$OnlySteps = @(),
   [switch]$Scoped,
   [switch]$ValidateOnly,
   [switch]$Verbose,
@@ -100,7 +100,7 @@ if ($Action -and $Action -ne 'all' -and ($Action -notin $ValidActions) -and -not
   $misbound += $Action
   $Action = 'all'
 }
-if ($OnlySteps -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += $OnlySteps; $OnlySteps = '' }
+if ($OnlySteps.Count -gt 0 -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += @($OnlySteps); $OnlySteps = @() }
 if ($WindowsTemplateOverride -and -not (Test-NamedArg -Name 'windows-template-override' -Raw $rawArgs)) { $misbound += $WindowsTemplateOverride; $WindowsTemplateOverride = '' }
 
 $cliArgs = @($args) + @($misbound)
@@ -427,7 +427,7 @@ if ($Scoped) { $pipelineForwardArgs.Add('--scoped') }
 if ($Online) { $pipelineForwardArgs.Add('--online') }
 if ($NoVerbose) { $pipelineForwardArgs.Add('--no-verbose') }
 if ($Help) { $pipelineForwardArgs.Add('--help') }
-if ($OnlySteps) { $pipelineForwardArgs.Add("--only-steps=$OnlySteps") }
+if ($OnlySteps.Count -gt 0) { $pipelineForwardArgs.Add("--only-steps=$($OnlySteps -join ',')") }
 if ($Verbose) {
   if ($verboseIds) { $pipelineForwardArgs.Add("--verbose=$verboseIds") }
   else { $pipelineForwardArgs.Add('--verbose') }
