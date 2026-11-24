@@ -63,7 +63,8 @@ BeforeAll {
     $Script:PosixOnlyGcCapabilities = @(
         $gcApp.globalFlags |
             Where-Object {
-                $platforms = @($_.platforms)
+                $pProp = $_.PSObject.Properties['platforms']
+                $platforms = if ($null -eq $pProp) { @() } else { @($pProp.Value) }
                 ($platforms -contains 'posix') -and (-not ($platforms -contains 'windows')) -and ($_.long -match '-gc$')
             } |
             ForEach-Object { ([string]$_.long) -replace '^--(?:no-)?', '' } |

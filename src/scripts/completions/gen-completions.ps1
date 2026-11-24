@@ -82,7 +82,9 @@ function Test-NucleusSpecFlagPlatform {
     [Parameter(Mandatory)]
     [string]$Platform
   )
-  $platforms = $Flag.platforms
+  $platformsProp = $Flag.PSObject.Properties['platforms']
+  if ($null -eq $platformsProp) { return $true }
+  $platforms = $platformsProp.Value
   if ($null -eq $platforms) { return $true }
   $values = @($platforms)
   if ($values.Count -eq 0) { return $true }

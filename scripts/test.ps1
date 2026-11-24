@@ -54,8 +54,24 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $rawArgs = @($args)
 function Test-NamedArg {
   param([string]$Name, [string[]]$Raw)
-  foreach ($r in $Raw) {
-    if ($r -eq "--$Name" -or $r -like "--$Name=*") { return $true }
+  $_norm = $Name.ToLowerInvariant() -replace '[^a-z0-9]', ''
+  $_candidates = @($Raw)
+  try { $_candidates += @([System.Environment]::GetCommandLineArgs()) } catch { } # check-suppress:suppression_doc: command line args are best-effort
+  foreach ($r in $_candidates) {
+    $_r = [string]$r
+    if ($_r -ieq "--$Name" -or $_r -ilike "--$Name=*") { return $true }
+    if ($_r -ieq "-$Name" -or $_r -ilike "-$Name=*") { return $true }
+    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
+    if ($_rn -eq $_norm) { return $true }
+  }
+  try {
+    $_cmd = [System.Environment]::CommandLine
+    if ($_cmd) { $_candidates += @($_cmd -split '[\s"''`]+') }
+  } catch { } # check-suppress:suppression_doc: command line args are best-effort
+  foreach ($r in $_candidates | Select-Object -Skip @($Raw).Count) {
+    $_r = [string]$r
+    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
+    if ($_rn -eq $_norm) { return $true }
   }
   return $false
 }

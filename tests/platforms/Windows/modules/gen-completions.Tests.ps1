@@ -19,6 +19,13 @@
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gen-completions.Tests.ps1 -Passthru"
 #>
 
+function Test-NucleusFlagAppliesToWindows($f) {
+  $p = if ($f -is [System.Collections.IDictionary]) { $f['platforms'] } else { $prop = $f.PSObject.Properties['platforms']; if ($null -eq $prop) { $null } else { $prop.Value } }
+  if ($null -eq $p) { return $true }
+  $vals = @($p)
+  return ($vals.Count -eq 0 -or $vals -contains 'windows')
+}
+
 BeforeAll {
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
@@ -277,11 +284,11 @@ Describe 'gen-completions.ps1 generated inventory' {
     $expected = @()
     if ($configApp) {
       foreach ($f in @($configApp.globalFlags)) {
-        if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+        if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
       }
       foreach ($sc in @($configApp.subcommands)) {
         foreach ($f in @($sc.flags)) {
-          if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+          if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
         }
       }
     }
@@ -350,11 +357,11 @@ Describe 'gen-completions.ps1 generated inventory' {
       $expected = @()
       if ($app) {
         foreach ($f in @($app.globalFlags)) {
-          if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+          if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
         }
         foreach ($sc in @($app.subcommands)) {
           foreach ($f in @($sc.flags)) {
-            if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+            if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
           }
         }
       }

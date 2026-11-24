@@ -283,12 +283,12 @@ fi
 
 # WHY service-registry: full mode + path arg is not applicable everywhere, so the
 # guard is exercised without running prereqs or platform-specific steps.
-run_ps check.ps1 src/scripts/lib/lib.sh --only-steps=service-registry
+run_ps check.ps1 src/scripts/lib/lib.sh -OnlySteps service-registry
 if [ "$PS_EXIT" -eq 0 ]; then
   assert_pass "check.ps1 existing path: exits 0 (guard does not reject real path)"
 else
   assert_fail "check.ps1 existing path: exit status" \
-    "expected 0, got $PS_EXIT; stderr=$(printf '%s' "$PS_STDERR" | one_line | cut -c1-160)"
+    "expected 0, got $PS_EXIT; stderr=$(printf '%s' "$PS_STDERR" | one_line | cut -c1-160); stdout=$(printf '%s' "$PS_STDOUT" | one_line | cut -c1-160)"
 fi
 
 finish_tests

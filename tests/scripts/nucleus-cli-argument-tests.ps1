@@ -57,12 +57,16 @@ $body
     return [pscustomobject]@{ Output = @($out); Rc = $rc; Text = (@($out) -join "`n") }
   }
 
-  function New-CliSpecRepoRoot([object]$spec) {
+  function New-CliSpecRepoRoot {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([object]$spec)
     $root = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-spec-test-" + [Guid]::NewGuid().ToString('n'))
     $specDir = Join-Path $root 'src/modules/completions'
-    New-Item -ItemType Directory -Path $specDir -Force > $null
-    $specPath = Join-Path $specDir 'nucleus-cli-spec.json'
-    $spec | ConvertTo-Json -Depth 20 | Set-Content -Path $specPath -Encoding UTF8
+    if ($PSCmdlet.ShouldProcess($specDir, 'Create test CLI spec repo root')) {
+      New-Item -ItemType Directory -Path $specDir -Force > $null
+      $specPath = Join-Path $specDir 'nucleus-cli-spec.json'
+      $spec | ConvertTo-Json -Depth 20 | Set-Content -Path $specPath -Encoding UTF8
+    }
     return $root
   }
 
