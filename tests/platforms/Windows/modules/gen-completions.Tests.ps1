@@ -127,51 +127,6 @@ BeforeAll {
     return @([regex]::Matches($match.Groups['list'].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
   }
 
-  function Get-ValidateSetSubcommandList {
-    # The labels of the ValidateSet on the entry-point parameter, meaning the
-    # first one inside the script's top-level param block: a nested option list
-    # (logs' scope, svc's live/pseudo list) must not answer for the subcommands.
-    param(
-      [Parameter(Mandatory)]
-      [string]$Path
-    )
-    $inBlock = $false
-    foreach ($line in (Get-Content -LiteralPath $Path)) {
-      if (-not $inBlock) {
-        if ($line -ceq 'param(') { $inBlock = $true }
-        continue
-      }
-      if ($line -ceq ')') { break }
-      if ($line -match 'ValidateSet\(') {
-        return @([regex]::Matches($line, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-      }
-    }
-    return @()
-  }
-
-  function Get-SwitchSubcommandList {
-    # The arm labels of a switch statement, for the one app that constrains its
-    # subcommands with a switch instead of a ValidateSet.
-    param(
-      [Parameter(Mandatory)]
-      [string]$Path,
-      [Parameter(Mandatory)]
-      [string]$Anchor
-    )
-    $inSwitch = $false
-    $labels = [System.Collections.Generic.List[string]]::new()
-    foreach ($line in (Get-Content -LiteralPath $Path)) {
-      if (-not $inSwitch) {
-        if ($line -ceq $Anchor) { $inSwitch = $true }
-        continue
-      }
-      if ($line -match '^\s*default') { break }
-      $match = [regex]::Match($line, "^\s*'([^']+)'")
-      if ($match.Success) { $labels.Add($match.Groups[1].Value) }
-    }
-    return @($labels)
-  }
-
   function Compare-SubcommandList {
     # The labels that are one-sided between an expected list and an actual
     # list, expected-only first and then actual-only. -Direction narrows the
@@ -307,7 +262,8 @@ Describe 'gen-completions.ps1 generated inventory' {
   It 'gc flags include the full generated set' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
-    foreach ($flag in '--tool-cache-gc', '--system-gc', '--nix-artifacts-gc', '--vm-data-gc', '--journald-gc') {
+    # --system-gc/--nix-artifacts-gc/--journald-gc are POSIX-only in spec; Windows generator filters them out.
+    foreach ($flag in '--tool-cache-gc', '--vm-data-gc', '--git-cache-gc', '--log-gc', '--scoop-gc') {
       $profileText | Should -Match ([regex]::Escape($flag))
     }
   }
@@ -320,8 +276,14 @@ Describe 'gen-completions.ps1 generated inventory' {
     $configApp = @($spec.apps | Where-Object { $_.name -eq 'config' }) | Select-Object -First 1
     $expected = @()
     if ($configApp) {
-      foreach ($f in @($configApp.globalFlags)) { if ($f.long) { $expected += $f.long } }
-      foreach ($sc in @($configApp.subcommands)) { foreach ($f in @($sc.flags)) { if ($f.long) { $expected += $f.long } } }
+      foreach ($f in @($configApp.globalFlags)) {
+        if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+      }
+      foreach ($sc in @($configApp.subcommands)) {
+        foreach ($f in @($sc.flags)) {
+          if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+        }
+      }
     }
     $expected = @($expected | Sort-Object -Unique)
     $actual = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusConfigFlags' -ProfileText $profileText | Sort-Object -Unique)
@@ -387,9 +349,13 @@ Describe 'gen-completions.ps1 generated inventory' {
       $app = @($spec.apps | Where-Object { $_.name -eq $appName }) | Select-Object -First 1
       $expected = @()
       if ($app) {
-        foreach ($f in @($app.globalFlags)) { if ($f.long) { $expected += $f.long } }
+        foreach ($f in @($app.globalFlags)) {
+          if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+        }
         foreach ($sc in @($app.subcommands)) {
-          foreach ($f in @($sc.flags)) { if ($f.long) { $expected += $f.long } }
+          foreach ($f in @($sc.flags)) {
+            if ($f.long -and ($null -eq $f.platforms -or @($f.platforms).Count -eq 0 -or @($f.platforms) -contains 'windows')) { $expected += $f.long }
+          }
         }
       }
       $expected = @($expected | Sort-Object -Unique)

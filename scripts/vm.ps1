@@ -188,6 +188,19 @@ function Get-VMManifest {
   return Get-Content $ManifestPath -Raw | ConvertFrom-Json
 }
 
+function Assert-NoExtraVMPositionalArg {
+  param(
+    [Parameter(Mandatory)]
+    [string]$ActionName,
+    [Parameter(Mandatory)]
+    [int]$Consumed
+  )
+  $extras = @($SubcommandArgs | Select-Object -Skip $Consumed | Where-Object { $_ -notlike '-*' })
+  if ($extras.Count -gt 0) {
+    Write-NucleusWarning "vm ${ActionName}: ignoring unexpected positional argument(s): $($extras -join ', ')"
+  }
+}
+
 function Invoke-VMSync {
   $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
@@ -221,6 +234,7 @@ function Invoke-VMBuildSystem {
     exit 1
   }
   $vmType = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'build-system' -Consumed 1
 
   $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
@@ -255,6 +269,7 @@ function Invoke-VMInject {
     exit 1
   }
   $vmName = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'inject' -Consumed 1
   $force = $Force.IsPresent
 
   $manifest = Get-VMManifest
@@ -385,6 +400,7 @@ function Invoke-VMStart {
   }
 
   $vmName = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'start' -Consumed 1
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
   $startScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPath "start-$vmName.ps1"
 
@@ -412,6 +428,7 @@ function Invoke-VMStop {
   }
 
   $vmName = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'stop' -Consumed 1
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
   $stopScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPath "stop-$vmName.ps1"
 
@@ -451,6 +468,7 @@ function Invoke-VMUpgrade {
   }
 
   $vmName = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'upgrade' -Consumed 1
   $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusError "Invoke-VMSetup module not found at $module"
@@ -470,6 +488,7 @@ function Invoke-VMReset {
   }
 
   $vmName = $SubcommandArgs[0]
+  Assert-NoExtraVMPositionalArg -ActionName 'reset' -Consumed 1
   $acceptGsiLicense = $AcceptGsiLicense.IsPresent
   if ($NoAcceptGsiLicense.IsPresent) { $acceptGsiLicense = $false }
 
@@ -520,8 +539,18 @@ function Invoke-VMAndroidConfig {
   if ($Root.IsPresent) { $configFlags += '--root' }
   if ($FakeWifi.IsPresent) { $configFlags += '--fake-wifi' }
   if ($FakeWifiRevert.IsPresent) { $configFlags += '--fake-wifi-revert' }
+  $extraPositional = @()
   if ($SubcommandArgs.Length -gt 1) {
-    $configFlags += @($SubcommandArgs[1..($SubcommandArgs.Length - 1)])
+    foreach ($arg in @($SubcommandArgs[1..($SubcommandArgs.Length - 1)])) {
+      if ($arg -like '-*') {
+        $configFlags += $arg
+      } else {
+        $extraPositional += $arg
+      }
+    }
+  }
+  if ($extraPositional.Count -gt 0) {
+    Write-NucleusWarning "vm android-config: ignoring unexpected positional argument(s): $($extraPositional -join ', ')"
   }
 
   $manifest = Get-VMManifest
@@ -556,6 +585,7 @@ function Invoke-VMResize {
 
   $vmName = $SubcommandArgs[0]
   $sizeArg = $SubcommandArgs[1]
+  Assert-NoExtraVMPositionalArg -ActionName 'resize' -Consumed 2
   $allowShrink = $AllowShrink.IsPresent
 
   $manifest = Get-VMManifest

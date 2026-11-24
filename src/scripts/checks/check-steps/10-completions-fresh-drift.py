@@ -104,26 +104,7 @@ def pwsh_spec_to_reflection(name, ps1, sf, env):
     except Exception as e:
         return [f'{name}: pwsh reflection failed: {e}']
     if param_count == 0:
-        # Hand-parsed script with no param() block: Get-Command exposes no parameter
-        # metadata, so fall back to runtime help output (not source text).
-        r = subprocess.run(
-            ['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-File', str(ps1), '--help'],
-            capture_output=True, text=True, env=env,
-        )
-        gh = subprocess.run(
-            ['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
-             f"Get-Help -Full '{str(ps1).replace(chr(39), chr(39) * 2)}' | Out-String -Width 4096"],
-            capture_output=True, text=True, env=env,
-        )
-        corpus_norm = norm(
-            (r.stdout or '') + '\n' + (r.stderr or '') + '\n' +
-            (gh.stdout or '') + '\n' + (gh.stderr or '')
-        )
-        errs = []
-        for flag in sorted(sf):
-            if norm(flag) not in corpus_norm:
-                errs.append(f'{name}: spec flag {flag} missing from pwsh help (no param metadata)')
-        return errs
+        return [f'{name}: pwsh reflection returned no declared parameters; spec flags cannot be verified']
     errs = []
     for flag in sorted(sf):
         if norm(flag) not in tokens:

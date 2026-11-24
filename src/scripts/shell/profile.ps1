@@ -788,8 +788,7 @@ $nucleusBootstrapFlags = @(
   '--no-ai-sync',
   '--no-apply',
   '--no-replica-sync',
-  '--replica-sync',
-  '--target-user'
+  '--replica-sync'
 )
 
 $nucleusCheckFlags = @(
@@ -825,16 +824,10 @@ $nucleusConfigFlags = @(
 $nucleusGcFlags = @(
   '--compress',
   '--dry-run',
-  '--duperemove-gc',
   '--expiry',
-  '--generations-keep',
   '--git-cache-gc',
   '--harness',
   '--help',
-  '--hm-expiry',
-  '--hm-gc',
-  '--hm-generations-keep',
-  '--journald-gc',
   '--json',
   '--kind',
   '--lines',
@@ -846,21 +839,12 @@ $nucleusGcFlags = @(
   '--log-max-size',
   '--max-files',
   '--max-size',
-  '--nix-artifacts-gc',
-  '--nix-expiry',
-  '--nix-gc',
   '--no-dry-run',
-  '--no-duperemove-gc',
   '--no-git-cache-gc',
-  '--no-hm-gc',
-  '--no-journald-gc',
   '--no-log-gc',
-  '--no-nix-artifacts-gc',
-  '--no-nix-gc',
   '--no-ollama-gc',
   '--no-sccache-gc',
   '--no-scoop-gc',
-  '--no-system-gc',
   '--no-tool-cache-gc',
   '--no-vm-data-gc',
   '--no-vm-gc',
@@ -871,8 +855,6 @@ $nucleusGcFlags = @(
   '--scoop-gc',
   '--scope',
   '--since',
-  '--system-gc',
-  '--system-generations-keep',
   '--tool-cache-gc',
   '--vm-data-gc',
   '--vm-gc',
@@ -920,7 +902,6 @@ $nucleusTestFlags = @(
   '--no-fail-fast',
   '--no-verbose',
   '--only-steps',
-  '--quiet',
   '--verbose'
 )
 
