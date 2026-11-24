@@ -9,6 +9,7 @@ import promptTools, {
 	NOTHING_TO_REPEAT_QUEUED_MESSAGE,
 	buildPromptChoices,
 	copyTextToClipboard,
+	createPromptPickerComponent,
 	createPromptToolsExtension,
 	extractUserMessageText,
 	filterPromptChoices,
@@ -25,6 +26,7 @@ import promptTools, {
 	readQueuedPrompt,
 	readQueuedPromptList,
 	resolvePromptChoice,
+	type PromptChoice,
 	type PromptToolsDeps,
 } from "../../../../../src/users/default/pi/extensions/prompt-tools.ts";
 
@@ -666,5 +668,186 @@ describe("handle helpers", () => {
 			[EMPTY_SESSION_MESSAGE, "info"],
 			[NOTHING_TO_CONTINUE_MESSAGE, "info"],
 		]);
+	});
+});
+
+describe("prompt picker component", () => {
+	const choices: readonly PromptChoice[] = [
+		{ source: "sent", text: "alpha prompt" },
+		{ source: "queued", text: "beta queued" },
+		{ source: "sent", text: "gamma prompt" },
+	];
+
+	test("empty filter shows all choices", () => {
+		let doneValue: PromptChoice | undefined | "unset" = "unset";
+		const component = createPromptPickerComponent(choices, (value) => {
+			doneValue = value;
+		});
+		const lines = component.render(80).join("\n");
+		expect(lines).toContain("alpha prompt");
+		expect(lines).toContain("beta queued");
+		expect(lines).toContain("gamma prompt");
+		expect(doneValue).toBe("unset");
+	});
+
+	test("typing narrows by case-insensitive substring match on prompt text", () => {
+		const component = createPromptPickerComponent(choices, () => {});
+		component.handleInput?.("B");
+		component.handleInput?.("E");
+		component.handleInput?.("T");
+		const lines = component.render(80).join("\n");
+		expect(lines.toLowerCase()).toContain("beta queued");
+		expect(lines.toLowerCase()).not.toContain("alpha prompt");
+		expect(lines.toLowerCase()).not.toContain("gamma prompt");
+	});
+
+	test("backspace restores previous filtered results", () => {
+		const component = createPromptPickerComponent(choices, () => {});
+		component.handleInput?.("b");
+		component.handleInput?.("e");
+		component.handleInput?.("t");
+		component.handleInput?.("\x7f");
+		component.handleInput?.("\x7f");
+		component.handleInput?.("\x7f");
+		const lines = component.render(80).join("\n");
+		expect(lines).toContain("alpha prompt");
+		expect(lines).toContain("beta queued");
+		expect(lines).toContain("gamma prompt");
+	});
+
+	test("up/down moves selection and clamps to filtered bounds", () => {
+		const selected: Array<PromptChoice | undefined> = [];
+		const component = createPromptPickerComponent(choices, (value) => {
+			selected.push(value);
+		});
+		component.handleInput?.("\x1b[A");
+		component.handleInput?.("\r");
+		expect(selected).toEqual([choices[0]]);
+	});
+
+	test("enter returns selected PromptChoice", () => {
+		const selected: Array<PromptChoice | undefined> = [];
+		const component = createPromptPickerComponent(choices, (value) => {
+			selected.push(value);
+		});
+		component.handleInput?.("\x1b[B");
+		component.handleInput?.("\r");
+		expect(selected).toEqual([choices[1]]);
+	});
+
+	test("escape cancels", () => {
+		const selected: Array<PromptChoice | undefined | "unset"> = ["unset"];
+		const component = createPromptPickerComponent(choices, (value) => {
+			selected.push(value);
+		});
+		component.handleInput?.("\x1b");
+		expect(selected).toEqual(["unset", undefined]);
+	});
+
+	test("no-match shows message and enter does not select", () => {
+		const selected: Array<PromptChoice | undefined> = [];
+		const component = createPromptPickerComponent(choices, (value) => {
+			selected.push(value);
+		});
+		for (const char of "zzz") {
+			component.handleInput?.(char);
+		}
+		const lines = component.render(80).join("\n").toLowerCase();
+		expect(lines).toContain("no match");
+		component.handleInput?.("\r");
+		expect(selected).toEqual([]);
+	});
+
+	test("renders long or multiline prompt as a single preview line", () => {
+		const longMultiline: readonly PromptChoice[] = [
+			{
+				source: "sent",
+				text: "line one\nline two\nline three with extra words to make it long enough for preview behavior",
+			},
+		];
+		const component = createPromptPickerComponent(longMultiline, () => {});
+		const lines = component.render(120);
+		const choiceLines = lines.filter((line) => line.includes("Sent:"));
+		expect(choiceLines).toHaveLength(1);
+		expect(choiceLines[0]).toBe(`> Sent: ${promptPreview(longMultiline[0].text)}`);
+		expect(choiceLines[0]).not.toContain("\n");
+	});
+});
+
+describe("pick mode uses custom picker when available", () => {
+	test("pickPromptChoice uses ui.custom and does not call select", async () => {
+		const choices: readonly PromptChoice[] = [
+			{ source: "sent", text: "sent prompt" },
+			{ source: "queued", text: "queued prompt" },
+		];
+		let selectCalls = 0;
+		let customCalls = 0;
+		const ui = {
+			select: async () => {
+				selectCalls += 1;
+				return undefined;
+			},
+			custom: async <T>(factory: (tui: unknown, theme: unknown, kb: unknown, done: (value: T) => void) => unknown) => {
+				customCalls += 1;
+				const component = await factory(
+					{},
+					{},
+					{},
+					(value: T) => value,
+				);
+				const c = component as { handleInput?: (data: string) => void };
+				c.handleInput?.("\r");
+				return choices[0] as T;
+			},
+		};
+		const result = await pickPromptChoice(choices, "", ui as never);
+		expect(customCalls).toBe(1);
+		expect(selectCalls).toBe(0);
+		expect(result).toEqual(choices[0]);
+	});
+
+	test("resolvePromptChoice pick uses ui.custom and does not show separate filter dialog", async () => {
+		let selectCalls = 0;
+		let inputCalls = 0;
+		let customCalls = 0;
+		const ui = {
+			select: async () => {
+				selectCalls += 1;
+				return undefined;
+			},
+			input: async () => {
+				inputCalls += 1;
+				return "";
+			},
+			custom: async <T>(factory: (tui: unknown, theme: unknown, kb: unknown, done: (value: T) => void) => unknown) => {
+				customCalls += 1;
+				const component = await factory({}, {}, {}, (value: T) => value);
+				const c = component as { handleInput?: (data: string) => void };
+				c.handleInput?.("\x1b[B");
+				c.handleInput?.("\r");
+				return { source: "queued", text: "queued prompt" } as T;
+			},
+		};
+		const ctx = {
+			sessionManager: {
+				getBranch: () => [{ type: "message", message: { role: "user", content: "sent prompt" } }],
+			},
+			ui,
+		};
+		const result = await resolvePromptChoice("pick", ctx as never, { readQueuedPrompt: () => "queued prompt" });
+		expect(customCalls).toBe(1);
+		expect(selectCalls).toBe(0);
+		expect(inputCalls).toBe(0);
+		expect(result).toEqual({ source: "queued", text: "queued prompt" });
+	});
+
+	test("ui.custom unavailable falls back to select", async () => {
+		const { ctx, selectCalls } = makeContext({
+			branch: [{ type: "message", message: { role: "user", content: "sent prompt" } }],
+			selectResult: `Sent: ${promptPreview("sent prompt")}`,
+		});
+		const result = await resolvePromptChoice("pick", ctx as never, { readQueuedPrompt: () => "queued prompt" });
+		expect(selectCalls).toHaveLength(1);
+		expect(result).toEqual({ source: "sent", text: "sent prompt" });
 	});
 });

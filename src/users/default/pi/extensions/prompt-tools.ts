@@ -350,6 +350,111 @@ function isPickerUi(value: unknown): value is ExtensionCommandContext["ui"] {
 	return isRecord(value) && typeof value.select === "function";
 }
 
+function isCustomPickerUi(
+	value: unknown,
+): value is ExtensionCommandContext["ui"] & { custom: NonNullable<ExtensionCommandContext["ui"]["custom"]> } {
+	return isRecord(value) && typeof value.custom === "function";
+}
+
+export interface PromptPickerComponent {
+	render(width: number): string[];
+	handleInput?(data: string): void;
+	invalidate?(): void;
+}
+
+export function createPromptPickerComponent(
+	choices: readonly PromptChoice[],
+	done: (value: PromptChoice | undefined) => void,
+): PromptPickerComponent {
+	let filter = "";
+	let selectedIndex = 0;
+
+	const filteredChoices = (): readonly PromptChoice[] => filterPromptChoices(choices, filter);
+
+	const clampSelection = (filtered: readonly PromptChoice[]): void => {
+		if (filtered.length === 0) {
+			selectedIndex = 0;
+			return;
+		}
+		if (selectedIndex < 0) {
+			selectedIndex = 0;
+			return;
+		}
+		if (selectedIndex >= filtered.length) {
+			selectedIndex = filtered.length - 1;
+		}
+	};
+
+	return {
+		render(_width: number): string[] {
+			const filtered = filteredChoices();
+			clampSelection(filtered);
+			const lines = [`Filter: ${filter}`, ""];
+			if (filtered.length === 0) {
+				lines.push("No matches");
+				return lines;
+			}
+			for (const [index, choice] of filtered.entries()) {
+				const prefix = index === selectedIndex ? "> " : "  ";
+				lines.push(`${prefix}${promptOptionLabel(choice)}`);
+			}
+			return lines;
+		},
+		handleInput(data: string): void {
+			const filtered = filteredChoices();
+			clampSelection(filtered);
+			if (data === "\x1b[A" || data === "\x1bOA") {
+				if (filtered.length > 0) {
+					selectedIndex = Math.max(0, selectedIndex - 1);
+				}
+				return;
+			}
+			if (data === "\x1b[B" || data === "\x1bOB") {
+				if (filtered.length > 0) {
+					selectedIndex = Math.min(filtered.length - 1, selectedIndex + 1);
+				}
+				return;
+			}
+			if (data === "\r" || data === "\n") {
+				if (filtered.length === 0) {
+					return;
+				}
+				done(filtered[selectedIndex]);
+				return;
+			}
+			if (data === "\x1b" || data === "\x1b\x1b") {
+				done(undefined);
+				return;
+			}
+			if (data === "\x7f" || data === "\b" || data === "\x1b[3~") {
+				if (filter.length > 0) {
+					filter = filter.slice(0, -1);
+					selectedIndex = 0;
+				}
+				return;
+			}
+			if (data.length === 1 && data >= " " && data !== "\x7f") {
+				filter += data;
+				selectedIndex = 0;
+			}
+		},
+		invalidate(): void {},
+	};
+}
+
+async function pickPromptWithCustom(
+	choices: readonly PromptChoice[],
+	ui: ExtensionCommandContext["ui"] & { custom: NonNullable<ExtensionCommandContext["ui"]["custom"]> },
+): Promise<PromptChoice | null | "cancelled"> {
+	if (choices.length === 0) {
+		return null;
+	}
+	const selected = await ui.custom<PromptChoice | undefined>((_tui, _theme, _kb, done) =>
+		createPromptPickerComponent(choices, done),
+	);
+	return selected === undefined ? "cancelled" : selected;
+}
+
 export async function pickPromptChoice(
 	first: PromptChoice | readonly PromptChoice[] | null,
 	second: PromptChoice | string | ExtensionCommandContext["ui"] | null,
@@ -360,6 +465,9 @@ export async function pickPromptChoice(
 		const choices = (first ?? []) as readonly PromptChoice[];
 		const filter = second;
 		const ui = third;
+		if (isCustomPickerUi(ui)) {
+			return pickPromptWithCustom(filterPromptChoices(choices, filter), ui);
+		}
 		const filtered = filterPromptChoices(choices, filter);
 		if (filtered.length === 0) {
 			return null;
@@ -394,6 +502,9 @@ export async function pickPromptChoice(
 		}
 		if (choices.length === 0) {
 			return null;
+		}
+		if (isCustomPickerUi(ui)) {
+			return pickPromptWithCustom(choices, ui);
 		}
 		const options = choices.map(promptOptionLabel);
 		const selected = await ui.select("Select prompt", options);
@@ -505,6 +616,10 @@ export async function resolvePromptChoice(
 		!sentPrompts.some((prompt) => typeof prompt.timestamp === "string" && prompt.timestamp.trim() !== "");
 	if (legacyTwo) {
 		return pickPromptChoice(sent, queued, ctx.ui);
+	}
+
+	if (isCustomPickerUi(ctx.ui)) {
+		return pickPromptWithCustom(choices, ctx.ui);
 	}
 
 	const filter = await promptForFilter(ctx.ui);
