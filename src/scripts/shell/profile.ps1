@@ -37,8 +37,9 @@ function Invoke-SafeDelete {
     try { $isInteractive = [Environment]::UserInteractive -and ($null -ne $Host.UI.RawUI) } catch { $isInteractive = $false }
   }
   process {
-    $targetPaths = if ($LiteralPath) { $LiteralPath } else { $Path }
-    if (-not $targetPaths) { return }
+    [string[]]$targetPaths = @()
+    if ($LiteralPath) { $targetPaths = @($LiteralPath) } else { $targetPaths = @($Path) }
+    if ($targetPaths.Count -eq 0) { return }
 
     if (-not $IsWindows) {
       # POSIX backend: delegate to the platform safe alternative.
