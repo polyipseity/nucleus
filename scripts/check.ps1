@@ -88,7 +88,7 @@ function Test-NamedArg {
   param([string]$Name, [string[]]$Raw)
   $_norm = $Name.ToLowerInvariant() -replace '[^a-z0-9]', ''
   $_candidates = @($Raw)
-  try { $_candidates += @([System.Environment]::GetCommandLineArgs()) } catch { } # check-suppress:suppression_doc: command line args are best-effort
+  try { $_candidates += @([System.Environment]::GetCommandLineArgs()) } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
   foreach ($r in $_candidates) {
     $_r = [string]$r
     if ($_r -ieq "--$Name" -or $_r -ilike "--$Name=*") { return $true }
@@ -99,7 +99,7 @@ function Test-NamedArg {
   try {
     $_cmd = [System.Environment]::CommandLine
     if ($_cmd) { $_candidates += @($_cmd -split '[\s"''`]+') }
-  } catch { } # check-suppress:suppression_doc: command line args are best-effort
+  } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
   foreach ($r in $_candidates | Select-Object -Skip @($Raw).Count) {
     $_r = [string]$r
     $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
