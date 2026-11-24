@@ -1,7 +1,100 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+mock.module("@earendil-works/pi-tui", () => {
+	class Input {
+		private value = "";
+		focused = false;
+		getValue(): string { return this.value; }
+		setValue(value: string): void { this.value = value; }
+		handleInput(data: string): void {
+			if (data === "\x7f" || data === "\b") { this.value = this.value.slice(0, -1); return; }
+			if (data === "\x1b[3~") { return; }
+			if (data.length === 1 && data >= " " && data !== "\x7f") { this.value += data; }
+		}
+		render(width: number): string[] { return [this.value.slice(0, width)]; }
+		invalidate(): void {}
+	}
+
+	class SelectList {
+		items: Array<{ value: string; label: string; description?: string }>;
+		selectedIndex = 0;
+		maxVisible: number;
+		theme: { noMatch?: (text: string) => string; scrollInfo?: (text: string) => string; selectedPrefix?: (text: string) => string; selectedText?: (text: string) => string; description?: (text: string) => string };
+		onSelect?: (item: { value: string; label: string; description?: string }) => void;
+		onCancel?: () => void;
+		constructor(items: Array<{ value: string; label: string; description?: string }>, maxVisible: number, theme: any) {
+			this.items = items;
+			this.maxVisible = maxVisible;
+			this.theme = theme;
+		}
+		setSelectedIndex(index: number): void { this.selectedIndex = index; }
+		getSelectedItem() { return this.items[this.selectedIndex] ?? null; }
+		invalidate(): void {}
+		render(width: number): string[] {
+			if (this.items.length === 0) return [(this.theme.noMatch?.("  No matches") ?? "  No matches").slice(0, width)];
+			const start = Math.max(0, Math.min(this.selectedIndex - Math.floor(this.maxVisible / 2), this.items.length - this.maxVisible));
+			const end = Math.min(start + this.maxVisible, this.items.length);
+			const lines: string[] = [];
+			for (let i = start; i < end; i++) {
+				const item = this.items[i];
+				const prefix = i === this.selectedIndex ? "> " : "  ";
+				lines.push(`${prefix}${item.label}`.slice(0, width));
+			}
+			if (start > 0 || end < this.items.length) lines.push(`(${this.selectedIndex + 1}/${this.items.length})`.slice(0, width));
+			return lines;
+		}
+		handleInput(data: string): void {
+			if (data === "\x1b[A" || data === "\x1bOA") { this.selectedIndex = this.items.length === 0 ? 0 : Math.max(0, this.selectedIndex - 1); return; }
+			if (data === "\x1b[B" || data === "\x1bOB") { this.selectedIndex = this.items.length === 0 ? 0 : Math.min(this.items.length - 1, this.selectedIndex + 1); return; }
+			if (data === "\r" || data === "\n") { const item = this.getSelectedItem(); if (item) this.onSelect?.(item); return; }
+			if (data === "\x1b" || data === "\x1b\x1b") { this.onCancel?.(); }
+		}
+	}
+
+	function fuzzyMatch(query: string, text: string) {
+		const q = query.toLower();
+		const t = text.toLowerCase();
+		let qi = 0;
+		let score = 0;
+		for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+			if (t[ti] === q[qi]) { score += ti; qi++; }
+		}
+		return { matches: qi === q.length, score };
+	}
+
+	function fuzzyFilter<T>(items: T[], query: string, getText: (item: T) => string): T[] {
+		if (!query) return [...items];
+		const tokens = query.trim().split(/\s+/).filter(Boolean);
+		if (tokens.length === 0) return [...items];
+		return items
+			.map((item) => {
+				const text = getText(item);
+				let total = 0;
+				for (const token of tokens) {
+					const m = fuzzyMatch(token, text);
+					if (!m.matches) return null;
+					total += m.score;
+				}
+				return { item, total };
+			})
+			.filter((x): x is { item: T; total: number } => x !== null)
+			.sort((a, b) => a.total - b.total)
+			.map((x) => x.item);
+	}
+
+	function truncateToWidth(text: string, width: number, ellipsis = ""): string {
+		if (width <= 0) return "";
+		if (text.length <= width) return text;
+		const e = ellipsis.slice(0, width);
+		return text.slice(0, Math.max(0, width - e.length)) + e;
+	}
+
+	return { Input, SelectList, fuzzyFilter, truncateToWidth };
+});
+
 import promptTools, {
 	EMPTY_SESSION_MESSAGE,
 	NOTHING_TO_CONTINUE_MESSAGE,
@@ -671,6 +764,90 @@ describe("handle helpers", () => {
 	});
 });
 
+function makePickerDeps() {
+	let renders = 0;
+	const tui = { requestRender: () => { renders += 1; } };
+	const theme = {
+		fg: (_color: string, text: string) => text,
+		bold: (text: string) => text,
+	};
+	const keybindings = {
+		matches: (data: string, binding: string) =>
+			binding === "tui.select.cancel" && (data === "\x1b" || data === "\x03"),
+	};
+	const piTuiModule = {
+		Input: class {
+			private value = "";
+			focused = false;
+			getValue() { return this.value; }
+			setValue(value: string) { this.value = value; }
+			handleInput(data: string) {
+				if (data === "\x7f" || data === "\b") { this.value = this.value.slice(0, -1); return; }
+				if (data === "\x1b[3~") { return; }
+				if (data.length === 1 && data >= " " && data !== "\x7f") { this.value += data; }
+			}
+			render(width: number) { return [this.value.slice(0, width)]; }
+			invalidate() {}
+		},
+		SelectList: class {
+			items: any[];
+			selectedIndex = 0;
+			maxVisible: number;
+			theme: any;
+			onSelect?: (item: any) => void;
+			onCancel?: () => void;
+			constructor(items: any[], maxVisible: number, theme: any) { this.items = items; this.maxVisible = maxVisible; this.theme = theme; }
+			setSelectedIndex(index: number) { this.selectedIndex = index; }
+			getSelectedIndex() { return this.selectedIndex; }
+			getSelectedItem() { return this.items[this.selectedIndex] ?? null; }
+			invalidate() {}
+			render(width: number) {
+				if (this.items.length === 0) return [("  No matches").slice(0, width)];
+				const start = Math.max(0, Math.min(this.selectedIndex - Math.floor(this.maxVisible / 2), this.items.length - this.maxVisible));
+				const end = Math.min(start + this.maxVisible, this.items.length);
+				const lines: string[] = [];
+				for (let i = start; i < end; i++) {
+					const item = this.items[i];
+					const prefix = i === this.selectedIndex ? "> " : "  ";
+					lines.push(`${prefix}${item.label}`.slice(0, width));
+				}
+				if (start > 0 || end < this.items.length) lines.push(`(${this.selectedIndex + 1}/${this.items.length})`.slice(0, width));
+				return lines;
+			}
+			handleInput(data: string) {
+				if (data === "\x1b[A" || data === "\x1bOA") { this.selectedIndex = this.items.length === 0 ? 0 : Math.max(0, this.selectedIndex - 1); return; }
+				if (data === "\x1b[B" || data === "\x1bOB") { this.selectedIndex = this.items.length === 0 ? 0 : Math.min(this.items.length - 1, this.selectedIndex + 1); return; }
+				if (data === "\r" || data === "\n") { const item = this.getSelectedItem(); if (item) this.onSelect?.(item); return; }
+				if (data === "\x1b" || data === "\x1b\x1b") { this.onCancel?.(); }
+			}
+		},
+		fuzzyFilter: <T,>(items: T[], query: string, getText: (item: T) => string): T[] => {
+			if (!query) return [...items];
+			const tokens = query.trim().split(/\s+/).filter(Boolean);
+			if (tokens.length === 0) return [...items];
+			const fuzzyMatch = (q: string, t: string) => {
+				const ql = q.toLowerCase(); const tl = t.toLowerCase();
+				let qi = 0; let score = 0;
+				for (let ti = 0; ti < tl.length && qi < ql.length; ti++) { if (tl[ti] === ql[qi]) { score += ti; qi++; } }
+				return { matches: qi === ql.length, score };
+			};
+			return items.map((item) => {
+				const text = getText(item);
+				let total = 0;
+				for (const token of tokens) { const m = fuzzyMatch(token, text); if (!m.matches) return null; total += m.score; }
+				return { item, total };
+			}).filter((x): x is { item: T; total: number } => x !== null).sort((a,b)=>a.total-b.total).map((x)=>x.item);
+		},
+		truncateToWidth: (text: string, width: number, ellipsis = ""): string => {
+			if (width <= 0) return "";
+			if (text.length <= width) return text;
+			const e = ellipsis.slice(0, width);
+			return text.slice(0, Math.max(0, width - e.length)) + e;
+		},
+	};
+	return { tui, theme, keybindings, piTuiModule, renderCount: () => renders };
+}
+
 describe("prompt picker component", () => {
 	const choices: readonly PromptChoice[] = [
 		{ source: "sent", text: "alpha prompt" },
@@ -678,11 +855,18 @@ describe("prompt picker component", () => {
 		{ source: "sent", text: "gamma prompt" },
 	];
 
+	test("filter bar visible with current query", () => {
+		const component = createPromptPickerComponent(choices, () => {}, "alp", makePickerDeps());
+		const lines = component.render(80).join("\n");
+		expect(lines).toContain("Filter:");
+		expect(lines).toContain("alp");
+	});
+
 	test("empty filter shows all choices", () => {
 		let doneValue: PromptChoice | undefined | "unset" = "unset";
 		const component = createPromptPickerComponent(choices, (value) => {
 			doneValue = value;
-		});
+		}, "", makePickerDeps());
 		const lines = component.render(80).join("\n");
 		expect(lines).toContain("alpha prompt");
 		expect(lines).toContain("beta queued");
@@ -691,7 +875,7 @@ describe("prompt picker component", () => {
 	});
 
 	test("typing narrows by case-insensitive substring match on prompt text", () => {
-		const component = createPromptPickerComponent(choices, () => {});
+		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
 		component.handleInput?.("B");
 		component.handleInput?.("E");
 		component.handleInput?.("T");
@@ -701,8 +885,38 @@ describe("prompt picker component", () => {
 		expect(lines.toLowerCase()).not.toContain("gamma prompt");
 	});
 
+	test("fuzzy match: query that is subsequence but not contiguous substring finds expected choice", () => {
+		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
+		component.handleInput?.("g");
+		component.handleInput?.("p");
+		component.handleInput?.("t");
+		const lines = component.render(80).join("\n").toLowerCase();
+		expect(lines).toContain("gamma prompt");
+		expect(lines).not.toContain("alpha prompt");
+		expect(lines).not.toContain("beta queued");
+	});
+
+	test("windowing: 30 choices renders at most fixed window, not 30 item lines", () => {
+		const many: PromptChoice[] = Array.from({ length: 30 }, (_, i) => ({
+			source: i % 2 === 0 ? "sent" : "queued",
+			text: `prompt number ${String(i).padStart(2, "0")}`,
+		}));
+		const component = createPromptPickerComponent(many, () => {}, "", makePickerDeps());
+		const lines = component.render(80);
+		expect(lines.length).toBeLessThanOrEqual(14);
+		for (let i = 10; i < 30; i++) {
+			expect(lines.join("\n")).not.toContain(`prompt number ${String(i).padStart(2, "0")}`);
+		}
+		for (let i = 0; i < 20; i++) {
+			component.handleInput?.("\x1b[B");
+		}
+		const moved = component.render(80).join("\n");
+		expect(moved).toContain("prompt number 20");
+		expect(moved.toLowerCase()).toMatch(/\d+\/30|scroll|↑|↓|more/);
+	});
+
 	test("backspace restores previous filtered results", () => {
-		const component = createPromptPickerComponent(choices, () => {});
+		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
 		component.handleInput?.("b");
 		component.handleInput?.("e");
 		component.handleInput?.("t");
@@ -719,7 +933,7 @@ describe("prompt picker component", () => {
 		const selected: Array<PromptChoice | undefined> = [];
 		const component = createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
-		});
+		}, "", makePickerDeps());
 		component.handleInput?.("\x1b[A");
 		component.handleInput?.("\r");
 		expect(selected).toEqual([choices[0]]);
@@ -729,7 +943,7 @@ describe("prompt picker component", () => {
 		const selected: Array<PromptChoice | undefined> = [];
 		const component = createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
-		});
+		}, "", makePickerDeps());
 		component.handleInput?.("\x1b[B");
 		component.handleInput?.("\r");
 		expect(selected).toEqual([choices[1]]);
@@ -739,16 +953,41 @@ describe("prompt picker component", () => {
 		const selected: Array<PromptChoice | undefined | "unset"> = ["unset"];
 		const component = createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
-		});
+		}, "", makePickerDeps());
 		component.handleInput?.("\x1b");
 		expect(selected).toEqual(["unset", undefined]);
+	});
+
+	test("ctrl+c cancels when keybindings match tui.select.cancel", () => {
+		const selected: Array<PromptChoice | undefined | "unset"> = ["unset"];
+		const component = createPromptPickerComponent(choices, (value) => {
+			selected.push(value);
+		}, "", makePickerDeps());
+		component.handleInput?.("\x03");
+		expect(selected).toEqual(["unset", undefined]);
+	});
+
+	test("requestRender called after input", () => {
+		const deps = makePickerDeps();
+		const component = createPromptPickerComponent(choices, () => {}, "", deps);
+		const before = deps.renderCount();
+		component.handleInput?.("a");
+		expect(deps.renderCount()).toBeGreaterThan(before);
+	});
+
+	test("pre-filter seed: initialQuery shows it and filters", () => {
+		const component = createPromptPickerComponent(choices, () => {}, "beta", makePickerDeps());
+		const lines = component.render(80).join("\n");
+		expect(lines).toContain("beta");
+		expect(lines.toLowerCase()).toContain("beta queued");
+		expect(lines.toLowerCase()).not.toContain("alpha prompt");
 	});
 
 	test("no-match shows message and enter does not select", () => {
 		const selected: Array<PromptChoice | undefined> = [];
 		const component = createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
-		});
+		}, "", makePickerDeps());
 		for (const char of "zzz") {
 			component.handleInput?.(char);
 		}
@@ -765,11 +1004,11 @@ describe("prompt picker component", () => {
 				text: "line one\nline two\nline three with extra words to make it long enough for preview behavior",
 			},
 		];
-		const component = createPromptPickerComponent(longMultiline, () => {});
+		const component = createPromptPickerComponent(longMultiline, () => {}, "", makePickerDeps());
 		const lines = component.render(120);
 		const choiceLines = lines.filter((line) => line.includes("Sent:"));
 		expect(choiceLines).toHaveLength(1);
-		expect(choiceLines[0]).toBe(`> Sent: ${promptPreview(longMultiline[0].text)}`);
+		expect(choiceLines[0]).toContain(`Sent: ${promptPreview(longMultiline[0].text)}`);
 		expect(choiceLines[0]).not.toContain("\n");
 	});
 });

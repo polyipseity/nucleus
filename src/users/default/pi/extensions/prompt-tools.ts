@@ -10,6 +10,53 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+type SelectItem = { value: string; label: string; description?: string };
+type SelectListTheme = {
+	selectedPrefix: (text: string) => string;
+	selectedText: (text: string) => string;
+	description: (text: string) => string;
+	scrollInfo: (text: string) => string;
+	noMatch: (text: string) => string;
+};
+
+interface PiTuiModule {
+	fuzzyFilter: <T>(items: T[], query: string, getText: (item: T) => string) => T[];
+	Input: new () => {
+		getValue(): string;
+		setValue(value: string): void;
+		handleInput(data: string): void;
+		render(width: number): string[];
+		invalidate?(): void;
+		focused?: boolean;
+	};
+	SelectList: new (items: SelectItem[], maxVisible: number, theme: SelectListTheme) => {
+		setSelectedIndex(index: number): void;
+		getSelectedItem(): SelectItem | null;
+		getSelectedIndex?(): number;
+		render(width: number): string[];
+		handleInput(data: string): void;
+		invalidate?(): void;
+		onSelect?: (item: SelectItem) => void;
+		onCancel?: () => void;
+	};
+	truncateToWidth: (text: string, width: number, ellipsis?: string) => string;
+}
+
+let piTui: PiTuiModule | undefined;
+async function loadPiTui(): Promise<PiTuiModule> {
+	if (!piTui) {
+		piTui = (await import("@earendil-works/pi-tui")) as unknown as PiTuiModule;
+	}
+	return piTui;
+}
+function requirePiTui(): PiTuiModule {
+	if (!piTui) {
+		throw new Error("pi-tui is not loaded");
+	}
+	return piTui;
+}
+// preload for sync rendering in interactive TUI
+void loadPiTui().catch(() => {});
 import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -362,95 +409,170 @@ export interface PromptPickerComponent {
 	invalidate?(): void;
 }
 
+interface PickerUiDeps {
+	readonly tui?: { requestRender?: () => void };
+	readonly theme?: {
+		fg?: (color: string, text: string) => string;
+		bold?: (text: string) => string;
+	};
+	readonly keybindings?: { matches?: (data: string, binding: string) => boolean };
+	readonly piTuiModule?: PiTuiModule;
+}
+
+const PICKER_VISIBLE_ROWS = 10;
+
+function promptPickerTheme(theme?: PickerUiDeps["theme"]): SelectListTheme {
+	const fg = theme?.fg ?? ((_color: string, text: string) => text);
+	return {
+		selectedPrefix: (text) => fg("accent", text),
+		selectedText: (text) => fg("accent", text),
+		description: (text) => fg("muted", text),
+		scrollInfo: (text) => fg("dim", text),
+		noMatch: (text) => fg("warning", text),
+	};
+}
+
 export function createPromptPickerComponent(
 	choices: readonly PromptChoice[],
 	done: (value: PromptChoice | undefined) => void,
+	initialQuery = "",
+	deps: PickerUiDeps = {},
 ): PromptPickerComponent {
-	let filter = "";
+	const tui = deps.piTuiModule ?? piTui;
+	if (!tui) {
+		throw new Error("pi-tui is not loaded");
+	}
+	const input = new tui.Input();
+	if (initialQuery !== "") {
+		input.setValue(initialQuery);
+	}
+
+	let filteredChoices: PromptChoice[] = [];
+	let currentItems: Array<SelectItem & { choice: PromptChoice }> = [];
 	let selectedIndex = 0;
+	let list = new tui.SelectList([], PICKER_VISIBLE_ROWS, promptPickerTheme(deps.theme));
 
-	const filteredChoices = (): readonly PromptChoice[] => filterPromptChoices(choices, filter);
-
-	const clampSelection = (filtered: readonly PromptChoice[]): void => {
-		if (filtered.length === 0) {
-			selectedIndex = 0;
+	const syncSelectedIndex = (): void => {
+		const selected = list.getSelectedItem();
+		if (!selected) {
+			selectedIndex = filteredChoices.length === 0 ? 0 : Math.min(selectedIndex, filteredChoices.length - 1);
 			return;
 		}
-		if (selectedIndex < 0) {
-			selectedIndex = 0;
-			return;
-		}
-		if (selectedIndex >= filtered.length) {
-			selectedIndex = filtered.length - 1;
-		}
+		const index = currentItems.findIndex((item) => item.value === selected.value && item.label === selected.label);
+		selectedIndex = index >= 0 ? index : 0;
 	};
 
+	const renderQuery = (): void => {
+		const query = input.getValue();
+		currentItems = tui
+			.fuzzyFilter([...choices], query, (choice) => `${promptOptionLabel(choice)} ${choice.text}`)
+			.map((choice) => ({
+				value: `${choice.source}\u0000${choice.text}`,
+				label: promptOptionLabel(choice),
+				description: "",
+				choice,
+			}));
+		const previousValue = list.getSelectedItem()?.value;
+		filteredChoices = currentItems.map((item) => item.choice);
+		list = new tui.SelectList(
+			currentItems.map(({ value, label, description }) => ({ value, label, description }) satisfies SelectItem),
+			PICKER_VISIBLE_ROWS,
+			promptPickerTheme(deps.theme),
+		);
+		selectedIndex = 0;
+		if (previousValue) {
+			const index = currentItems.findIndex((item) => item.value === previousValue);
+			if (index >= 0) {
+				selectedIndex = index;
+				list.setSelectedIndex(index);
+			}
+		}
+		list.onSelect = (item) => {
+			const index = currentItems.findIndex((candidate) => candidate.value === item.value && candidate.label === item.label);
+			done(index >= 0 ? currentItems[index].choice : undefined);
+		};
+		list.onCancel = () => {
+			done(undefined);
+		};
+		list.onSelectionChange = () => {
+			syncSelectedIndex();
+		};
+	};
+
+	renderQuery();
+
+	const requestRender = (): void => {
+		deps.tui?.requestRender?.();
+	};
+
+	const isCancel = (data: string): boolean =>
+		deps.keybindings?.matches?.(data, "tui.select.cancel") === true || data === "\x1b" || data === "\x1b\x1b";
+
+	const isPrintable = (data: string): boolean => data.length === 1 && data >= " " && data !== "\x7f";
+
 	return {
-		render(_width: number): string[] {
-			const filtered = filteredChoices();
-			clampSelection(filtered);
-			const lines = [`Filter: ${filter}`, ""];
-			if (filtered.length === 0) {
-				lines.push("No matches");
-				return lines;
-			}
-			for (const [index, choice] of filtered.entries()) {
-				const prefix = index === selectedIndex ? "> " : "  ";
-				lines.push(`${prefix}${promptOptionLabel(choice)}`);
-			}
-			return lines;
+		render(width: number): string[] {
+			const queryLine = tui.truncateToWidth(`Filter: ${input.getValue()}`, width, "");
+			const listLines = list.render(width).map((line) => tui.truncateToWidth(line, width, ""));
+			return [queryLine, "", ...listLines];
 		},
 		handleInput(data: string): void {
-			const filtered = filteredChoices();
-			clampSelection(filtered);
-			if (data === "\x1b[A" || data === "\x1bOA") {
-				if (filtered.length > 0) {
-					selectedIndex = Math.max(0, selectedIndex - 1);
-				}
-				return;
-			}
-			if (data === "\x1b[B" || data === "\x1bOB") {
-				if (filtered.length > 0) {
-					selectedIndex = Math.min(filtered.length - 1, selectedIndex + 1);
-				}
+			if (isCancel(data)) {
+				done(undefined);
+				requestRender();
 				return;
 			}
 			if (data === "\r" || data === "\n") {
-				if (filtered.length === 0) {
-					return;
+				syncSelectedIndex();
+				const choice = filteredChoices[selectedIndex];
+				if (choice) {
+					done(choice);
 				}
-				done(filtered[selectedIndex]);
+				requestRender();
 				return;
 			}
-			if (data === "\x1b" || data === "\x1b\x1b") {
-				done(undefined);
-				return;
+
+			const beforeQuery = input.getValue();
+			const beforeIndex = selectedIndex;
+			if (
+				data === "\x1b[A" ||
+				data === "\x1bOA" ||
+				data === "\x1b[B" ||
+				data === "\x1bOB" ||
+				data === "\x1b[5~" ||
+				data === "\x1b[6~"
+			) {
+				list.handleInput(data);
+				syncSelectedIndex();
+			} else {
+				input.handleInput(data);
 			}
-			if (data === "\x7f" || data === "\b" || data === "\x1b[3~") {
-				if (filter.length > 0) {
-					filter = filter.slice(0, -1);
-					selectedIndex = 0;
-				}
-				return;
+
+			if (input.getValue() !== beforeQuery) {
+				renderQuery();
 			}
-			if (data.length === 1 && data >= " " && data !== "\x7f") {
-				filter += data;
-				selectedIndex = 0;
+			if (input.getValue() !== beforeQuery || selectedIndex !== beforeIndex || isPrintable(data) || data === "\x7f" || data === "\b" || data === "\x1b[3~") {
+				requestRender();
 			}
 		},
-		invalidate(): void {},
+		invalidate(): void {
+			input.invalidate?.();
+			list.invalidate?.();
+		},
 	};
 }
 
 async function pickPromptWithCustom(
 	choices: readonly PromptChoice[],
 	ui: ExtensionCommandContext["ui"] & { custom: NonNullable<ExtensionCommandContext["ui"]["custom"]> },
+	initialQuery = "",
 ): Promise<PromptChoice | null | "cancelled"> {
 	if (choices.length === 0) {
 		return null;
 	}
-	const selected = await ui.custom<PromptChoice | undefined>((_tui, _theme, _kb, done) =>
-		createPromptPickerComponent(choices, done),
+	await loadPiTui();
+	const selected = await ui.custom<PromptChoice | undefined>((tui, theme, keybindings, done) =>
+		createPromptPickerComponent(choices, done, initialQuery, { tui, theme, keybindings }),
 	);
 	return selected === undefined ? "cancelled" : selected;
 }
@@ -466,7 +588,7 @@ export async function pickPromptChoice(
 		const filter = second;
 		const ui = third;
 		if (isCustomPickerUi(ui)) {
-			return pickPromptWithCustom(filterPromptChoices(choices, filter), ui);
+			return pickPromptWithCustom(choices, ui, filter);
 		}
 		const filtered = filterPromptChoices(choices, filter);
 		if (filtered.length === 0) {
@@ -619,7 +741,7 @@ export async function resolvePromptChoice(
 	}
 
 	if (isCustomPickerUi(ctx.ui)) {
-		return pickPromptWithCustom(choices, ctx.ui);
+		return pickPromptWithCustom(choices, ctx.ui, "");
 	}
 
 	const filter = await promptForFilter(ctx.ui);
