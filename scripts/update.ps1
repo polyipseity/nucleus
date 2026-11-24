@@ -100,6 +100,14 @@ if ($Sops) { $NoSops = $false }
 # WHY: without positional binding a leading flag lands in $Action instead of $RemainingArgs,
 # so the action slot is folded back into the scanned token list.
 $_ua = @($RemainingArgs)
+# WHY: under -Command with a subcommand word present, PowerShell binds a following
+# --flag into the [string]$Sections parameter instead of the matching switch, so the
+# flag never reaches the scan loop below and silently becomes a section name.
+# A flag-shaped $Sections is therefore a misbinding; return it to the token list.
+if ($Sections -match '^-') {
+  $_ua = @($Sections) + $_ua
+  $Sections = ''
+}
 if ($Action -match '^-') { $_ua = @($Action) + $_ua; $Action = 'all' }
 $i = 0
 while ($i -lt $_ua.Count) {

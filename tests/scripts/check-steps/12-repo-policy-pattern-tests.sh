@@ -828,6 +828,13 @@ function Register-Step {
   $script:stepAction = $Action
 }
 function Write-Message { param([Parameter(Mandatory, Position = 0)][string]$Message) Write-Output $Message }
+function Register-StepToolManifest {
+  param(
+    [Parameter(Mandatory)][string]$Id,
+    [AllowEmptyString()][string]$Tool = ''
+  )
+  $null = $Id, $Tool
+}
 function Write-ErrorMessage { param([Parameter(Mandatory, Position = 0)][string]$Message) Write-Output "ERROR: $Message" }
 function Select-GitIgnored { process { "$_" } }
 

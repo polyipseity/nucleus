@@ -54,6 +54,10 @@ function Register-Step {
   $null = $Id, $Name, $Platform, $Mode, $Requires
   $script:CapturedStepAction = $Action
 }
+function Register-StepToolManifest {
+  param($Id, $Tool)
+  $null = $Id, $Tool
+}
 . (Join-Path $CheckDir 'check-steps/12-repo-policy-pattern.ps1')
 if ($null -eq $script:CapturedStepAction) {
   throw 'step 12 action was not captured'

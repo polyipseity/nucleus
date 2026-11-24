@@ -18,6 +18,7 @@ STEP_FILE="${PROMPT_CONTRACT_STEP_FILE:-$REPO_ROOT/src/scripts/checks/check-step
 # shellcheck source=../../../src/scripts/checks/check-lib.sh
 . "$REPO_ROOT/src/scripts/checks/check-lib.sh"
 register_step() { :; }
+register_step_tools() { :; }
 _captured=""
 error() { _captured+="$*"$'\n'; }
 say() { :; }
