@@ -35,13 +35,21 @@ function Invoke-ProfileProbe {
   $null = New-Item -ItemType Directory -Path $tmp
   try {
     $log = Join-Path $tmp 'args.txt'
-    $fake = Join-Path $tmp 'safe-rm'
-    @'
+    if ($IsWindows) {
+      $fake = Join-Path $tmp 'safe-rm.cmd'
+      @"
+@echo off
+for %%A in (%*) do >> "$log" echo %%~A
+"@ | Set-Content -Path $fake -Encoding ascii
+    } else {
+      $fake = Join-Path $tmp 'safe-rm'
+      @'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$@" > "${NUCLEUS_SAFE_RM_LOG:?}"
 '@ | Set-Content -Path $fake -Encoding utf8NoBOM
-    & chmod +x $fake
+      & chmod +x $fake
+    }
 
     $child = @"
 `$ErrorActionPreference = 'Stop'
@@ -56,6 +64,29 @@ if (`$errors.Count -gt 0) { throw (`$errors | ForEach-Object Message | Join-Stri
 `$fn = `$ast.FindAll({ param(`$n) `$n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and `$n.Name -eq 'Invoke-SafeDelete' }, `$true) | Select-Object -First 1
 if (-not `$fn) { throw 'Invoke-SafeDelete not found in profile.ps1' }
 . ([scriptblock]::Create(`$fn.Extent.Text))
+
+# Windows fallback path calls `$script:OriginalRemoveItem when a target is not a
+# filesystem item. Stub it so the probe exercises the common target-path construction.
+`$script:OriginalRemoveItem = {
+  [CmdletBinding()]
+  param(
+    [Parameter(ValueFromPipeline=`$true, ValueFromPipelineByPropertyName=`$true)]
+    [string[]]`$Path,
+    [Parameter(ValueFromPipelineByPropertyName=`$true)]
+    [string[]]`$LiteralPath,
+    [Switch]`$Recurse,
+    [Switch]`$Force,
+    [string]`$Filter,
+    [string[]]`$Include,
+    [string[]]`$Exclude,
+    [Switch]`$WhatIf,
+    [Switch]`$Confirm
+  )
+  process {
+    `$paths = if (`$LiteralPath) { @(`$LiteralPath) } else { @(`$Path) }
+    `$paths | Add-Content -Path `$env:NUCLEUS_SAFE_RM_LOG -Encoding utf8NoBOM
+  }
+}
 
 $Expression
 "@
