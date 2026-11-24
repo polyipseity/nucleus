@@ -4,6 +4,7 @@
 bash_guard_require 5 1 check
 
 register_step "nix-flake-eval" "Nix flake evaluation and managed config keys" run_nix_flake_eval posix any none
+register_step_tools "nix-flake-eval" "nix nixf-tidy jq"
 
 _ne_now_ms() {
   if declare -F _step_now_ms >/dev/null 2>&1; then

@@ -222,3 +222,5 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Platfor
   Write-Message 'Code formatting and linting passed.'
   return $true
 }
+
+Register-StepToolManifest -Id "code-formatting" -Tool "actionlint pinact zizmor packer"

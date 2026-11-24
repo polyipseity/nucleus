@@ -591,3 +591,5 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   Write-Message "repository policy (pattern-based) passed."
   return $true
 }
+
+Register-StepToolManifest -Id "repo-policy-pattern" -Tool "git"

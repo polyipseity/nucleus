@@ -19,9 +19,8 @@
 #>
 
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Arguments = @(),
@@ -36,9 +35,17 @@ Assert-NucleusPowerShell -Minimum '7.0'
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or $Command -in @('-h', '--help', '-?', 'help')) {
+if ($Help -or ($Command -in @('-h', '--help', '-?', 'help'))) {
   Get-Help $PSCommandPath -Detailed
   return
+}
+
+# WHY: PositionalBinding is off so `--flag` reaches the arguments instead of filling the command slot.
+# The subcommand is the first token that is not a flag.
+$Arguments = @($Arguments | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+if ([string]::IsNullOrWhiteSpace($Command) -and $Arguments.Count -gt 0 -and $Arguments[0] -notmatch '^-') {
+  $Command = [string]$Arguments[0]
+  $Arguments = @($Arguments | Select-Object -Skip 1)
 }
 
 $configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json"

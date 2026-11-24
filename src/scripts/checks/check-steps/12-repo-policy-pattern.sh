@@ -14,6 +14,7 @@ _POLICY_STEP_SELF_SH="$REPLY"
 _POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
 register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern posix any none
+register_step_tools "repo-policy-pattern" "git nix"
 
 _POLICY_PATTERN_CHECKS=(
   "activation naming policy|run_activation_naming_policy|files"

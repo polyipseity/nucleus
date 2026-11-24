@@ -40,12 +40,11 @@
   Exit codes: 0 on success; non-zero on failure.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [string]$Action,
 
-  [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
+  [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$ServiceName = @(),
 
   [switch]$Json,
@@ -85,6 +84,10 @@ Assert-NucleusPowerShell -Minimum '7.0'
 . (Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1')
 # Normalize flags from ServiceName (ValueFromRemainingArguments)
 $ServiceName = @(Resolve-NucleusArgument -Arguments $ServiceName -CommandPath $PSCommandPath -CommandName 'svc' -Subcommand $Action -BoundParameters $PSBoundParameters)
+# WHY: PositionalBinding is off so `--flag` reaches the resolver instead of filling the action slot.
+# Positional words neither flag consumed are the action and the service names.
+$ServiceName = @($ServiceName | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+if ($ServiceName.Count -gt 0 -and [string]::IsNullOrWhiteSpace($Action)) { $Action = [string]$ServiceName[0]; $ServiceName = @($ServiceName | Select-Object -Skip 1) }
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed

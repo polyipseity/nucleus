@@ -314,3 +314,5 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   Write-Message "repository policy (data-driven) passed."
   return $true
 }
+
+Register-StepToolManifest -Id "repo-policy-data" -Tool "git"

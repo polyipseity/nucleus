@@ -525,6 +525,7 @@ function Initialize-StepState {
     $script:StepPlatforms = [System.Collections.Generic.List[string]]::new()
     $script:StepModes = [System.Collections.Generic.List[string]]::new()
     $script:StepRequires = [System.Collections.Generic.List[string]]::new()
+    $script:StepTools = [System.Collections.Generic.List[string]]::new()
     $script:OnlySteps = @()
     $script:NotRunStates = @{}
     $script:ONLINE = $false
@@ -1104,8 +1105,63 @@ try {
     }
 }
 
+# ---- Tool manifests: per-step prerequisite declaration ----
+
+function Test-RegisterStepToolManifest-StoresManifest {
+    Initialize-StepState
+    . $stepRunner
+
+    Register-Step -Id 'lint' -Number 1 -Name 'Lint' -Action { $true }
+    Register-Step -Id 'registry' -Number 2 -Name 'Registry' -Action { $true }
+    Register-StepToolManifest -Id 'lint' -Tool 'jq yq'
+
+    $lintTools = $script:StepTools[0]
+    $registryTools = $script:StepTools[1]
+    if ($lintTools -eq 'jq yq' -and $registryTools -eq '') {
+        Assert-Pass "Register-StepToolManifest stores tools on the named step and leaves others empty"
+    } else {
+        Assert-Fail "Register-StepToolManifest stores tools" "got lint='$lintTools' registry='$registryTools'"
+    }
+}
+
+function Test-RegisterStepToolManifest-UnknownId {
+    Initialize-StepState
+    . $stepRunner
+
+    Register-Step -Id 'lint' -Number 1 -Name 'Lint' -Action { $true }
+    $threw = $false
+    $message = ''
+    try {
+        Register-StepToolManifest -Id 'no-such-step' -Tool 'jq'
+    } catch {
+        $threw = $true
+        $message = $_.Exception.Message
+    }
+    if ($threw -and $message -match 'unknown step id') {
+        Assert-Pass "Register-StepToolManifest rejects an unknown step id"
+    } else {
+        Assert-Fail "Register-StepToolManifest unknown id" "threw=$threw message='$message'"
+    }
+}
+
+function Test-RegisterStep-ToolsDefaultEmpty {
+    Initialize-StepState
+    . $stepRunner
+
+    Register-Step -Id 'lint' -Number 1 -Name 'Lint' -Action { $true }
+
+    if ($script:StepTools.Count -eq 1 -and $script:StepTools[0] -eq '') {
+        Assert-Pass "Register-Step appends an empty tool declaration so indices stay aligned"
+    } else {
+        Assert-Fail "Register-Step tool default" "got count=$($script:StepTools.Count) value='$($script:StepTools[0])'"
+    }
+}
+
 Test-SaveFileListCache-NoPathBeyondSymlink
 Test-PipelineLiveProgressReportsFinishedAndHeartbeat
+Test-RegisterStepToolManifest-StoresManifest
+Test-RegisterStepToolManifest-UnknownId
+Test-RegisterStep-ToolsDefaultEmpty
 Test-PipelineTimeoutFailsStepWith124
 Test-PipelineTimeoutRejectsNonNumeric
 Test-PipelineTimeoutZeroDisablesBound

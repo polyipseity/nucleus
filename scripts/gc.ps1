@@ -72,9 +72,8 @@
   Environment variables: NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [string]$Action = '',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
@@ -145,6 +144,9 @@ $null = $GitCacheGc, $LogGc, $OllamaGc, $SccacheGc, $ScoopGc, $ToolCacheGc, $VMG
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 $leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'gc' -Subcommand $Action -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+# WHY: PositionalBinding is off so `--flag` reaches the resolver instead of filling the action slot.
+# The action word arrives as the first leftover token.
+if ($leftover.Count -gt 0) { $Action = [string]$leftover[0]; $leftover = @($leftover | Select-Object -Skip 1) }
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'gc' "unexpected argument '$($leftover[0])'"
   exit 1

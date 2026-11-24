@@ -187,3 +187,5 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
   Write-Message "schema validation passed."
   return $true
 }
+
+Register-StepToolManifest -Id "schema-validation" -Tool "check-jsonschema yamllint"

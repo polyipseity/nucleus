@@ -993,7 +993,7 @@ test_runner_abort_diagnostic_silent_for_normal_step_failure() {
   local _out _exit=0
   _out=$(
     set +e
-    # shellcheck disable=SC2031 # reason: subshell-scoped; the change is intentionally local to this test
+    # shellcheck disable=SC2030,SC2031 # reason: PARALLEL_JOBS must be set in the subshell that sources step-runner; the change is scoped to that subshell
     export PARALLEL_JOBS=1
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
@@ -1017,5 +1017,61 @@ test_runner_abort_before_any_step_started_reports_diagnostic
 test_runner_abort_diagnostic_silent_for_help
 test_runner_abort_diagnostic_silent_for_list_steps
 test_runner_abort_diagnostic_silent_for_normal_step_failure
+
+# ---- Tool manifests: per-step prerequisite declaration ----
+
+test_register_step_tools_stores() {
+  local result
+  result=$(
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    register_step "lint" 1 "Lint" lint_func
+    register_step "registry" 2 "Registry" registry_func
+    register_step_tools "lint" "jq yq"
+    echo "${_STEP_TOOLS[0]}|${_STEP_TOOLS[1]}"
+  )
+  if [ "$result" = "jq yq|" ]; then
+    assert_pass "register_step_tools stores tools on the named step and leaves others empty"
+  else
+    assert_fail "register_step_tools stores tools" "Expected 'jq yq|', got: $result"
+  fi
+}
+
+test_register_step_tools_unknown_id() {
+  local result rc
+  # WHY: the function exits the shell on an unknown id, so it needs its own
+  # process; a subshell would otherwise abort the suite.
+  set +e
+  result=$({
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    register_step "lint" 1 "Lint" lint_func
+    register_step_tools "no-such-step" "jq"
+  } 2>&1)
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ] && echo "$result" | grep -q "unknown step id"; then
+    assert_pass "register_step_tools rejects an unknown step id"
+  else
+    assert_fail "register_step_tools unknown id" "rc=$rc output=$result"
+  fi
+}
+
+test_register_step_tools_default_empty() {
+  local result
+  result=$(
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    register_step "lint" 1 "Lint" lint_func
+    echo "count=${#_STEP_TOOLS[@]} value='${_STEP_TOOLS[0]}'"
+  )
+  if [ "$result" = "count=1 value=''" ]; then
+    assert_pass "register_step appends an empty tool declaration so indices stay aligned"
+  else
+    assert_fail "register_step tool default" "Expected \"count=1 value=''\", got: $result"
+  fi
+}
+
+echo "--- Tool manifests ---"
+test_register_step_tools_stores
+test_register_step_tools_unknown_id
+test_register_step_tools_default_empty
 
 finish_tests

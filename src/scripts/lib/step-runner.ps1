@@ -50,6 +50,10 @@ $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
 $script:StepPlatforms = [System.Collections.Generic.List[string]]::new()
 $script:StepModes = [System.Collections.Generic.List[string]]::new()
 $script:StepRequires = [System.Collections.Generic.List[string]]::new()
+# External tools a step invokes. Test-Prerequisite asserts only the tools of steps
+# that will actually run, so a path-scoped or --only-steps run never demands a
+# tool its selected steps do not use.
+$script:StepTools = [System.Collections.Generic.List[string]]::new()
 $script:StepLibPath = $null
 $script:OnlySteps = @()
 $script:NotRunStates = @{}
@@ -127,6 +131,34 @@ function Register-Step {
   $script:StepPlatforms.Add($Platform)
   $script:StepModes.Add($Mode)
   $script:StepRequires.Add($Requires)
+  $script:StepTools.Add('')
+}
+
+function Register-StepToolManifest {
+  <#
+  .SYNOPSIS
+    Declares the external commands a registered step invokes.
+  .DESCRIPTION
+    Test-Prerequisite requires exactly these tools, so a tool missing from the
+    declaration surfaces on the run that needs it while a tool belonging to an
+    unselected step is never demanded.
+  .PARAMETER Id
+    Registered step id.
+  .PARAMETER Tool
+    Space-separated external command names.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Id,
+    [AllowEmptyString()]
+    [string]$Tool = ''
+  )
+  $index = $script:StepIds.IndexOf($Id)
+  if ($index -lt 0) {
+    throw "Register-StepToolManifest: unknown step id '$Id'"
+  }
+  $script:StepTools[$index] = $Tool
 }
 
 # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
@@ -914,18 +946,14 @@ function Format-StepSummary {
 }
 
 function Test-Prerequisite {
-  Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
-  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
-  Assert-ToolAvailable -Name 'bun' -Type 'Command'
-  Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
+  for ($i = 0; $i -lt $script:StepIds.Count; $i++) {
+    $stepId = $script:StepIds[$i]
+    $state = Get-StepRunState -Id $stepId -Platform $script:StepPlatforms[$i] -Mode $script:StepModes[$i] -Requires $script:StepRequires[$i]
+    if ($null -ne $state) { continue }
+    foreach ($toolName in @($script:StepTools[$i] -split '\s+' | Where-Object { $_ })) {
+      Assert-ToolAvailable -Name $toolName -Type 'Command'
+    }
+  }
+  # WHY: deny-list filtering shells out to git in the runner itself, before any step runs.
   Assert-ToolAvailable -Name 'git' -Type 'Command'
-  Assert-ToolAvailable -Name 'jq' -Type 'Command'
-  Assert-ToolAvailable -Name 'packer' -Type 'Command'
-  Assert-ToolAvailable -Name 'pinact' -Type 'Command'
-  Assert-ToolAvailable -Name 'pwsh' -Type 'Command'
-  Assert-ToolAvailable -Name 'shfmt' -Type 'Command'
-  Assert-ToolAvailable -Name 'taplo' -Type 'Command'
-  Assert-ToolAvailable -Name 'yamllint' -Type 'Command'
-  Assert-ToolAvailable -Name 'yq' -Type 'Command'
-  Assert-ToolAvailable -Name 'zizmor' -Type 'Command'
 }

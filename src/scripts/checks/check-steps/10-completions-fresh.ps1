@@ -335,3 +335,5 @@ if errors:
   Write-Message "completions are fresh."
   return $true
 }
+
+Register-StepToolManifest -Id "completions-fresh" -Tool "pwsh jq python3"

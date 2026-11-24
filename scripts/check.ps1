@@ -53,6 +53,7 @@
   Environment variables:
     NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #>
+[CmdletBinding(PositionalBinding = $false)]
 param(
   [string]$Action = 'all',
   [switch]$FailFast,
@@ -66,9 +67,10 @@ param(
   [string[]]$OnlySteps = @(),
   [switch]$Scoped,
   [switch]$ValidateOnly,
-  [switch]$Verbose,
   [string]$WindowsTemplateOverride = '',
-  [switch]$AnnotationCheckOnly
+  [switch]$AnnotationCheckOnly,
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 Set-StrictMode -Version Latest
@@ -81,47 +83,17 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-# WHY: with plain param() positional binding, stray positionals can be captured by string params.
-# Reclassify any value-param that was not explicitly named as --name/--name= in raw args.
-$rawArgs = @($args)
-function Test-NamedArg {
-  param([string]$Name, [string[]]$Raw)
-  $_norm = $Name.ToLowerInvariant() -replace '[^a-z0-9]', ''
-  $_candidates = @($Raw)
-  try { $_candidates += @([System.Environment]::GetCommandLineArgs()) } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
-  foreach ($r in $_candidates) {
-    $_r = [string]$r
-    if ($_r -ieq "--$Name" -or $_r -ilike "--$Name=*") { return $true }
-    if ($_r -ieq "-$Name" -or $_r -ilike "-$Name=*") { return $true }
-    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
-    if ($_rn -eq $_norm) { return $true }
-  }
-  try {
-    $_cmd = [System.Environment]::CommandLine
-    if ($_cmd) { $_candidates += @($_cmd -split '[\s"''`]+') }
-  } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
-  foreach ($r in $_candidates | Select-Object -Skip @($Raw).Count) {
-    $_r = [string]$r
-    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
-    if ($_rn -eq $_norm) { return $true }
-  }
-  return $false
-}
-$ValidActions = @('all', 'packer', 'sh', 'pwsh')
-
-$misbound = @()
-if ($Action -and $Action -ne 'all' -and ($Action -notin $ValidActions) -and -not (Test-NamedArg -Name 'action' -Raw $rawArgs)) {
-  $misbound += $Action
-  $Action = 'all'
-}
-if ($OnlySteps.Count -gt 0 -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += @($OnlySteps); $OnlySteps = @() }
-if ($WindowsTemplateOverride -and -not (Test-NamedArg -Name 'windows-template-override' -Raw $rawArgs)) { $misbound += $WindowsTemplateOverride; $WindowsTemplateOverride = '' }
-
-$cliArgs = @($args) + @($misbound)
+# WHY: --verbose is value-optional and must not fill the action slot, so it is read as a
+# plain variable rather than a parameter; a declared parameter would either reject the
+# `=ids` form or collide with the advanced-function common parameter.
+$Verbose = $false
+# Normalize positionals through the shared resolver: with PositionalBinding off, flags and
+# positionals both arrive here, and the resolver is the only flag-binding mechanism.
+$cliArgs = @($RemainingArgs)
 
 # Top-level help request (matches check.sh).
 $_firstRaw = if ($cliArgs.Count -gt 0) { [string]$cliArgs[0] } else { '' }
-if ($_firstRaw -in @('help', '-h', '--help', '-Help') -or ($Help -and $Action -eq 'all' -and $cliArgs.Count -eq 0)) {
+if ($_firstRaw -in @('help', '-h', '--help', '-Help') -or ($Help -and $cliArgs.Count -eq 0)) {
   Write-Output "Usage: check.ps1 [-h|--help] [all|packer|sh|pwsh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps] [--validate-only] [path ...]"
   Write-Output "  Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch."
   Write-Output "  Subcommands: all, packer, sh, pwsh."
@@ -143,8 +115,9 @@ $cliArgs = @($cliArgs | Where-Object { $_ -ne '--paths' })
 $leftover = @((Resolve-NucleusArgument -Arguments $cliArgs -CommandPath $PSCommandPath -CommandName 'check' -Subcommand $Action -PassThroughUnknownFlags -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 
 # First leftover token may be an action word.
+$ValidActions = @('all', 'packer', 'sh', 'pwsh')
 if ($leftover.Count -gt 0 -and $leftover[0] -in $ValidActions) {
-  if ($Action -eq 'all') { $Action = [string]$leftover[0] }
+  $Action = [string]$leftover[0]
   $leftover = @($leftover | Select-Object -Skip 1)
 }
 

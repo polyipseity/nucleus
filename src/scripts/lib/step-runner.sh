@@ -21,6 +21,10 @@ declare -a _STEP_FUNCS=()
 declare -a _STEP_PLATFORMS=()
 declare -a _STEP_MODES=()
 declare -a _STEP_REQUIRES=()
+# External tools a step invokes. preflight_check asserts only the tools of steps
+# that will actually run, so a path-scoped or --only-steps run never demands a
+# tool its selected steps do not use.
+declare -a _STEP_TOOLS=()
 # Populated at dispatch, rendered by aggregate_results as '–'.
 declare -A _NOT_RUN_STATES=()
 
@@ -121,6 +125,23 @@ register_step() {
   _STEP_PLATFORMS+=("$_platform")
   _STEP_MODES+=("$_mode")
   _STEP_REQUIRES+=("$_requires")
+  _STEP_TOOLS+=("")
+}
+
+# register_step_tools <id> <space-separated tools>
+# Declares the external commands a step invokes. preflight_check requires exactly
+# these, so a tool missing from this list is caught when its step runs and a tool
+# belonging to an unselected step is never demanded.
+register_step_tools() {
+  local _id="$1" _tools="$2" _i
+  for _i in "${!_STEP_IDS[@]}"; do
+    if [ "${_STEP_IDS[$_i]}" = "$_id" ]; then
+      _STEP_TOOLS[_i]="$_tools"
+      return 0
+    fi
+  done
+  error "register_step_tools: unknown step id '$_id'"
+  exit 1
 }
 
 _wave_tmpdir=""
@@ -896,21 +917,17 @@ aggregate_results() {
 }
 
 preflight_check() {
-  require_command actionlint
-  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
-  require_command bun
-  require_command check-jsonschema
-  require_command git # required by deny-list.sh for gitignore filtering; must hard-fail rather than silently pass through
-  require_command jq
-  require_command nix
-  require_command nixf-tidy
-  require_command packer
-  require_command pinact
-  require_command pwsh
-  require_command shfmt
-  require_command taplo
-  require_command treefmt
-  require_command yamllint
-  require_command yq
-  require_command zizmor
+  local _i _id _tool
+  for _i in "${!_STEP_IDS[@]}"; do
+    _id="${_STEP_IDS[$_i]}"
+    if [ -n "$(_step_run_state "$_id" "${_STEP_PLATFORMS[$_i]}" "${_STEP_MODES[$_i]}" "${_STEP_REQUIRES[$_i]}")" ]; then
+      continue
+    fi
+    for _tool in ${_STEP_TOOLS[$_i]}; do
+      require_command "$_tool"
+    done
+  done
+  # WHY: deny-list.sh shells out to git for gitignore filtering in the runner itself,
+  # before any step runs, so this is a runner prerequisite rather than a step tool.
+  require_command git
 }

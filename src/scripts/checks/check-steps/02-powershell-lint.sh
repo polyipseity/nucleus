@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "powershell-lint" "PowerShell syntax" run_powershell_lint posix any none
+register_step_tools "powershell-lint" "pwsh git"
 
 run_powershell_lint() {
   local -n ctx="$1"

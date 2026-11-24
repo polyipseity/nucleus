@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "schema-validation" "Schema validation (JSON/YAML)" run_schema_validation posix any none
+register_step_tools "schema-validation" "check-jsonschema yamllint jq yq"
 
 run_schema_validation() {
   local -n ctx="$1"

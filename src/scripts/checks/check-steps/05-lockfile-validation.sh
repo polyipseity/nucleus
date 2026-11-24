@@ -4,6 +4,7 @@
 bash_guard_require 5 1 check
 
 register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation posix any none
+register_step_tools "lockfile-validation" "jq yq"
 
 run_lockfile_validation() {
   local -n ctx="$1"

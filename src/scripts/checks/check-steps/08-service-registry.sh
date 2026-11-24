@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "service-registry" "Service registry validation" run_service_registry posix full none
+register_step_tools "service-registry" "jq"
 
 run_service_registry() {
   local -n ctx="$1"

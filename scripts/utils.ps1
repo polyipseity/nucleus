@@ -36,9 +36,8 @@
   src/scripts/notify/.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [ValidateSet('optimize-pdf', 'strip-metadata', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')]
   [string]$Action,
 
@@ -72,7 +71,7 @@ param(
   [Parameter()]
   [switch]$Hook,
 
-  [Parameter(Position = 1, ValueFromRemainingArguments)]
+  [Parameter(ValueFromRemainingArguments)]
   [string[]]$File = @(),
 
   [Alias("h")]
@@ -475,6 +474,10 @@ if ($Help) {
 
 # A bare invocation prints the usage summary and succeeds, matching utils.sh:
 # asking which subcommand to run is not a failure.
+# WHY: PositionalBinding is off so `--flag` stays a flag instead of filling the action slot.
+# The subcommand is the first token that is a known action word.
+$File = @($File | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+if ([string]::IsNullOrWhiteSpace($Action) -and $File.Count -gt 0) { $Action = [string]$File[0]; $File = @($File | Select-Object -Skip 1) }
 if (-not $Action) {
   $scriptName = Split-Path -Leaf $PSCommandPath
   Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>... | harness-notify <harness> <event> [text] | harness-approval [-Plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [args]..."

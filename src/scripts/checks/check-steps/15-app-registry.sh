@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "app-registry" "App auto-start registry validation" run_app_registry posix full none
+register_step_tools "app-registry" "jq"
 
 # _kind_in_enum <kind> <array-name>: true when the named array holds <kind>.
 _kind_in_enum() {

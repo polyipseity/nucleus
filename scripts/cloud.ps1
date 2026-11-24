@@ -13,9 +13,8 @@
 
 #Requires -Version 7.4
 
-[CmdletBinding(DefaultParameterSetName = 'Action')]
+[CmdletBinding(DefaultParameterSetName = 'Action', PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [string]$Action = 'setup',
 
   # setup options
@@ -45,7 +44,10 @@ $fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Forma
 Import-Module $fmtModulePath -Force -DisableNameChecking
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
-$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'cloud' -Subcommand $Action -BoundParameters $PSBoundParameters)
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'cloud' -Subcommand $Action -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+# WHY: PositionalBinding is off so `--flag` reaches the resolver instead of filling the action slot.
+# The action word arrives as the first leftover token.
+if ($leftover.Count -gt 0) { $Action = [string]$leftover[0]; $leftover = @($leftover | Select-Object -Skip 1) }
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'cloud' "unexpected argument '$($leftover[0])'"
   exit 1

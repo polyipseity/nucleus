@@ -44,9 +44,8 @@
   Exit codes: 0 on success; non-zero on failure.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [ValidateSet('sync', 'list', 'status', 'endpoint', 'config')]
   [string]$Action,
 
@@ -81,7 +80,10 @@ if ($Help) {
 
 $cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
 . $cliFlagsModulePath
-$leftover = @(Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'ai' -Subcommand $Action -BoundParameters $PSBoundParameters)
+$leftover = @((Resolve-NucleusArgument -Arguments $RemainingArgs -CommandPath $PSCommandPath -CommandName 'ai' -Subcommand $Action -BoundParameters $PSBoundParameters) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+# WHY: PositionalBinding is off so `--flag` reaches the resolver instead of filling the action slot.
+# The action word arrives as the first leftover token.
+if ($leftover.Count -gt 0) { $Action = [string]$leftover[0]; $leftover = @($leftover | Select-Object -Skip 1) }
 if ($leftover.Count -gt 0) {
   Write-NucleusError -CommandName 'ai' "unexpected argument '$($leftover[0])'"
   exit 1

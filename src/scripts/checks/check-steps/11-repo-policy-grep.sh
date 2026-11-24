@@ -6,6 +6,7 @@
 bash_guard_require 5 1 check
 
 register_step "repo-policy-grep" "Repository policy (grep-heavy)" run_repo_policy_grep posix any none
+register_step_tools "repo-policy-grep" "bun git jq nix python3 yq"
 
 # Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_GREP_CHECKS=(

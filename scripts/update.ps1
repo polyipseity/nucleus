@@ -56,7 +56,6 @@
 #>
 
 param(
-  [Parameter(Position = 0)]
   [string]$Action = 'all',
 
   [switch]$Flake,
@@ -98,7 +97,10 @@ if ($Flake) { $NoFlake = $false }
 if ($Sops) { $NoSops = $false }
 
 # Prefer raw invocation args so POSIX --flags are not rejected by parameter binding.
+# WHY: without positional binding a leading flag lands in $Action instead of $RemainingArgs,
+# so the action slot is folded back into the scanned token list.
 $_ua = @($RemainingArgs)
+if ($Action -match '^-') { $_ua = @($Action) + $_ua; $Action = 'all' }
 $i = 0
 while ($i -lt $_ua.Count) {
   $a = [string]$_ua[$i]

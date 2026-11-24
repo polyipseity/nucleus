@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "code-formatting" "Code formatting and linting" run_code_formatting posix any none
+register_step_tools "code-formatting" "treefmt packer"
 
 run_code_formatting() {
   local -n ctx="$1"

@@ -5,6 +5,7 @@
 bash_guard_require 5 1 check
 
 register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data posix any none
+register_step_tools "repo-policy-data" "bun git jq nix python3"
 
 # WHY: this step resolves the shared awk scan program by absolute path, and a
 #   suite sources this file on its own, so the directory is derived here rather

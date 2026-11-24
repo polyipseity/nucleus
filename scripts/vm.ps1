@@ -41,13 +41,12 @@
   Exit codes: 0 on success; 1 on failure.
 #>
 
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
-  [Parameter(Position = 0)]
   [ValidateSet('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
-  [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
+  [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$SubcommandArgs = @(),
 
   [Alias("h")]
@@ -149,6 +148,10 @@ $ErrorActionPreference = 'Stop'
 $cliFlagsModulePath = Join-Path $PSScriptRoot '../src/scripts/lib/nucleus-cli-flags.ps1'
 . $cliFlagsModulePath
 $SubcommandArgs = @(Resolve-NucleusArgument -Arguments $SubcommandArgs -CommandPath $PSCommandPath -CommandName 'vm' -Subcommand $Action -BoundParameters $PSBoundParameters)
+# WHY: PositionalBinding is off so `--flag` reaches the resolver instead of filling the action slot.
+# The subcommand is the first leftover token that is not a flag.
+$SubcommandArgs = @($SubcommandArgs | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+if ([string]::IsNullOrWhiteSpace($Action) -and $SubcommandArgs.Count -gt 0) { $Action = [string]$SubcommandArgs[0]; $SubcommandArgs = @($SubcommandArgs | Select-Object -Skip 1) }
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking

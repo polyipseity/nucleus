@@ -25,3 +25,5 @@ Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Platform windows 
   Write-Message "PowerShell syntax check passed."
   return $true
 }
+
+Register-StepToolManifest -Id "powershell-lint" -Tool "pwsh"

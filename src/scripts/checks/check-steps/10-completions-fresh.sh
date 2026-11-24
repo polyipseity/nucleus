@@ -81,6 +81,7 @@ sh_for_command() {
 }
 
 register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full nix
+register_step_tools "completions-fresh" "nix pwsh jq python3"
 
 _cf_na_manifest_result_file() {
   local _ctx_name="$1"

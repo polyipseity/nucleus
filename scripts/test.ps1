@@ -33,6 +33,7 @@
   Environment variables:
     NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #>
+[CmdletBinding(PositionalBinding = $false)]
 param(
   [switch]$FailFast,
   [Alias('h')]
@@ -41,43 +42,20 @@ param(
   [switch]$NoFailFast,
   [switch]$NoVerbose,
   [string[]]$OnlySteps = @(),
-  [switch]$Verbose,
   [switch]$Scoped,
-  [switch]$Full
+  [switch]$Full,
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\nucleus-cli-flags.ps1')
 
-# WHY: with plain param() positional binding, stray positionals can be captured by string params.
-$rawArgs = @($args)
-function Test-NamedArg {
-  param([string]$Name, [string[]]$Raw)
-  $_norm = $Name.ToLowerInvariant() -replace '[^a-z0-9]', ''
-  $_candidates = @($Raw)
-  try { $_candidates += @([System.Environment]::GetCommandLineArgs()) } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
-  foreach ($r in $_candidates) {
-    $_r = [string]$r
-    if ($_r -ieq "--$Name" -or $_r -ilike "--$Name=*") { return $true }
-    if ($_r -ieq "-$Name" -or $_r -ilike "-$Name=*") { return $true }
-    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
-    if ($_rn -eq $_norm) { return $true }
-  }
-  try {
-    $_cmd = [System.Environment]::CommandLine
-    if ($_cmd) { $_candidates += @($_cmd -split '[\s"''`]+') }
-  } catch { } # check-suppress:suppression_doc: command line args best-effort # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- command line args best-effort
-  foreach ($r in $_candidates | Select-Object -Skip @($Raw).Count) {
-    $_r = [string]$r
-    $_rn = ($_r -replace '^--?', '' -replace '=.*$', '').ToLowerInvariant() -replace '[^a-z0-9]', ''
-    if ($_rn -eq $_norm) { return $true }
-  }
-  return $false
-}
-$misbound = @()
-if ($OnlySteps.Count -gt 0 -and -not (Test-NamedArg -Name 'only-steps' -Raw $rawArgs)) { $misbound += @($OnlySteps); $OnlySteps = @() }
-$cliArgs = @($args) + @($misbound)
+# WHY: --verbose is value-optional and read as a plain variable; a declared parameter would
+# either reject the `=ids` form or collide with the advanced-function common parameter.
+$Verbose = $false
+$cliArgs = @($RemainingArgs)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
