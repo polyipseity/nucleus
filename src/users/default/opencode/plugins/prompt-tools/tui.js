@@ -361,11 +361,20 @@ export async function readQueuedPrompt(context, deps = {}) {
   return { source: "queued", text: queuedText };
 }
 
-function selectIndex(selected, length) {
-  if (selected === undefined || selected === null) return -1;
-  const index = typeof selected === "number" ? selected : Number(selected?.value ?? selected?.index ?? NaN);
-  if (!Number.isInteger(index) || index < 0 || index >= length) return -1;
-  return index;
+function pickOptionValue(choice, index) {
+  return JSON.stringify({ idx: index, source: choice.source, text: choice.text });
+}
+
+function parsePickOptionValue(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!isRecord(parsed)) return null;
+    if (typeof parsed.idx !== "number" || typeof parsed.source !== "string" || typeof parsed.text !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export async function pickPromptChoice(first, second, third) {
@@ -377,16 +386,44 @@ export async function pickPromptChoice(first, second, third) {
     const ui = third;
     const filtered = filterPromptChoices(choices, filter);
     if (filtered.length === 0) return null;
-    const select = ui?.dialog?.select;
-    if (typeof select !== "function") return "cancelled";
-    const options = filtered.map((choice) => promptOptionLabel(choice));
-    const selected = await select({
-      title: "Select prompt",
-      options: options.map((label, index) => ({ label, value: index })),
-      current: 0,
+    const dialogStack = ui?.dialog;
+    const DialogSelect = ui?.DialogSelect;
+    if (!dialogStack || typeof dialogStack.replace !== "function" || typeof DialogSelect !== "function") return "cancelled";
+    const options = filtered.map((choice, index) => ({
+      title: promptOptionLabel(choice),
+      value: pickOptionValue(choice, index),
+    }));
+    return await new Promise((resolve) => {
+      let settled = false;
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        try {
+          dialogStack.clear();
+        } catch {
+          // ignore clear failures
+        }
+        resolve(result);
+      };
+      dialogStack.replace(() => DialogSelect({
+        title: "Select prompt",
+        placeholder: "Filter prompts",
+        options,
+        skipFilter: false,
+        onSelect: (option) => {
+          if (!option || option.disabled) return;
+          const parsed = parsePickOptionValue(option.value);
+          if (!parsed) {
+            finish("cancelled");
+            return;
+          }
+          const choice = filtered.find((c) => c.source === parsed.source && c.text === parsed.text);
+          finish(choice ?? "cancelled");
+        },
+      }), () => {
+        finish("cancelled");
+      });
     });
-    const index = selectIndex(selected, filtered.length);
-    return index < 0 ? "cancelled" : filtered[index] ?? "cancelled";
   }
 
   // Legacy signature: (sent, queued, ui)
@@ -398,20 +435,46 @@ export async function pickPromptChoice(first, second, third) {
   if (queued) choices.push(queued);
   if (choices.length === 0) return null;
 
-  const options = choices.map(promptOptionLabel);
-  const select = ui?.dialog?.select;
-  if (typeof select !== "function") {
-    // No picker available: cannot satisfy "always opens dialog.select".
+  const dialogStack = ui?.dialog;
+  const DialogSelect = ui?.DialogSelect;
+  if (!dialogStack || typeof dialogStack.replace !== "function" || typeof DialogSelect !== "function") {
     return "cancelled";
   }
-  const selected = await select({
-    title: "Select prompt",
-    options: options.map((label, index) => ({ label, value: index })),
-    current: 0,
+  const options = choices.map((choice, index) => ({
+    title: promptOptionLabel(choice),
+    value: pickOptionValue(choice, index),
+  }));
+  return await new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      try {
+        dialogStack.clear();
+      } catch {
+        // ignore clear failures
+      }
+      resolve(result);
+    };
+    dialogStack.replace(() => DialogSelect({
+      title: "Select prompt",
+      placeholder: "Filter prompts",
+      options,
+      skipFilter: false,
+      onSelect: (option) => {
+        if (!option || option.disabled) return;
+        const parsed = parsePickOptionValue(option.value);
+        if (!parsed) {
+          finish("cancelled");
+          return;
+        }
+        const choice = choices.find((c) => c.source === parsed.source && c.text === parsed.text);
+        finish(choice ?? "cancelled");
+      },
+    }), () => {
+      finish("cancelled");
+    });
   });
-  if (selected === undefined || selected === null) return "cancelled";
-  const index = selectIndex(selected, choices.length);
-  return index < 0 ? "cancelled" : choices[index] ?? "cancelled";
 }
 
 export async function resolvePromptChoice(mode, context, deps = {}) {
@@ -426,44 +489,11 @@ export async function resolvePromptChoice(mode, context, deps = {}) {
   if (choices.length === 0) return null;
 
   const ui = context?.ui;
-  const select = ui?.dialog?.select;
-  if (typeof select !== "function") return "cancelled";
-
-  // Legacy-compatible presentation for the simple 1+1 untimestamped case.
-  const legacyTwo = allSent.length <= 1 && allQueued.length <= 1 && !allSent.some((p) => typeof p.timestamp === "string" && p.timestamp.trim() !== "");
-  if (legacyTwo) {
-    return pickPromptChoice(sent, queued, ui);
-  }
-
-  let filter = "";
-  const input = ui?.dialog?.input;
-  if (typeof input === "function") {
-    const value = await input({ title: "Filter prompts", placeholder: "text filter (empty for all)" });
-    if (value === undefined || value === null) return "cancelled";
-    if (typeof value === "string") filter = value;
-    else if (isRecord(value) && typeof value.value === "string") filter = value.value;
-    else filter = "";
-  }
-
-  const filtered = filterPromptChoices(choices, filter);
-  if (filtered.length === 0) return null;
-
-  const nowMs = typeof deps.now === "function" ? deps.now() : Date.now();
-  const selected = await select({
-    title: "Select prompt",
-    options: filtered.map((choice, index) => ({ label: pickLabel(choice, nowMs), value: index })),
-    current: 0,
-  });
-  const index = selectIndex(selected, filtered.length);
-  return index < 0 ? "cancelled" : filtered[index] ?? "cancelled";
+  return pickPromptChoice(choices, "", ui);
 }
 
 function printLine(context, text) {
   const ui = context?.ui;
-  if (ui && typeof ui.print === "function") {
-    ui.print(text);
-    return;
-  }
   if (ui && typeof ui.toast === "function") {
     ui.toast(text);
     return;
@@ -472,16 +502,12 @@ function printLine(context, text) {
     ui.toast.show({ message: text });
     return;
   }
+  if (ui && typeof ui.print === "function") {
+    ui.print(text);
+    return;
+  }
   if (ui?.notify && typeof ui.notify === "function") {
     ui.notify(text);
-    return;
-  }
-  if (ui?.dialog && typeof ui.dialog.alert === "function") {
-    ui.dialog.alert({ title: "prompt-tools", message: text });
-    return;
-  }
-  if (ui?.dialog && typeof ui.dialog.message === "function") {
-    ui.dialog.message({ title: "prompt-tools", message: text });
     return;
   }
   if (typeof console !== "undefined" && typeof console.log === "function") {
@@ -659,13 +685,38 @@ export async function handleRepeatUserPrompt(args, context, deps = {}) {
 
   const running = await isSessionRunning(context, deps);
   if (running) {
-    const confirm = context?.ui?.dialog?.confirm;
+    const ui = context?.ui;
+    const dialogStack = ui?.dialog;
+    const DialogConfirm = ui?.DialogConfirm;
     let confirmed = false;
-    if (typeof confirm === "function") {
-      confirmed = Boolean(await confirm({
-        title: "Repeat prompt?",
-        message: "A turn is running. Resubmit this prompt as a new user turn?",
-      }));
+    if (dialogStack && typeof dialogStack.replace === "function" && typeof DialogConfirm === "function") {
+      confirmed = await new Promise((resolve) => {
+        let settled = false;
+        const finish = (v) => {
+          if (settled) return;
+          settled = true;
+          try {
+            dialogStack.clear();
+          } catch {
+            // ignore
+          }
+          resolve(Boolean(v));
+        };
+        dialogStack.replace(() => DialogConfirm({
+          title: "Repeat prompt?",
+          message: "A turn is running. Resubmit this prompt as a new user turn?",
+          onConfirm: () => finish(true),
+          onCancel: () => finish(false),
+        }), () => finish(false));
+      });
+    } else {
+      const confirm = ui?.dialog?.confirm;
+      if (typeof confirm === "function") {
+        confirmed = Boolean(await confirm({
+          title: "Repeat prompt?",
+          message: "A turn is running. Resubmit this prompt as a new user turn?",
+        }));
+      }
     }
     if (!confirmed) return;
   }

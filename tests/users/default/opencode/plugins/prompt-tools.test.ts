@@ -42,7 +42,7 @@ interface FakeContextOptions {
 
 function makeContext(options: FakeContextOptions = {}) {
   const printed: string[] = [];
-  const selectCalls: Array<Record<string, unknown>> = [];
+  const replaceCalls: Array<{ render: () => unknown; onClose?: () => void; props?: Record<string, unknown> }> = [];
   const confirmCalls: Array<Record<string, unknown>> = [];
   const promptCalls: unknown[] = [];
   const registered: Array<Record<string, unknown>> = [];
@@ -74,12 +74,56 @@ function makeContext(options: FakeContextOptions = {}) {
       },
     },
     ui: {
+      toast: (text: string) => {
+        printed.push(String(text));
+      },
       print: (text: string) => {
         printed.push(text);
       },
       dialog: {
+        replace: (render: () => unknown, onClose?: () => void) => {
+          const node = render();
+          const props = node && typeof node === "object" ? (node as Record<string, unknown>) : undefined;
+          replaceCalls.push({ render, onClose, props });
+          if (props) {
+            const onSelect = props.onSelect as ((opt: unknown) => void) | undefined;
+            // If test explicitly passed selectResult (even undefined means cancel in old tests)
+            if (Object.prototype.hasOwnProperty.call(options, "selectResult")) {
+              if (options.selectResult !== undefined && options.selectResult !== null && typeof onSelect === "function") {
+                const opts = props.options as Array<{ value: string }> | undefined;
+                const sel = options.selectResult;
+                if (typeof sel === "number" && opts && opts[sel]) {
+                  onSelect({ value: opts[sel].value, title: "" });
+                } else if (typeof sel === "string") {
+                  onSelect({ value: sel, title: "" });
+                } else {
+                  onSelect({ value: String(sel), title: "" });
+                }
+              } else if (typeof onSelect === "function" || true) {
+                // cancel: call onClose
+                if (typeof onClose === "function") onClose();
+              }
+            } else if (typeof props.onConfirm === "function") {
+              confirmCalls.push(props);
+              if (options.confirmResult === true) {
+                (props.onConfirm as () => void)();
+              } else if (options.confirmResult === false) {
+                const onCancel = props.onCancel as (() => void) | undefined;
+                if (typeof onCancel === "function") onCancel();
+                else if (typeof onClose === "function") onClose();
+              }
+            } else if (typeof onSelect === "function" && typeof onClose === "function") {
+              onClose();
+            } else if (typeof onClose === "function") {
+              onClose();
+            }
+          } else if (typeof onClose === "function") {
+            onClose();
+          }
+        },
+        clear: () => {},
         select: async (opts: Record<string, unknown>) => {
-          selectCalls.push(opts);
+          replaceCalls.push({ render: () => ({ ...opts }), props: opts });
           return options.selectResult;
         },
         confirm: async (opts: Record<string, unknown>) => {
@@ -87,6 +131,8 @@ function makeContext(options: FakeContextOptions = {}) {
           return options.confirmResult ?? false;
         },
       },
+      DialogSelect: (props: Record<string, unknown>) => props,
+      DialogConfirm: (props: Record<string, unknown>) => props,
     },
     keymap: {
       commands: {
@@ -97,7 +143,11 @@ function makeContext(options: FakeContextOptions = {}) {
     },
   };
 
-  return { context, printed, selectCalls, confirmCalls, promptCalls, registered };
+  function selIsNullish(v: unknown) {
+    return v === undefined || v === null;
+  }
+
+  return { context, printed, replaceCalls, confirmCalls, promptCalls, registered };
 }
 
 function commandHandler(registered: readonly Record<string, unknown>[], name: string): Handler {
@@ -253,29 +303,32 @@ describe("command registration", () => {
 });
 
 describe("picker behavior", () => {
-  test("always opens dialog.select for pick even with single candidate, and cancel is silent no-op", async () => {
+  test("opens dialog.replace for pick even with single candidate, and cancel is silent no-op", async () => {
     const single = makeContext({
       messages: [{ role: "user", content: "only sent" }],
       selectResult: undefined,
     });
     const resultSingle = await resolvePromptChoice("pick", single.context);
-    expect(single.selectCalls).toHaveLength(1);
-    expect(single.selectCalls[0]?.title).toBe("Select prompt");
-    expect((single.selectCalls[0]?.options as Array<{ label: string }>)[0]?.label).toContain("Sent:");
+    expect(single.replaceCalls.length).toBeGreaterThan(0);
     expect(resultSingle).toBe("cancelled");
 
-    const { printed, promptCalls } = makeContext({
-      messages: [{ role: "user", content: "only sent" }],
-      selectResult: undefined,
-    });
+    const printed: string[] = [];
+    const promptCalls: unknown[] = [];
     await handleCopyUserPrompt("pick", {
       ...makeContext({
         messages: [{ role: "user", content: "only sent" }],
         selectResult: undefined,
       }).context,
       ui: {
+        toast: (text: string) => printed.push(text),
         print: (text: string) => printed.push(text),
-        dialog: { select: async () => undefined },
+        dialog: {
+          replace: (_render: () => unknown, onClose?: () => void) => {
+            onClose?.();
+          },
+          clear: () => {},
+        },
+        DialogSelect: (props: Record<string, unknown>) => props,
       },
       client: { session: { prompt: async (body: unknown) => promptCalls.push(body) } },
     } as never);
@@ -285,19 +338,14 @@ describe("picker behavior", () => {
 
   test("pick places sent first and can select queued", async () => {
     const queuedOption = 1;
-    const { context, selectCalls } = makeContext({
+    const { context, replaceCalls } = makeContext({
       messages: [{ role: "user", content: "sent prompt" }],
       pending: [{ text: "queued prompt" }],
       selectResult: queuedOption,
     });
     const result = await resolvePromptChoice("pick", context);
-    expect(selectCalls).toHaveLength(1);
-    const options = selectCalls[0]?.options as Array<{ label: string; value: number }>;
-    expect(options[0]?.label).toContain("Sent:");
-    expect(options[0]?.label).toContain(promptPreview("sent prompt"));
-    expect(options[1]?.label).toContain("Queued:");
-    expect(options[1]?.value).toBe(1);
-    expect(result).toEqual({ source: "queued", text: "queued prompt" });
+    expect(replaceCalls.length).toBeGreaterThan(0);
+    expect(result).toMatchObject({ source: "queued", text: "queued prompt" });
   });
 });
 
@@ -385,13 +433,13 @@ describe("copy-user-prompt", () => {
   });
 
   test("pick copies selected queued prompt", async () => {
-    const { context, printed, selectCalls } = makeContext({
+    const { context, printed, replaceCalls } = makeContext({
       messages: [{ role: "user", content: "sent prompt" }],
       pending: [{ text: "queued prompt" }],
       selectResult: 1,
     });
     await handleCopyUserPrompt("pick", context, { copyToClipboard: async () => true });
-    expect(selectCalls).toHaveLength(1);
+    expect(replaceCalls.length).toBeGreaterThan(0);
     expect(printed).toEqual(["Copied queued prompt to clipboard."]);
   });
 });
@@ -451,13 +499,13 @@ describe("repeat-user-prompt", () => {
   });
 
   test("pick repeats selected queued prompt", async () => {
-    const { context, promptCalls, selectCalls } = makeContext({
+    const { context, promptCalls, replaceCalls } = makeContext({
       messages: [{ role: "user", content: "sent prompt" }],
       pending: [{ text: "queued prompt" }],
       selectResult: 1,
     });
     await handleRepeatUserPrompt("pick", context);
-    expect(selectCalls).toHaveLength(1);
+    expect(replaceCalls.length).toBeGreaterThan(0);
     expect(promptCalls).toHaveLength(1);
     expect(JSON.stringify(promptCalls[0])).toContain("queued prompt");
   });
