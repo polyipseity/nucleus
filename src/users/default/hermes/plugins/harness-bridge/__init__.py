@@ -12,6 +12,7 @@ Commands (available in CLI and gateway sessions alike):
     /harness approve <id>        allow a pending request
     /harness deny <id>           deny a pending request
     /harness send <harness> <t>  queue a prompt for a harness session
+    /harness prompts [index]     list queued prompts, or copy prompt <index>
     /harness sessions            per-harness activity summary
     /harness help                command list
 
@@ -51,7 +52,7 @@ _HELP_TEXT = """Harness bridge
 /harness approve <id>          allow a pending request
 /harness deny <id>             deny a pending request
 /harness send <harness> <text> queue a prompt for a harness session
-/harness prompts [index]       list queued prompts, or copy prompt <index>
+/harness prompts [index|query] list or filter queued prompts, or copy by index
 /harness sessions              per-harness activity summary
 /harness help                  this text"""
 
@@ -197,6 +198,9 @@ def _cmd_send(args: List[str]) -> str:
     return f"Queued for {harness} ({command_id}): {text}"
 
 
+PROMPT_LIST_WINDOW = 10
+
+
 def _queued_prompts(harness: str = "hermes") -> List[Dict[str, Any]]:
     """Queued bridge prompts for a harness, newest first. Never consumes files."""
     directory = _commands_dir() / harness
@@ -224,10 +228,66 @@ def _queued_prompts(harness: str = "hermes") -> List[Dict[str, Any]]:
     return prompts
 
 
+def _fuzzy_token_score(text: str, token: str) -> Optional[int]:
+    haystack = str(text).lower()
+    needle = str(token).lower()
+    if needle == "":
+        return 0
+    best: Optional[int] = None
+    for start, char in enumerate(haystack):
+        if char != needle[0]:
+            continue
+        haystack_index = start + 1
+        needle_index = 1
+        gaps = 0
+        previous = start
+        while haystack_index < len(haystack) and needle_index < len(needle):
+            if haystack[haystack_index] == needle[needle_index]:
+                gaps += haystack_index - previous - 1
+                previous = haystack_index
+                needle_index += 1
+            haystack_index += 1
+        if needle_index == len(needle):
+            span = previous - start + 1
+            score = gaps * 100000 + start * 1000 + span * 10 + len(haystack)
+            if best is None or score < best:
+                best = score
+    return best
+
+
+def _fuzzy_match_score(text: str, query: str) -> Optional[int]:
+    tokens = [token for token in str(query).lower().strip().split() if token != ""]
+    if not tokens:
+        return 0
+    total = 0
+    for token in tokens:
+        score = _fuzzy_token_score(text, token)
+        if score is None:
+            return None
+        total += score
+    return total
+
+
+def filter_prompt_choices(prompts: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
+    if query == "":
+        return list(prompts)
+    scored: List[tuple[int, int, Dict[str, Any]]] = []
+    for index, prompt in enumerate(prompts):
+        score = _fuzzy_match_score(str(prompt.get("text", "")), query)
+        if score is not None:
+            scored.append((score, index, prompt))
+    scored.sort(key=lambda entry: (entry[0], entry[1]))
+    return [entry[2] for entry in scored]
+
+
 def _format_prompts(prompts: List[Dict[str, Any]]) -> str:
-    lines = [f"{index}. queued · {item['text']}" for index, item in enumerate(prompts, start=1)]
+    shown = prompts[:PROMPT_LIST_WINDOW]
+    lines = [f"{index}. queued · {item['text']}" for index, item in enumerate(shown, start=1)]
     if not lines:
         lines.append("No queued prompts.")
+    remaining = len(prompts) - len(shown)
+    if remaining > 0:
+        lines.append(f"(+{remaining} more)")
     lines.append("Sent history unavailable: Hermes plugin cannot read message history.")
     return "\n".join(lines)
 
@@ -250,10 +310,22 @@ def _copy_with_harness_clipboard(text: str) -> bool:
 
 
 def _cmd_prompts(args: List[str]) -> str:
-    prompts = _queued_prompts("hermes")
-    if not args:
+    all_prompts = _queued_prompts("hermes")
+    filter_query = ""
+    index_arg: Optional[str] = None
+    if args:
+        if args[0].lower() == "filter":
+            filter_query = " ".join(args[1:]).strip()
+        elif args[0].strip().isdigit():
+            index_arg = args[0].strip()
+        else:
+            filter_query = " ".join(args).strip()
+
+    prompts = filter_prompt_choices(all_prompts, filter_query)
+    if index_arg is None:
         return _format_prompts(prompts)
-    raw = args[0].strip()
+
+    raw = index_arg
     if not raw.isdigit():
         return f'Invalid index "{raw}". Enter a number from 1 to {len(prompts) or 1}.'
     index = int(raw)

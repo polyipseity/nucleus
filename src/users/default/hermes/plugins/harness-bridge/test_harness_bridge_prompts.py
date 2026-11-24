@@ -70,6 +70,33 @@ class HarnessBridgePromptsTests(unittest.TestCase):
         self.assertIn("1 to 1", out)
         self.assertNotIn("Copied", out)
 
+    def test_prompts_window_and_more_line(self):
+        for i in range(12):
+            self.write_queue(f"{100 + i}-p{i}.json", f"p{i}", 100 + i)
+        with mock.patch.object(self.mod, "_nucleus_user_root", return_value=self.root):
+            out = self.mod._handle_command("prompts")
+        self.assertIn("10. queued · p2", out)
+        self.assertNotIn("11. queued ·", out)
+        self.assertIn("(+2 more)", out)
+        self.assertIn("Sent history unavailable", out)
+
+    def test_prompts_filter_ranks_fuzzy_and_selects_full_list(self):
+        self.write_queue("100-a.json", "run git reset", 100)
+        self.write_queue("200-b.json", "gamma prompt", 200)
+        self.write_queue("300-c.json", "queued gpt text", 300)
+        with mock.patch.object(self.mod, "_nucleus_user_root", return_value=self.root):
+            out = self.mod._handle_command("prompts filter gpt")
+        self.assertIn("1. queued · queued gpt text", out)
+        self.assertNotIn("run git reset", out)
+
+    def test_shared_fuzzy_fixture_cases(self):
+        fixture_path = Path(__file__).resolve().parents[6] / "tests" / "fixtures" / "prompt-picker-fuzzy.json"
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+        for case in fixture["cases"]:
+            prompts = [{"text": item} for item in case["items"]]
+            ranked = self.mod.filter_prompt_choices(prompts, case["query"])
+            self.assertEqual([item["text"] for item in ranked], case["expected"])
+
 
 if __name__ == "__main__":
     unittest.main()

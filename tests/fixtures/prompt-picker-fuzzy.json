@@ -1,0 +1,53 @@
+{
+  "$schema": "./prompt-picker-fuzzy.schema.json",
+  "cases": [
+    {
+      "query": "gpt",
+      "items": [
+        "run git reset",
+        "alpha bravo",
+        "queued gpt text"
+      ],
+      "expected": [
+        "queued gpt text"
+      ]
+    },
+    {
+      "query": "rsm",
+      "items": [
+        "resume session",
+        "random sample",
+        "reset master"
+      ],
+      "expected": [
+        "resume session",
+        "reset master",
+        "random sample"
+      ]
+    },
+    {
+      "query": "cont",
+      "items": [
+        "copy text",
+        "continue work",
+        "context"
+      ],
+      "expected": [
+        "context",
+        "continue work"
+      ]
+    },
+    {
+      "query": "foo bar",
+      "items": [
+        "foo baz bar",
+        "bar foo",
+        "foo only"
+      ],
+      "expected": [
+        "bar foo",
+        "foo baz bar"
+      ]
+    }
+  ]
+}

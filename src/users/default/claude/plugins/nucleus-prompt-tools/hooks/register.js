@@ -250,14 +250,66 @@ export function buildPromptChoices(sent, queued) {
   return [...mixed, ...untimedSent].map(({ source, text, timestamp, mtimeMs }) => ({ source, text, timestamp, mtimeMs }));
 }
 
+const PROMPT_LIST_WINDOW = 10;
+
+function fuzzyTokenScore(text, token) {
+  const haystack = String(text).toLowerCase();
+  const needle = String(token).toLowerCase();
+  if (needle.length === 0) return 0;
+  let best = null;
+  for (let start = 0; start < haystack.length; start += 1) {
+    if (haystack[start] !== needle[0]) continue;
+    let haystackIndex = start + 1;
+    let needleIndex = 1;
+    let gaps = 0;
+    let previous = start;
+    while (haystackIndex < haystack.length && needleIndex < needle.length) {
+      if (haystack[haystackIndex] === needle[needleIndex]) {
+        gaps += haystackIndex - previous - 1;
+        previous = haystackIndex;
+        needleIndex += 1;
+      }
+      haystackIndex += 1;
+    }
+    if (needleIndex === needle.length) {
+      const span = previous - start + 1;
+      const score = gaps * 100000 + start * 1000 + span * 10 + haystack.length;
+      if (best === null || score < best) best = score;
+    }
+  }
+  return best;
+}
+
+function fuzzyMatchScore(text, query) {
+  const tokens = String(query).toLowerCase().trim().split(/\s+/).filter((token) => token.length > 0);
+  if (tokens.length === 0) return 0;
+  let total = 0;
+  for (const token of tokens) {
+    const score = fuzzyTokenScore(text, token);
+    if (score === null) return null;
+    total += score;
+  }
+  return total;
+}
+
 export function filterPromptChoices(choices, filter) {
   if (filter === "") return choices;
-  const needle = String(filter).toLowerCase();
-  return choices.filter((choice) => String(choice.text).toLowerCase().includes(needle));
+  const scored = [];
+  for (let index = 0; index < choices.length; index += 1) {
+    const choice = choices[index];
+    const score = fuzzyMatchScore(choice.text, filter);
+    if (score !== null) scored.push({ choice, score, index });
+  }
+  scored.sort((a, b) => (a.score !== b.score ? a.score - b.score : a.index - b.index));
+  return scored.map((entry) => entry.choice);
 }
 
 export function formatPromptChoiceList(choices, nowMs = Date.now()) {
-  return choices.map((choice, index) => `${index + 1}. ${choiceLabel(choice, nowMs)}`).join("\n");
+  const shown = choices.slice(0, PROMPT_LIST_WINDOW);
+  const lines = shown.map((choice, index) => `${index + 1}. ${choiceLabel(choice, nowMs)}`);
+  const remaining = choices.length - shown.length;
+  if (remaining > 0) lines.push(`(+${remaining} more)`);
+  return lines.join("\n");
 }
 
 export function selectPromptChoice(choices, index) {

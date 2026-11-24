@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import registerDefault, {
@@ -253,6 +253,39 @@ describe("resolvePromptChoice and pick behavior", () => {
 	test("an out-of-range index reports the range instead of choosing", () => {
 		const choices = buildPromptChoices([{ text: "a" }], []);
 		expect(selectPromptChoice(choices, "9")).toMatchObject({ error: expect.any(String) });
+	});
+
+	test("windowed list shows 10 items and a (+N more) line", () => {
+		const choices = buildPromptChoices(Array.from({ length: 12 }, (_, i) => ({ text: `p${i}` })), []);
+		const out = formatPromptChoiceList(choices);
+		expect(out).toContain("10.");
+		expect(out).not.toContain("11.");
+		expect(out).toContain("(+2 more)");
+	});
+
+	test("fuzzy filter ranks subsequence matches and keeps stable ties", () => {
+		const choices = [
+			{ source: "sent" as const, text: "run git reset" },
+			{ source: "sent" as const, text: "alpha bravo" },
+			{ source: "sent" as const, text: "queued gpt text" },
+		];
+		expect(filterPromptChoices(choices, "gpt").map((c) => c.text)).toEqual(["queued gpt text"]);
+		const cont = [
+			{ source: "sent" as const, text: "context" },
+			{ source: "sent" as const, text: "continue work" },
+			{ source: "sent" as const, text: "copy text" },
+		];
+		expect(filterPromptChoices(cont, "cont").map((c) => c.text)).toEqual(["context", "continue work"]);
+	});
+
+	test("shared fuzzy fixture cases match filterPromptChoices", () => {
+		const fixture = JSON.parse(
+			readFileSync(join(process.cwd(), "tests/fixtures/prompt-picker-fuzzy.json"), "utf8"),
+		) as { cases: Array<{ query: string; items: string[]; expected: string[] }> };
+		for (const c of fixture.cases) {
+			const choices = buildPromptChoices(c.items.map((text) => ({ text })), []);
+			expect(filterPromptChoices(choices, c.query).map((choice) => choice.text)).toEqual(c.expected);
+		}
 	});
 });
 

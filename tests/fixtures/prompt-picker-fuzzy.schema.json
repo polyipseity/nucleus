@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prompt picker fuzzy ranking fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query", "items", "expected"],
+        "properties": {
+          "query": { "type": "string" },
+          "items": { "type": "array", "items": { "type": "string" } },
+          "expected": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
