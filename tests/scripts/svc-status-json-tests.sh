@@ -33,7 +33,9 @@ if printf '%s' "$list_json" | jq -e '[.services[] |
   (.running | type == "boolean") and
   (.status | type == "string") and
   (.exitCode == null or (.exitCode | type == "number")) and
-  (.state == null or (.state | type == "string"))
+  (.state == null or (.state | type == "string")) and
+  (.liveness | type == "string") and
+  (.liveness == "live" or .liveness == "dead" or .liveness == "unknown" or .liveness == "-" or .liveness == "n/a")
 ] | all' >/dev/null; then
   assert_pass "list --json service fields have expected types"
 else
@@ -44,7 +46,9 @@ if printf '%s' "$status_json" | jq -e '[.services[] |
   (.running | type == "boolean") and
   (.status | type == "string") and
   (.exitCode == null or (.exitCode | type == "number")) and
-  (.state == null or (.state | type == "string"))
+  (.state == null or (.state | type == "string")) and
+  (.liveness | type == "string") and
+  (.liveness == "live" or .liveness == "dead" or .liveness == "unknown" or .liveness == "-" or .liveness == "n/a")
 ] | all' >/dev/null; then
   assert_pass "status --json service fields have expected types"
 else

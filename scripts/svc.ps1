@@ -215,6 +215,7 @@ foreach ($svc in $RegistryRaw.Keys) {
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\ServiceHealth.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\scripts\lib\ServiceLiveness.ps1")
 
 function New-ResolvedRow {
   <#
@@ -397,6 +398,74 @@ function Get-InstanceArgument {
   return $Row.instanceId
 }
 
+function Get-ServiceLiveness {
+  <#
+  .SYNOPSIS
+    Probes the declared network.default endpoint for a live service row.
+  .DESCRIPTION
+    Returns live, dead, unknown, n/a for non-live rows, or - when no applicable
+    endpoint is declared. Probe failures return unknown and never throw.
+  #>
+  # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- read-only liveness probe; no system state changes
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+  param(
+    [Parameter(Mandatory)][hashtable]$ResolvedRow
+  )
+
+  if ($ResolvedRow.class -ne 'live') { return 'n/a' }
+
+  $regKey = $ResolvedRow.registryKey
+  $network = $null
+  if ($script:Registry.ContainsKey($regKey)) {
+    $network = $script:Registry[$regKey].network
+  }
+
+  $endpoint = $null
+  if ($null -ne $network) {
+    if ($network -is [System.Collections.IDictionary]) {
+      if ($network.Contains('default')) { $endpoint = $network['default'] }
+    } else {
+      $defaultProp = $network.PSObject.Properties['default']
+      if ($null -ne $defaultProp) { $endpoint = $defaultProp.Value }
+    }
+  }
+  if ($null -eq $endpoint) { return '-' }
+
+  $epHost = $null
+  $epPort = $null
+  $epProto = $null
+  if ($endpoint -is [System.Collections.IDictionary]) {
+    if ($endpoint.Contains('host')) { $epHost = $endpoint['host'] }
+    if ($endpoint.Contains('port')) { $epPort = $endpoint['port'] }
+    if ($endpoint.Contains('protocol')) { $epProto = $endpoint['protocol'] }
+  } else {
+    $hostProp = $endpoint.PSObject.Properties['host']
+    $portProp = $endpoint.PSObject.Properties['port']
+    $protoProp = $endpoint.PSObject.Properties['protocol']
+    if ($null -ne $hostProp) { $epHost = $hostProp.Value }
+    if ($null -ne $portProp) { $epPort = $portProp.Value }
+    if ($null -ne $protoProp) { $epProto = $protoProp.Value }
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$epHost) -or $null -eq $epPort -or [string]::IsNullOrWhiteSpace([string]$epProto)) {
+    return '-'
+  }
+
+  if (-not (Get-Command Invoke-ServiceLivenessProbe -ErrorAction SilentlyContinue)) { # check-suppress:suppression_doc: probe command may be absent in partial harnesses
+    return 'unknown'
+  }
+
+  try {
+    $probe = Invoke-ServiceLivenessProbe -Endpoint $endpoint
+    switch ([string]$probe.Status) {
+      'live' { return 'live' }
+      'dead' { return 'dead' }
+      default { return 'unknown' }
+    }
+  } catch {
+    return 'unknown'
+  }
+}
+
 function New-StatusRow {
   <#
   .SYNOPSIS
@@ -420,6 +489,7 @@ function New-StatusRow {
       status      = if ($ResolvedRow.class -eq 'configured') { 'not-loaded' } else { 'n/a' }
       running     = '-'
       pid         = '-'
+      liveness    = 'n/a'
     }
     if ($ResolvedRow.class -eq 'configured') { $row.configured = $true }
     return $row
@@ -429,6 +499,7 @@ function New-StatusRow {
   $status.class = 'live'
   $status.id = $ResolvedRow.instanceId
   $status.displayName = $ResolvedRow.displayName
+  $status.liveness = Get-ServiceLiveness -ResolvedRow $ResolvedRow
   return $status
 }
 
@@ -613,12 +684,13 @@ function Format-StatusTable {
   }
 
   $lines = @()
-  $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f 'ID', 'Name', 'Status', 'Running', 'PID'
-  $lines += '-' * 80
+  $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4,-10} {5}" -f 'ID', 'Name', 'Status', 'Running', 'PID', 'Liveness'
+  $lines += '-' * 91
 
   foreach ($row in $Rows) {
     $pidText = if ($row.pid) { $row.pid } else { '-' }
-    $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $row.id, $row.displayName, $row.status, $row.running, $pidText
+    $liveText = if ($null -ne $row.liveness -and $row.liveness -ne '') { $row.liveness } else { 'n/a' }
+    $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4,-10} {5}" -f $row.id, $row.displayName, $row.status, $row.running, $pidText, $liveText
   }
   return $lines -join "`n"
 }

@@ -387,7 +387,14 @@ assert_contains "a declared mount is reported by its instance id" "$captured_out
 assert_contains "a second declared mount is reported" "$captured_output" "local.cloud-mount.OneDrive"
 assert_contains "a third declared mount is reported" "$captured_output" "local.cloud-mount.GoogleDrive"
 assert_contains "a declared mount reports not-loaded" "$captured_output" "not-loaded"
-assert_not_contains "a declared mount is not reported as n/a" "$captured_output" "n/a"
+# A configured row is not the old n/a placeholder; status is not-loaded and
+# liveness is reported as n/a (no endpoint probe for non-live rows).
+_declared_line="$(printf '%s\n' "$captured_output" | grep 'local.cloud-mount.iCloud' | head -n 1)"
+if printf '%s' "$_declared_line" | grep -q 'not-loaded' && printf '%s' "$_declared_line" | grep -Eq '[[:space:]]n/a$'; then
+  assert_pass "a declared mount is not reported as n/a status"
+else
+  assert_fail "a declared mount is not reported as n/a status" "$_declared_line"
+fi
 
 run_cli list --user --json
 assert_eq "json listing with declared mounts exits 0" 0 "$captured_status"

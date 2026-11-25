@@ -30,6 +30,8 @@ bash_guard_require 5 1 svc
 . "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
+# shellcheck source=../src/scripts/lib/service-liveness.sh
+[ -n "${_NUCLEUS_SERVICE_LIVENESS_SOURCED-}" ] || . "$SCRIPT_DIR/../src/scripts/lib/service-liveness.sh"
 
 # WHY: the help text is the executable contract, so it must enumerate every
 # subcommand, flag and domain option the parsers accept.
@@ -249,11 +251,46 @@ row_is_named() {
   return 1
 }
 
+# WHY: liveness comes from the declared network.default endpoint so the column
+# reports service health, not only supervisor state. Probe failures must not
+# abort listing; unknown is safer than a confident false negative.
+svc_liveness() {
+  local registry="$1" key="$2" row_class="$3"
+
+  if [ "$row_class" != "live" ]; then
+    printf 'n/a\n'
+    return 0
+  fi
+
+  local endpoint_json
+  endpoint_json=$(printf '%s' "$registry" | jq -c --arg k "$key" '.[$k].network.default // empty' 2>/dev/null) || endpoint_json=""
+  if [ -z "$endpoint_json" ] || [ "$endpoint_json" = "null" ]; then
+    printf '%s\n' '-'
+    return 0
+  fi
+  if ! printf '%s' "$endpoint_json" | jq -e 'type == "object" and .host and .port and .protocol' >/dev/null 2>&1; then
+    printf '%s\n' '-'
+    return 0
+  fi
+  if ! command -v svc_liveness_probe_endpoint >/dev/null 2>&1; then
+    printf 'unknown\n'
+    return 0
+  fi
+
+  local reason rc=0
+  reason="$(svc_liveness_probe_endpoint "$endpoint_json" 2>/dev/null)" || rc=$?
+  case "$rc" in
+  0) printf 'live\n' ;;
+  1) printf 'dead\n' ;;
+  *) printf 'unknown\n' ;;
+  esac
+}
+
 # WHY: reporting such a row as "inactive" would be a lie: nothing was probed.
 placeholder_status_json() {
   case "$1" in
-  pseudo) printf '{"status":"n/a","running":false,"enabled":false,"pid":null,"crashLoop":"-"}\n' ;;
-  configured) printf '{"status":"not-loaded","running":false,"enabled":false,"pid":null,"configured":true,"crashLoop":"-"}\n' ;;
+  pseudo) printf '{"status":"n/a","running":false,"enabled":false,"pid":null,"crashLoop":"-","liveness":"n/a"}\n' ;;
+  configured) printf '{"status":"not-loaded","running":false,"enabled":false,"pid":null,"configured":true,"crashLoop":"-","liveness":"n/a"}\n' ;;
   esac
 }
 
@@ -971,13 +1008,15 @@ do_list() {
       fi
       local status_json pair_json
       if [ "$row_class" = "live" ]; then
-        local crash_status
+        local crash_status liveness
         status_json=$(svc_status "$instance" "$svc_json") || status_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}'
         # check-suppress:suppression_doc: probe failure must not abort listing; health state is best-effort.
         crash_status=$(svc_health_status "$instance" 2>/dev/null) || crash_status="unknown" # check-suppress:suppression_doc: crash-loop health probe is best-effort for listing resilience.
+        # check-suppress:suppression_doc: probe failure must not abort listing; unknown is safer than a confident false negative.
+        liveness=$(svc_liveness "$registry" "$key" "$row_class" 2>/dev/null) || liveness="unknown" # check-suppress:suppression_doc: probe failure must not abort listing.
         # check-suppress:suppression_doc: jq shaping is best-effort; fall back to typed unknown row.
-        status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}' 2>/dev/null) ||
-          status_json=$(jq -cn --arg cs "$crash_status" '{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null,"crashLoop":$cs}')
+        status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" --arg lv "$liveness" '. + {crashLoop: $cs, liveness: $lv}' 2>/dev/null) ||
+          status_json=$(jq -cn --arg cs "$crash_status" --arg lv "$liveness" '{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null,"crashLoop":$cs,"liveness":$lv}')
       else
         status_json=$(placeholder_status_json "$row_class")
       fi
@@ -991,13 +1030,13 @@ $pair_json"
     done <<<"$entries"
     printf '%s\n' "$entries_json" | jq -c -s 'reduce .[] as $i ({}; .[$i.key] = $i.value) | {version: 1, services: .}'
   else
-    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "ID" "Name" "Status" "Running" "PID" "CrashLoop"
-    printf '%.0s-' {1..91}
+    printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "ID" "Name" "Status" "Running" "PID" "CrashLoop" "Liveness"
+    printf '%.0s-' {1..102}
     printf '\n'
     while IFS=$'\t' read -r key display svc_json instance row_class; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
-        printf '%-20s %-24s %-10s %-8s %s\n' "$err_name" "" "n/a" "-" "-"
+        printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "$err_name" "" "n/a" "-" "-" "-" "n/a"
         has_error=true
         continue
       fi
@@ -1012,7 +1051,7 @@ $pair_json"
       if [ "$row_class" != "live" ]; then
         local ph_status
         ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
-        printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-"
+        printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-" "n/a"
         continue
       fi
       local status_json
@@ -1026,10 +1065,12 @@ $pair_json"
         local exit_display="exit $exit_code"
         pid="$exit_display"
       fi
-      local crash_status
+      local crash_status liveness
       # check-suppress:suppression_doc: probe failure must not abort listing; health state is best-effort.
       crash_status=$(svc_health_status "$instance" 2>/dev/null) || crash_status="unknown" # check-suppress:suppression_doc: crash-loop health probe is best-effort for listing resilience.
-      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status"
+      # check-suppress:suppression_doc: probe failure must not abort listing; unknown is safer than a confident false negative.
+      liveness=$(svc_liveness "$registry" "$key" "$row_class" 2>/dev/null) || liveness="unknown" # check-suppress:suppression_doc: probe failure must not abort listing.
+      printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status" "$liveness"
       print_blocked_note "$status_json"
     done <<<"$entries"
     if [ -n "$domain_filter_warning" ]; then
@@ -1071,23 +1112,26 @@ do_status() {
     if [ "$row_class" != "live" ]; then
       local ph_status
       ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
-      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-"
+      printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-" "n/a"
       continue
     fi
     local status_json
-    status_json=$(svc_status "$instance" "$svc_json")
+    status_json=$(svc_status "$instance" "$svc_json") || status_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}'
     local status running pid exit_code
-    status=$(echo "$status_json" | jq -r '.status')
-    running=$(echo "$status_json" | jq -r '.running')
-    pid=$(echo "$status_json" | jq -r '.pid // "-"')
-    exit_code=$(echo "$status_json" | jq -r '.exitCode // ""')
+    status=$(echo "$status_json" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown") # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+    running=$(echo "$status_json" | jq -r '.running // "false"' 2>/dev/null || echo "false")   # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+    pid=$(echo "$status_json" | jq -r '.pid // "-"' 2>/dev/null || echo "-")                   # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+    exit_code=$(echo "$status_json" | jq -r '.exitCode // ""' 2>/dev/null || echo "")          # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
     if [ -n "$exit_code" ] && [ "$exit_code" != "null" ]; then
       local exit_display="exit $exit_code"
       pid="$exit_display"
     fi
-    local crash_status
-    crash_status=$(svc_health_status "$instance")
-    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status"
+    local crash_status liveness
+    # check-suppress:suppression_doc: probe failure must not abort listing; health state is best-effort.
+    crash_status=$(svc_health_status "$instance" 2>/dev/null) || crash_status="unknown" # check-suppress:suppression_doc: crash-loop health probe is best-effort for listing resilience.
+    # check-suppress:suppression_doc: probe failure must not abort listing; unknown is safer than a confident false negative.
+    liveness=$(svc_liveness "$registry" "$key" "$row_class" 2>/dev/null) || liveness="unknown" # check-suppress:suppression_doc: probe failure must not abort listing.
+    printf '%-20s %-24s %-10s %-8s %-10s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status" "$liveness"
     print_blocked_note "$status_json"
   done <<<"$entries"
   "$any_error" && return 1 || return 0

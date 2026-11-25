@@ -161,6 +161,10 @@ BeforeAll {
   }
   function Enable-ScheduledTask { throw 'stub: Enable-ScheduledTask' }
   function Disable-ScheduledTask { throw 'stub: Disable-ScheduledTask' }
+  function Invoke-ServiceLivenessProbe {
+    param([object]$Endpoint)
+    throw 'stub: Invoke-ServiceLivenessProbe'
+  }
 
   # Mock external dependencies for log functions.
   Mock Get-NucleusLogDir { return 'TestDrive:\nucleus\logs' }
@@ -277,7 +281,7 @@ Describe 'Format-StatusTable' {
     $output = Format-StatusTable -Rows $rows
     $lines = $output -split "`n"
     $dataLines = $lines | Where-Object { $_ -match 'sshd' }
-    $dataLines | ForEach-Object { $_ | Should -Match '\s-\s*$' }
+    $dataLines | ForEach-Object { $_ | Should -Match '\s-\s+n/a\s*$' }
   }
 
   It 'formats PID as number when pid is present' {
@@ -289,6 +293,25 @@ Describe 'Format-StatusTable' {
     $lines = $output -split "`n"
     $dataLines = $lines | Where-Object { $_ -match 'ollama' }
     $dataLines | ForEach-Object { $_ | Should -Match '9876' }
+  }
+
+  It 'includes Liveness column in text output' {
+    $Script:Json = $false
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 123; liveness = 'live' }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match 'Liveness'
+    $output | Should -Match 'live'
+  }
+
+  It 'includes liveness in JSON output' {
+    $Script:Json = $true
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 123; liveness = 'dead' }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match '"liveness":"dead"'
   }
 }
 
@@ -407,6 +430,7 @@ Describe 'New-StatusRow' {
     $row.status | Should -Be 'n/a'
     $row.running | Should -Be '-'
     $row.pid | Should -Be '-'
+    $row.liveness | Should -Be 'n/a'
     Should -Invoke Get-ServiceStatus -Exactly 0
   }
 
@@ -417,6 +441,7 @@ Describe 'New-StatusRow' {
     $row.status | Should -Be 'not-loaded'
     $row.running | Should -Be '-'
     $row.pid | Should -Be '-'
+    $row.liveness | Should -Be 'n/a'
     $row.configured | Should -Be $true
     Should -Invoke Get-ServiceStatus -Exactly 0
   }
@@ -429,6 +454,37 @@ Describe 'New-StatusRow' {
     $row.displayName | Should -Be 'Cloud Drive Mounts (work)'
     $row.status | Should -Be 'active'
     $row.class | Should -Be 'live'
+    $row.liveness | Should -Be '-'
+  }
+}
+
+Describe 'Get-ServiceLiveness' {
+  It 'returns live when probe reports live' {
+    Mock Invoke-ServiceLivenessProbe { return [pscustomobject]@{ Status = 'live'; Reason = 'live' } }
+    $row = @{ registryKey = 'ollama'; class = 'live'; hostEntry = $Script:Registry['ollama'].hostEntry }
+    Get-ServiceLiveness -ResolvedRow $row | Should -Be 'live'
+  }
+
+  It 'returns dead when probe reports dead' {
+    Mock Invoke-ServiceLivenessProbe { return [pscustomobject]@{ Status = 'dead'; Reason = 'dead:connect-failed' } }
+    $row = @{ registryKey = 'ollama'; class = 'live'; hostEntry = $Script:Registry['ollama'].hostEntry }
+    Get-ServiceLiveness -ResolvedRow $row | Should -Be 'dead'
+  }
+
+  It 'returns unknown when probe reports unknown' {
+    Mock Invoke-ServiceLivenessProbe { return [pscustomobject]@{ Status = 'unknown'; Reason = 'unknown:timeout' } }
+    $row = @{ registryKey = 'ollama'; class = 'live'; hostEntry = $Script:Registry['ollama'].hostEntry }
+    Get-ServiceLiveness -ResolvedRow $row | Should -Be 'unknown'
+  }
+
+  It 'returns - when live row has no default endpoint' {
+    $row = @{ registryKey = 'cloud-drive'; class = 'live'; hostEntry = $Script:Registry['cloud-drive'].hostEntry }
+    Get-ServiceLiveness -ResolvedRow $row | Should -Be '-'
+  }
+
+  It 'returns n/a for non-live rows' {
+    $row = @{ registryKey = 'cloud-drive'; class = 'configured'; hostEntry = $Script:Registry['cloud-drive'].hostEntry }
+    Get-ServiceLiveness -ResolvedRow $row | Should -Be 'n/a'
   }
 }
 
