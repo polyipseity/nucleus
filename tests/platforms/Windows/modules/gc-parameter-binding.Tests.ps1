@@ -16,10 +16,9 @@
     the block rather than on the file text keeps the assertion behavioural:
     it is the binding that is under test, not the spelling of the default.
 
-    The switch-to-variable map is spelled out rather than derived, because
     The switch map is spelled out rather than derived, because the test
-    exercises binding behaviour and a small explicit list keeps the intent
-    obvious. It covers the skip switches declared in scripts/gc.ps1 plus
+    exercises binding behavior and a small explicit list keeps the intent
+    obvious. It covers skip switches declared in scripts/gc.ps1 plus
     GCVMData and DryRun, which bind through the same param block.
 
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gc-parameter-binding.Tests.ps1 -Passthru"
@@ -38,12 +37,14 @@ BeforeAll {
         [pscustomobject]@{ Switch = 'NoSccacheGc' }
         [pscustomobject]@{ Switch = 'NoWallpaperGc' }
         [pscustomobject]@{ Switch = 'NoVMGc' }
+        [pscustomobject]@{ Switch = 'NoVMDataGc' }
         [pscustomobject]@{ Switch = 'NoLogGc' }
         [pscustomobject]@{ Switch = 'GCVMData' }
         # WHY: DryRun is a mode switch rather than a no-* skip switch, but it
         # binds through the same param block and defaults the same way, so it
         # rides the same map instead of growing a second reporting mechanism.
         [pscustomobject]@{ Switch = 'DryRun' }
+        [pscustomobject]@{ Switch = 'NoDryRun' }
     )
 
     # The NUCLEUS_GC_NO_* variables the switches used to default from, named
@@ -57,7 +58,9 @@ BeforeAll {
         'NUCLEUS_GC_NO_SCCACHE_GC'
         'NUCLEUS_GC_NO_WALLPAPER_GC'
         'NUCLEUS_GC_NO_VM_GC'
+        'NUCLEUS_GC_NO_VM_DATA_GC'
         'NUCLEUS_GC_NO_LOG_GC'
+        'NUCLEUS_GC_DRY_RUN'
     )
 
     function Get-GcParamBlock {
@@ -133,9 +136,30 @@ BeforeAll {
         }
         return $state
     }
+
+    function Get-GcDeclaredSwitches {
+        $tokens = $null
+        $errors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+            $Script:GcScript, [ref]$tokens, [ref]$errors)
+        return @(
+            $ast.ParamBlock.Parameters |
+                Where-Object { $_.StaticType.Name -eq 'SwitchParameter' } |
+                ForEach-Object { $_.Name.VariablePath.UserPath }
+        )
+    }
 }
 
 Describe 'nucleus-gc parameter block' {
+    It 'covers every declared no-* and mode switch in gc.ps1' {
+        $declared = @(Get-GcDeclaredSwitches | Where-Object { $_ -like 'No*' -or $_ -in @('DryRun', 'GCVMData') })
+        $covered = @($Script:SwitchMap.Switch)
+        $missing = @($declared | Where-Object { $_ -notin $covered })
+        $extra = @($covered | Where-Object { $_ -notin $declared })
+        $missing | Should -BeNullOrEmpty -Because "every declared skip/mode switch must be covered by the behavioral map; missing: $($missing -join ', ')"
+        $extra | Should -BeNullOrEmpty -Because "the map must only cover switches declared in gc.ps1; extra: $($extra -join ', ')"
+    }
+
     It 'binds every no-* switch false when it is not passed on the command line' {
         $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock)
         $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
