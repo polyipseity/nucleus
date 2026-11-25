@@ -275,39 +275,90 @@ svc_status() {
     local scope launchd_domain
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
-    [ "$scope" = "system" ] && domain_flag="sudo"
+    [ "$scope" = "system" ] && domain_flag="sudo -n"
 
-    local list_line running=true pid=""
-    # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-    if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
-      list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-    else
-      list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-    fi
+    local list_line="" running=true pid="" print_out="" probe_definitive=true
     local socket_activated
     socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
-    if [ -z "$list_line" ]; then
-      running=false
-    else
-      pid=$(echo "$list_line" | awk '{ print $1 }')
-      if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
-      local last_exit
-      last_exit=$(echo "$list_line" | awk '{ print $2 }')
-      if [ -z "$pid" ] && [ "$last_exit" != "0" ]; then
-        running=false
-      fi
-    fi
-    if [ "$running" != "true" ]; then
-      local print_out
+
+    # WHY: read-only probes must not report a confident false inactive when the
+    # probe could not run. For system scope, unprivileged launchctl print can be
+    # definitive; if it is inconclusive, escalate to sudo -n when available. A
+    # probe that stays inconclusive yields status unknown instead of inactive.
+    if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      print_out=$($domain_flag launchctl print "$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")" 2>/dev/null || true)
-      case "$print_out" in
-      *"state = running"*)
-        running=true
-        pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
-        [ -z "$pid" ] && pid=""
-        ;;
-      esac
+      list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+    elif [ "$scope" = "system" ]; then
+      local _svc_print_target _svc_probe_prefix _svc_probe_rc _svc_probe_def _svc_probe_out
+      _svc_print_target="$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")"
+      probe_definitive=false
+      for _svc_probe_prefix in "" "$domain_flag"; do
+        _svc_probe_rc=0
+        # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+        _svc_probe_out=$($_svc_probe_prefix launchctl print "$_svc_print_target" 2>&1) || _svc_probe_rc=$?
+        _svc_probe_def=false
+        case "$_svc_probe_out" in
+        *"state ="* | *"pid ="* | *"last exit code ="* | *"Could not find service"* | *"could not find service"* | *"Bad request"*)
+          _svc_probe_def=true
+          ;;
+        esac
+        if [ "$_svc_probe_rc" -eq 0 ]; then
+          _svc_probe_def=true
+        fi
+        if [ "$_svc_probe_def" = true ]; then
+          print_out="$_svc_probe_out"
+          probe_definitive=true
+          case "$print_out" in
+          *"state = running"*)
+            running=true
+            pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
+            [ -z "$pid" ] && pid=""
+            ;;
+          *)
+            running=false
+            ;;
+          esac
+          if [ -n "$_svc_probe_prefix" ]; then
+            # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+            list_line=$($_svc_probe_prefix launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+          fi
+          break
+        fi
+      done
+      if [ "$probe_definitive" = true ] && [ -z "$pid" ] && [ -n "$list_line" ]; then
+        pid=$(echo "$list_line" | awk '{ print $1 }')
+        if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
+      fi
+    else
+      # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+      list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+    fi
+
+    if [ "$scope" != "system" ]; then
+      if [ -z "$list_line" ]; then
+        running=false
+      else
+        pid=$(echo "$list_line" | awk '{ print $1 }')
+        if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
+        local last_exit
+        last_exit=$(echo "$list_line" | awk '{ print $2 }')
+        if [ -z "$pid" ] && [ "$last_exit" != "0" ]; then
+          running=false
+        fi
+      fi
+      if [ "$running" != "true" ]; then
+        local _svc_print_rc=0
+        # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+        print_out=$($domain_flag launchctl print "$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")" 2>&1) || _svc_print_rc=$?
+        case "$print_out" in
+        *"state = running"*)
+          running=true
+          pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
+          [ -z "$pid" ] && pid=""
+          ;;
+        esac
+        : "$_svc_print_rc"
+      fi
     fi
     # The disabled gate is a separate question from loaded-ness, so it is read on
     # its own and stays tri-state: only a read that names the state can claim one.
@@ -318,12 +369,23 @@ svc_status() {
       domain_target=$(launchctl_bootstrap_domain "${launchd_domain:-gui}" "$(launchctl_session_uid)")
     fi
     local enabled_json="null"
-    case "$(launchctl_service_enabled "$domain_target" "$svc_id" "$domain_flag")" in
+    local _svc_enabled=""
+    _svc_enabled="$(launchctl_service_enabled "$domain_target" "$svc_id" "")"
+    if [ "$_svc_enabled" = "unknown" ] && [ "$scope" = "system" ]; then
+      _svc_enabled="$(launchctl_service_enabled "$domain_target" "$svc_id" "$domain_flag")"
+    elif [ "$_svc_enabled" = "unknown" ] && [ -n "$domain_flag" ]; then
+      _svc_enabled="$(launchctl_service_enabled "$domain_target" "$svc_id" "$domain_flag")"
+    fi
+    case "$_svc_enabled" in
     enabled) enabled_json=true ;;
     disabled) enabled_json=false ;;
     esac
     local status_text state_text="" exit_code=""
-    if [ "$running" = true ]; then
+    if [ "$probe_definitive" != true ]; then
+      status_text="unknown"
+      running=false
+      pid=""
+    elif [ "$running" = true ]; then
       status_text="active"
     elif [ "$socket_activated" = "true" ]; then
       status_text="listening"

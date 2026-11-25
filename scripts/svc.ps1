@@ -468,7 +468,18 @@ function Get-ServiceStatus {
           pid     = $processId
         }
       } catch {
-        return @{ status = 'not-found'; running = $false; enabled = $false; pid = $null }
+        # WHY: a read failure (access denied, transient error) must not be reported
+        # as a confident not-found; only a clear not-found is definitive.
+        $ex = $_.Exception
+        $msg = if ($null -ne $ex) { [string]$ex.Message } else { '' }
+        $fqid = [string]$_.FullyQualifiedErrorId
+        $isNotFound = ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) -or
+          ($fqid -like '*NoServiceFoundForGivenName*') -or
+          ($msg -match '(?i)cannot find|not found|does not exist')
+        if ($isNotFound) {
+          return @{ status = 'not-found'; running = $false; enabled = $false; pid = $null }
+        }
+        return @{ status = 'unknown'; running = $false; enabled = $null; pid = $null }
       }
     }
     'windows-schtask' {
@@ -483,7 +494,17 @@ function Get-ServiceStatus {
           enabled = $enabled
         }
       } catch {
-        return @{ status = 'not-found'; running = $false; enabled = $false }
+        # WHY: a read failure (access denied, transient error) must not be reported
+        # as a confident not-found; only a clear not-found is definitive.
+        $ex = $_.Exception
+        $msg = if ($null -ne $ex) { [string]$ex.Message } else { '' }
+        $fqid = [string]$_.FullyQualifiedErrorId
+        $isNotFound = ($_.CategoryInfo.Category -eq [System.Management.Automation.ErrorCategory]::ObjectNotFound) -or
+          ($msg -match '(?i)No MSFT_ScheduledTask|cannot find|not found|does not exist')
+        if ($isNotFound) {
+          return @{ status = 'not-found'; running = $false; enabled = $false }
+        }
+        return @{ status = 'unknown'; running = $false; enabled = $null }
       }
     }
     default {
@@ -528,7 +549,7 @@ function Get-ServiceActionWarning {
   # WHY: a service that is not installed has no enable state to report, and its start
   # fails with its own error, so warning here would only add noise.
   $status = Get-ServiceStatus -HostEntry $HostEntry
-  if ($status.status -eq 'not-found' -or $status.enabled) { return $null }
+  if ($status.status -in @('not-found', 'unknown') -or $status.enabled) { return $null }
   return 'the service is not enabled, so it will not start on its own; use -Enable to enable it'
 }
 

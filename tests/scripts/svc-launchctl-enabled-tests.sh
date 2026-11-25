@@ -43,7 +43,9 @@ FAKE_RC="$_tmp/print-disabled.rc"
 # FAKE_LOADED: the labels the fake reports as loaded, so the status assertions
 # can tell a running job from an unloaded one.
 FAKE_LOADED=""
-export FAKE_LOG FAKE_BODY FAKE_RC FAKE_LOADED
+FAKE_SUDO_RC="0"
+FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO="0"
+export FAKE_LOG FAKE_BODY FAKE_RC FAKE_LOADED FAKE_SUDO_RC FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO
 
 # --- Fake service manager -----------------------------------------------------
 # Models only what the code under test reads: a print-disabled reply and its exit
@@ -56,6 +58,10 @@ cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 printf '%s\n' "$*" >>"$FAKE_LOG"
 case "${1:-}" in
 print-disabled)
+  if [ "${FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO:-0}" = "1" ] && [ "${FAKE_SUDO_ACTIVE:-0}" != "1" ]; then
+    printf '\n' >&2
+    exit 150
+  fi
   cat "$FAKE_BODY"
   exit "$(cat "$FAKE_RC")"
   ;;
@@ -64,6 +70,10 @@ list)
   for _label in ${FAKE_LOADED:-}; do printf '4242\t0\t%s\n' "$_label"; done
   ;;
 print)
+  if [ "${FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO:-0}" = "1" ] && [ "${FAKE_SUDO_ACTIVE:-0}" != "1" ]; then
+    printf 'Not privileged\n' >&2
+    exit 150
+  fi
   for _label in ${FAKE_LOADED:-}; do
     case "${*: -1}" in
     */"$_label")
@@ -81,6 +91,9 @@ FAKE_LAUNCHCTL
 cat >"$_tmp/bin/sudo" <<'FAKE_SUDO'
 #!/usr/bin/env bash
 printf 'sudo %s\n' "$*" >>"$FAKE_LOG"
+if [ "${FAKE_SUDO_RC:-0}" != "0" ]; then exit "$FAKE_SUDO_RC"; fi
+if [ "${1:-}" = "-n" ]; then shift; fi
+export FAKE_SUDO_ACTIVE=1
 exec "$@"
 FAKE_SUDO
 chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/sudo"
@@ -128,6 +141,9 @@ serve() { # <rc> [entry...]
   fi
   printf '%s\n' "$rc" >"$FAKE_RC"
   : >"$FAKE_LOG"
+  FAKE_SUDO_RC="0"
+  FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO="0"
+  export FAKE_SUDO_RC FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO
 }
 
 # probe_rc <domain-target> <label> <sudo-prefix>: "rc=<status> out=<verdict>", so
@@ -267,5 +283,51 @@ assert_eq "false" "$(status_field .enabled "$status_entry")" \
 serve 0 '"local.demo" => enabled'
 assert_eq "true" "$(status_field .enabled "$status_entry")" \
   "an unloaded job leaves the enabled verdict to the database"
+
+section 5 "system-scope read-only probes are best-effort and never false inactive"
+
+system_status_entry='{"type":"macos-launchctl","service":"local.demo","scope":"system","launchdDomain":"gui"}'
+
+# Case 1: unprivileged print is definitive running even when sudo is unavailable.
+serve 0 '"local.demo" => enabled'
+FAKE_LOADED=local.demo
+FAKE_SUDO_RC=1
+FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO=0
+assert_eq "active" "$(status_field .status "$system_status_entry")" \
+  "system-scope: unprivileged running print reports active even when sudo is unavailable"
+assert_eq "true" "$(status_field .running "$system_status_entry")" \
+  "system-scope: unprivileged running print reports running=true even when sudo is unavailable"
+
+# Case 2: unprivileged inconclusive and sudo unavailable -> unknown, not inactive.
+serve 0 '"local.demo" => enabled'
+FAKE_LOADED=""
+FAKE_SUDO_RC=1
+FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO=1
+assert_eq "unknown" "$(status_field .status "$system_status_entry")" \
+  "system-scope: inconclusive probes report unknown, not inactive, when sudo is unavailable"
+assert_eq "false" "$(status_field .running "$system_status_entry")" \
+  "system-scope: inconclusive probes report running=false under unknown convention"
+assert_eq "null" "$(status_field .enabled "$system_status_entry")" \
+  "system-scope: inconclusive probes report enabled=null under unknown convention"
+
+# Escalation: unprivileged inconclusive, sudo -n available and definitive.
+serve 0 '"local.demo" => disabled'
+FAKE_LOADED=local.demo
+FAKE_SUDO_RC=0
+FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO=1
+assert_eq "active" "$(status_field .status "$system_status_entry")" \
+  "system-scope: sudo -n escalation reports active when unprivileged print is inconclusive"
+assert_eq "false" "$(status_field .enabled "$system_status_entry")" \
+  "system-scope: sudo -n escalation reads enabled gate when unprivileged read is inconclusive"
+
+# Definitive not-found: unprivileged print reports Could not find service.
+serve 0 '"local.demo" => enabled'
+FAKE_LOADED=""
+FAKE_SUDO_RC=1
+FAKE_PRINT_INCONCLUSIVE_WITHOUT_SUDO=0
+assert_eq "inactive" "$(status_field .status "$system_status_entry")" \
+  "system-scope: definitive not-found print reports inactive even without sudo"
+assert_eq "false" "$(status_field .running "$system_status_entry")" \
+  "system-scope: definitive not-found print reports running=false"
 
 finish_tests
