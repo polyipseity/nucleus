@@ -1,6 +1,7 @@
 #Requires -Version 7.4
 # Unit tests for Invoke-SafeDelete in src/scripts/shell/profile.ps1.
-# Focus: argument shaping when delegating to the POSIX safe-delete backend.
+# Focus: argument shaping. On POSIX the function delegates to safe-rm; on
+# Windows it falls back to $script:OriginalRemoveItem for non-filesystem targets.
 
 [CmdletBinding()]
 param()
@@ -34,7 +35,7 @@ $fn = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.Fun
 if (-not $fn) { throw 'Invoke-SafeDelete not found in profile.ps1' }
 . ([scriptblock]::Create($fn.Extent.Text))
 
-# In-process stub: records the argument shape Invoke-SafeDelete delegates.
+# POSIX in-process stub: records delegated argument shape.
 $script:SafeRmCalls = @()
 function global:safe-rm {
   [CmdletBinding()]
@@ -45,23 +46,66 @@ function global:safe-rm {
   $script:SafeRmCalls += , @($CapturedArgs)
 }
 
+# Windows fallback stub: records the shaped parameters passed to OriginalRemoveItem.
+$script:OriginalRemoveItemCalls = @()
+function New-OriginalRemoveItemStub {
+  return {
+    [CmdletBinding()]
+    param(
+      [Parameter(ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+      [string[]]$Path,
+      [Parameter(ValueFromPipelineByPropertyName = $true)]
+      [string[]]$LiteralPath,
+      [Switch]$Recurse,
+      [Switch]$Force,
+      [string]$Filter,
+      [string[]]$Include,
+      [string[]]$Exclude,
+      [Switch]$WhatIf,
+      [Switch]$Confirm
+    )
+    process {
+      $script:OriginalRemoveItemCalls += , [pscustomobject]@{
+        Path        = @($Path)
+        LiteralPath = @($LiteralPath)
+        Recurse     = [bool]$Recurse
+        Force       = [bool]$Force
+      }
+    }
+  }
+}
+
 function Invoke-SafeDeleteProbe {
   param(
     [Parameter(Mandatory)][scriptblock]$Expression
   )
 
   $script:SafeRmCalls = @()
+  $script:OriginalRemoveItemCalls = @()
   $script:OriginalRemoveItem = $null
+  if ($IsWindows) {
+    $script:OriginalRemoveItem = New-OriginalRemoveItemStub
+  }
   try {
     & $Expression
   }
   finally {
     $script:OriginalRemoveItem = $null
   }
-  return , @($script:SafeRmCalls)
+
+  if ($IsWindows) {
+    return [pscustomobject]@{
+      Backend = 'windows-fallback'
+      Calls   = @($script:OriginalRemoveItemCalls)
+    }
+  }
+  return [pscustomobject]@{
+    Backend = 'posix-safe-rm'
+    Calls   = @($script:SafeRmCalls)
+  }
 }
 
-function Assert-Calls {
+function Assert-PosixCall {
   param(
     [Parameter(Mandatory)][string]$Name,
     [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Calls,
@@ -69,7 +113,7 @@ function Assert-Calls {
   )
 
   if ($Calls.Count -ne 1) {
-    Assert-Fail $Name "expected 1 call, got $($Calls.Count)"
+    Assert-Fail $Name "expected 1 safe-rm call, got $($Calls.Count)"
     return
   }
   $actual = @($Calls[0] | ForEach-Object { [string]$_ })
@@ -86,28 +130,88 @@ function Assert-Calls {
   Assert-Pass $Name
 }
 
+function Assert-WindowsFallbackCall {
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Calls,
+    [string[]]$ExpectedPath = @(),
+    [string[]]$ExpectedLiteralPath = @(),
+    [bool]$ExpectedRecurse = $false,
+    [bool]$ExpectedForce = $false
+  )
+
+  if ($Calls.Count -ne 1) {
+    Assert-Fail $Name "expected 1 OriginalRemoveItem call, got $($Calls.Count)"
+    return
+  }
+  $call = $Calls[0]
+  $actualPath = @($call.Path | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+  $actualLiteral = @($call.LiteralPath | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+  $expectedPathValues = @($ExpectedPath | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+  $expectedLiteralValues = @($ExpectedLiteralPath | Where-Object { $null -ne $_ } | ForEach-Object { [string]$_ })
+
+  if (($actualPath -join "`n") -ne ($expectedPathValues -join "`n")) {
+    Assert-Fail $Name "expected Path [$($expectedPathValues -join ', ')], got [$($actualPath -join ', ')]"
+    return
+  }
+  if (($actualLiteral -join "`n") -ne ($expectedLiteralValues -join "`n")) {
+    Assert-Fail $Name "expected LiteralPath [$($expectedLiteralValues -join ', ')], got [$($actualLiteral -join ', ')]"
+    return
+  }
+  if ([bool]$call.Recurse -ne $ExpectedRecurse) {
+    Assert-Fail $Name "expected Recurse=$ExpectedRecurse, got $($call.Recurse)"
+    return
+  }
+  if ([bool]$call.Force -ne $ExpectedForce) {
+    Assert-Fail $Name "expected Force=$ExpectedForce, got $($call.Force)"
+    return
+  }
+  Assert-Pass $Name
+}
+
+function New-MissingPath([string]$Leaf) {
+  return Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-safe-delete-missing-" + [System.Guid]::NewGuid().ToString('N') + '-' + $Leaf)
+}
+
 function Test-SinglePathNotCharSplatted {
-  if ($IsWindows) { Assert-Pass 'single-path-not-char-splatted'; return }
-  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete 'ab' }
-  Assert-Calls -Name 'single-path-not-char-splatted' -Calls $calls -Expected @('ab')
+  $missing = New-MissingPath 'ab'
+  $probe = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete $missing }
+  if ($probe.Backend -eq 'posix-safe-rm') {
+    Assert-PosixCall -Name 'single-path-not-char-splatted' -Calls $probe.Calls -Expected @($missing)
+    return
+  }
+  Assert-WindowsFallbackCall -Name 'single-path-not-char-splatted' -Calls $probe.Calls -ExpectedPath @($missing) -ExpectedLiteralPath @()
 }
 
 function Test-MultiplePathsPreserved {
-  if ($IsWindows) { Assert-Pass 'multiple-paths-preserved'; return }
-  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Path @('ab', 'cd') }
-  Assert-Calls -Name 'multiple-paths-preserved' -Calls $calls -Expected @('ab', 'cd')
+  $missing1 = New-MissingPath 'ab'
+  $missing2 = New-MissingPath 'cd'
+  $probe = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Path @($missing1, $missing2) }
+  if ($probe.Backend -eq 'posix-safe-rm') {
+    Assert-PosixCall -Name 'multiple-paths-preserved' -Calls $probe.Calls -Expected @($missing1, $missing2)
+    return
+  }
+  Assert-WindowsFallbackCall -Name 'multiple-paths-preserved' -Calls $probe.Calls -ExpectedPath @($missing1, $missing2) -ExpectedLiteralPath @()
 }
 
 function Test-LiteralPathSinglePath {
-  if ($IsWindows) { Assert-Pass 'literalpath-single-path'; return }
-  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -LiteralPath 'ab' }
-  Assert-Calls -Name 'literalpath-single-path' -Calls $calls -Expected @('ab')
+  $missing = New-MissingPath 'ab'
+  $probe = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -LiteralPath $missing }
+  if ($probe.Backend -eq 'posix-safe-rm') {
+    Assert-PosixCall -Name 'literalpath-single-path' -Calls $probe.Calls -Expected @($missing)
+    return
+  }
+  Assert-WindowsFallbackCall -Name 'literalpath-single-path' -Calls $probe.Calls -ExpectedPath @() -ExpectedLiteralPath @($missing)
 }
 
 function Test-RecurseForceStillBind {
-  if ($IsWindows) { Assert-Pass 'recurse-force-still-bind'; return }
-  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Recurse -Force 'ab' }
-  Assert-Calls -Name 'recurse-force-still-bind' -Calls $calls -Expected @('ab')
+  $missing = New-MissingPath 'ab'
+  $probe = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Recurse -Force $missing }
+  if ($probe.Backend -eq 'posix-safe-rm') {
+    Assert-PosixCall -Name 'recurse-force-still-bind' -Calls $probe.Calls -Expected @($missing)
+    return
+  }
+  Assert-WindowsFallbackCall -Name 'recurse-force-still-bind' -Calls $probe.Calls -ExpectedPath @($missing) -ExpectedLiteralPath @() -ExpectedRecurse $true -ExpectedForce $true
 }
 
 Write-Output '=== safe-delete-profile tests ==='
