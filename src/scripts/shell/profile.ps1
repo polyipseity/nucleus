@@ -43,14 +43,14 @@ function Invoke-SafeDelete {
 
     if (-not $IsWindows) {
       # POSIX backend: delegate to the platform safe alternative.
-      $safeBin = $null
+      $safeCmd = $null
       foreach ($candidate in @('safe-rm')) {
         # check-suppress:suppression_doc: safe-rm is optional; an absent candidate falls through to the original cmdlet
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
-        if ($cmd) { $safeBin = $cmd.Source; break }
+        if ($cmd) { $safeCmd = $cmd; break }
       }
-      if ($safeBin) {
-        & $safeBin @targetPaths
+      if ($safeCmd) {
+        & $safeCmd @targetPaths
         return
       }
       # Fallback: pass through to the original Remove-Item (no recycling available).

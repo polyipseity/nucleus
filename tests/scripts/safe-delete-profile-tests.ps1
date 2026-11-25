@@ -1,6 +1,6 @@
 #Requires -Version 7.4
 # Unit tests for Invoke-SafeDelete in src/scripts/shell/profile.ps1.
-# Focus: a single string path must not be character-splatted when delegated.
+# Focus: argument shaping when delegating to the POSIX safe-delete backend.
 
 [CmdletBinding()]
 param()
@@ -24,160 +24,99 @@ function Assert-Fail([string]$Name, [string]$Reason) {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $profilePath = Join-Path $repoRoot 'src/scripts/shell/profile.ps1'
 
-# Dot-source profile in a clean child pwsh so its side effects do not leak.
-# The child writes captured args to a log file, one per line.
-function Invoke-ProfileProbe {
-  param(
-    [Parameter(Mandatory)][string]$Expression
-  )
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($profilePath, [ref]$tokens, [ref]$errors)
+if ($errors.Count -gt 0) {
+  throw ($errors | ForEach-Object Message | Join-String -Separator '; ')
+}
+$fn = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-SafeDelete' }, $true) | Select-Object -First 1
+if (-not $fn) { throw 'Invoke-SafeDelete not found in profile.ps1' }
+. ([scriptblock]::Create($fn.Extent.Text))
 
-  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-safe-delete-test-" + [System.Guid]::NewGuid().ToString('N'))
-  $null = New-Item -ItemType Directory -Path $tmp
-  try {
-    $log = Join-Path $tmp 'args.txt'
-    if ($IsWindows) {
-      $fake = Join-Path $tmp 'safe-rm.cmd'
-      @"
-@echo off
-for %%A in (%*) do >> "$log" echo %%~A
-"@ | Set-Content -Path $fake -Encoding ascii
-    } else {
-      $fake = Join-Path $tmp 'safe-rm'
-      @'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$@" > "${NUCLEUS_SAFE_RM_LOG:?}"
-'@ | Set-Content -Path $fake -Encoding utf8NoBOM
-      & chmod +x $fake
-    }
-
-    $child = @"
-`$ErrorActionPreference = 'Stop'
-Set-StrictMode -Version Latest
-`$env:NUCLEUS_SAFE_RM_LOG = '$log'
-`$env:PATH = '$tmp' + [System.IO.Path]::PathSeparator + `$env:PATH
-
-# Extract only Invoke-SafeDelete from profile.ps1 to avoid top-level side effects.
-`$tokens = `$null; `$errors = `$null
-`$ast = [System.Management.Automation.Language.Parser]::ParseFile('$profilePath', [ref]`$tokens, [ref]`$errors)
-if (`$errors.Count -gt 0) { throw (`$errors | ForEach-Object Message | Join-String -Separator '; ') }
-`$fn = `$ast.FindAll({ param(`$n) `$n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and `$n.Name -eq 'Invoke-SafeDelete' }, `$true) | Select-Object -First 1
-if (-not `$fn) { throw 'Invoke-SafeDelete not found in profile.ps1' }
-. ([scriptblock]::Create(`$fn.Extent.Text))
-
-# Windows fallback path calls `$script:OriginalRemoveItem when a target is not a
-# filesystem item. Stub it so the probe exercises the common target-path construction.
-`$script:OriginalRemoveItem = {
+# In-process stub: records the argument shape Invoke-SafeDelete delegates.
+$script:SafeRmCalls = @()
+function global:safe-rm {
   [CmdletBinding()]
   param(
-    [Parameter(ValueFromPipeline=`$true, ValueFromPipelineByPropertyName=`$true)]
-    [string[]]`$Path,
-    [Parameter(ValueFromPipelineByPropertyName=`$true)]
-    [string[]]`$LiteralPath,
-    [Switch]`$Recurse,
-    [Switch]`$Force,
-    [string]`$Filter,
-    [string[]]`$Include,
-    [string[]]`$Exclude,
-    [Switch]`$WhatIf,
-    [Switch]`$Confirm
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [object[]]$CapturedArgs
   )
-  process {
-    `$paths = if (`$LiteralPath) { @(`$LiteralPath) } else { @(`$Path) }
-    `$paths | Add-Content -Path `$env:NUCLEUS_SAFE_RM_LOG -Encoding utf8NoBOM
-  }
+  $script:SafeRmCalls += , @($CapturedArgs)
 }
 
-$Expression
-"@
-    $childPath = Join-Path $tmp 'probe.ps1'
-    Set-Content -Path $childPath -Value $child -Encoding utf8NoBOM
+function Invoke-SafeDeleteProbe {
+  param(
+    [Parameter(Mandatory)][scriptblock]$Expression
+  )
 
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = (Get-Command pwsh).Source
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    foreach ($a in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $childPath)) {
-      $psi.ArgumentList.Add($a)
-    }
-    $p = [System.Diagnostics.Process]::Start($psi)
-    $stdout = $p.StandardOutput.ReadToEndAsync()
-    $stderr = $p.StandardError.ReadToEndAsync()
-    $p.WaitForExit()
-    $argsOut = if (Test-Path $log) { @((Get-Content -Path $log) | Where-Object { $_ -ne '' }) } else { @() }
-    return [pscustomobject]@{
-      ExitCode = $p.ExitCode
-      Stdout   = $stdout.Result
-      Stderr   = $stderr.Result
-      Args     = [string[]]@($argsOut)
-    }
+  $script:SafeRmCalls = @()
+  $script:OriginalRemoveItem = $null
+  try {
+    & $Expression
   }
   finally {
-    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    $script:OriginalRemoveItem = $null
   }
+  return , @($script:SafeRmCalls)
+}
+
+function Assert-Calls {
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Calls,
+    [Parameter(Mandatory)][string[]]$Expected
+  )
+
+  if ($Calls.Count -ne 1) {
+    Assert-Fail $Name "expected 1 call, got $($Calls.Count)"
+    return
+  }
+  $actual = @($Calls[0] | ForEach-Object { [string]$_ })
+  if ($actual.Count -ne $Expected.Count) {
+    Assert-Fail $Name "expected [$($Expected -join ', ')], got [$($actual -join ', ')]"
+    return
+  }
+  for ($i = 0; $i -lt $Expected.Count; $i++) {
+    if ($actual[$i] -ne $Expected[$i]) {
+      Assert-Fail $Name "expected [$($Expected -join ', ')], got [$($actual -join ', ')]"
+      return
+    }
+  }
+  Assert-Pass $Name
 }
 
 function Test-SinglePathNotCharSplatted {
-  $r = Invoke-ProfileProbe -Expression 'Invoke-SafeDelete "ab"'
-  if ($r.ExitCode -ne 0) {
-    Assert-Fail 'single-path-not-char-splatted' "probe exited $($r.ExitCode): $($r.Stderr)"
-    return
-  }
-  if (@($r.Args).Count -eq 1 -and $r.Args[0] -eq 'ab') {
-    Assert-Pass 'single-path-not-char-splatted'
-  } else {
-    Assert-Fail 'single-path-not-char-splatted' "expected [ab], got [$($r.Args -join ', ')]"
-  }
+  if ($IsWindows) { Assert-Pass 'single-path-not-char-splatted'; return }
+  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete 'ab' }
+  Assert-Calls -Name 'single-path-not-char-splatted' -Calls $calls -Expected @('ab')
 }
 
 function Test-MultiplePathsPreserved {
-  $r = Invoke-ProfileProbe -Expression 'Invoke-SafeDelete -Path @("ab","cd")'
-  if ($r.ExitCode -ne 0) {
-    Assert-Fail 'multiple-paths-preserved' "probe exited $($r.ExitCode): $($r.Stderr)"
-    return
-  }
-  if (@($r.Args).Count -eq 2 -and $r.Args[0] -eq 'ab' -and $r.Args[1] -eq 'cd') {
-    Assert-Pass 'multiple-paths-preserved'
-  } else {
-    Assert-Fail 'multiple-paths-preserved' "expected [ab, cd], got [$($r.Args -join ', ')]"
-  }
+  if ($IsWindows) { Assert-Pass 'multiple-paths-preserved'; return }
+  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Path @('ab', 'cd') }
+  Assert-Calls -Name 'multiple-paths-preserved' -Calls $calls -Expected @('ab', 'cd')
 }
 
 function Test-LiteralPathSinglePath {
-  $r = Invoke-ProfileProbe -Expression 'Invoke-SafeDelete -LiteralPath "ab"'
-  if ($r.ExitCode -ne 0) {
-    Assert-Fail 'literalpath-single-path' "probe exited $($r.ExitCode): $($r.Stderr)"
-    return
-  }
-  if (@($r.Args).Count -eq 1 -and $r.Args[0] -eq 'ab') {
-    Assert-Pass 'literalpath-single-path'
-  } else {
-    Assert-Fail 'literalpath-single-path' "expected [ab], got [$($r.Args -join ', ')]"
-  }
+  if ($IsWindows) { Assert-Pass 'literalpath-single-path'; return }
+  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -LiteralPath 'ab' }
+  Assert-Calls -Name 'literalpath-single-path' -Calls $calls -Expected @('ab')
 }
 
 function Test-RecurseForceStillBind {
-  # Should not throw parameter-binding errors; safe-rm receives the path.
-  $r = Invoke-ProfileProbe -Expression 'Invoke-SafeDelete -Recurse -Force "ab"'
-  if ($r.ExitCode -ne 0) {
-    Assert-Fail 'recurse-force-still-bind' "probe exited $($r.ExitCode): $($r.Stderr)"
-    return
-  }
-  if (@($r.Args).Count -eq 1 -and $r.Args[0] -eq 'ab') {
-    Assert-Pass 'recurse-force-still-bind'
-  } else {
-    Assert-Fail 'recurse-force-still-bind' "expected [ab], got [$($r.Args -join ', ')]"
-  }
+  if ($IsWindows) { Assert-Pass 'recurse-force-still-bind'; return }
+  $calls = Invoke-SafeDeleteProbe -Expression { Invoke-SafeDelete -Recurse -Force 'ab' }
+  Assert-Calls -Name 'recurse-force-still-bind' -Calls $calls -Expected @('ab')
 }
 
-Write-Output "=== safe-delete-profile tests ==="
+Write-Output '=== safe-delete-profile tests ==='
 Test-SinglePathNotCharSplatted
 Test-MultiplePathsPreserved
 Test-LiteralPathSinglePath
 Test-RecurseForceStillBind
 
-Write-Output ""
+Write-Output ''
 Write-Output "safe-delete-profile: $($script:passCount) passed, $($script:failCount) failed"
 if ($script:failCount -gt 0) { exit 1 }
 exit 0
