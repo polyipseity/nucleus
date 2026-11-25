@@ -15,6 +15,7 @@
   nucleusApps,
   users ? null,
   hostName,
+  repoRoot ? ../../../..,
   ...
 }:
 let
@@ -104,12 +105,15 @@ let
   };
 
   # In the Nix store so the ProgramArguments path is stable across
-  # home-manager generations. The freshness check matters because the plist
-  # embeds the derivation path, so every switch reloads the agent; skipping a
-  # rebuild when the database is under 6 days old keeps apply fast.
+  # home-manager generations. The refresh compares against the pinned lockfile
+  # hash and downloads only when the local database differs.
   nixIndexUpdate = pkgs.writeNucleusShellApplication {
     name = "nix-index-update";
-    runtimeInputs = [ pkgs.nix-index ];
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.jq
+    ];
     scriptName = "src/scripts/packages/update-nix-index";
   };
 
@@ -263,9 +267,8 @@ in
   };
 
   # Keeps the nix-index database current so pay-respects can suggest
-  # `nix profile install` commands. Not a synchronous activation step: a full
-  # build takes minutes and would block the activation chain. A stale database
-  # only means pay-respects stops suggesting packages, so failure is benign.
+  # `nix profile install` commands. The refresh downloads a pinned prebuilt
+  # database only when the local hash differs.
   launchd.agents."nix-index-update" = {
     enable = true;
     domain = "gui";
@@ -273,11 +276,11 @@ in
       Label = "local.nix-index-update";
       ProgramArguments = [
         "${nixIndexUpdate}/bin/nucleus-nix-index-update"
-        "nix-index"
-        "6"
+        "${config.home.homeDirectory}/.cache/nix-index"
+        "${pkgs.coreutils}/bin/sha256sum"
+        "${pkgs.jq}/bin/jq"
+        "${repoRoot}/src/lockfiles/lockfile.json"
       ];
-      # A freshly provisioned machine gets a rebuild at load rather than
-      # waiting for the next daily window.
       RunAtLoad = true;
       StartCalendarInterval = [
         {

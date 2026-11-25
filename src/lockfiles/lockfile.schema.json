@@ -41,21 +41,21 @@
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Bun-resolved package versions: global installs plus packages fetched ephemerally with `bun x`. Package name → version string or VCS hash pin.",
+      "description": "Bun-resolved package versions: global installs plus packages fetched ephemerally with `bun x`. Package name \u2192 version string or VCS hash pin.",
       "type": "object"
     },
     "cargo-binstall": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
+      "description": "cargo-binstall crate versions. Crate name \u2192 version string or VCS hash pin.",
       "type": "object"
     },
     "cursor": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Deterministic pinned versions for Cursor editor plugins. Plugin name → VCS hash pin.",
+      "description": "Deterministic pinned versions for Cursor editor plugins. Plugin name \u2192 VCS hash pin.",
       "type": "object"
     },
     "deepfilternet": {
@@ -92,7 +92,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Pi coding agent npm package versions. Package name → version string.",
+      "description": "Pi coding agent npm package versions. Package name \u2192 version string.",
       "type": "object"
     },
     "psgallery": {
@@ -124,7 +124,7 @@
           }
         ]
       },
-      "description": "PowerShell module versions from PSGallery. Module name → version string or {version, hash} object.",
+      "description": "PowerShell module versions from PSGallery. Module name \u2192 version string or {version, hash} object.",
       "type": "object"
     },
     "rustup": {
@@ -132,7 +132,7 @@
         "minLength": 1,
         "type": "string"
       },
-      "description": "Rustup toolchain pins. Channel name → version (stable/beta) or nightly-YYYY-MM-DD (nightly).",
+      "description": "Rustup toolchain pins. Channel name \u2192 version (stable/beta) or nightly-YYYY-MM-DD (nightly).",
       "type": "object"
     },
     "scoop": {
@@ -140,14 +140,14 @@
         "minLength": 1,
         "type": "string"
       },
-      "description": "Scoop package versions. Package name → version string.",
+      "description": "Scoop package versions. Package name \u2192 version string.",
       "type": "object"
     },
     "source-builds": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL.",
+      "description": "Windows source-built package VCS pins. Package name \u2192 VCS hash pin with source URL.",
       "type": "object"
     },
     "suggestions": {
@@ -170,7 +170,7 @@
               "additionalProperties": {
                 "type": "string"
               },
-              "description": "Mac App Store app identifiers. App name → App Store ID string.",
+              "description": "Mac App Store app identifiers. App name \u2192 App Store ID string.",
               "type": "object"
             }
           },
@@ -208,7 +208,7 @@
           "additionalProperties": {
             "$ref": "#/definitions/versionOrHash"
           },
-          "description": "OpenCode plugin versions (warn-only). Plugin name → version string or VCS hash pin.",
+          "description": "OpenCode plugin versions (warn-only). Plugin name \u2192 version string or VCS hash pin.",
           "type": "object"
         },
         "vm-setup": {
@@ -233,7 +233,7 @@
                 ],
                 "type": "object"
               },
-              "description": "Windows ISO pins. Empty placeholder — digest recording unimplemented.",
+              "description": "Windows ISO pins. Empty placeholder \u2014 digest recording unimplemented.",
               "type": "object"
             }
           },
@@ -259,7 +259,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "uv (pip) tool versions. Tool name → version string or VCS hash pin.",
+      "description": "uv (pip) tool versions. Tool name \u2192 version string or VCS hash pin.",
       "type": "object"
     },
     "version": {
@@ -346,7 +346,7 @@
             ],
             "type": "object"
           },
-          "description": "Windows ISO pins. Empty placeholder — populated when digest recording is implemented.",
+          "description": "Windows ISO pins. Empty placeholder \u2014 populated when digest recording is implemented.",
           "type": "object"
         }
       },
@@ -356,7 +356,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Deterministic pinned versions for VS Code editor plugins. Plugin name → VCS hash pin.",
+      "description": "Deterministic pinned versions for VS Code editor plugins. Plugin name \u2192 VCS hash pin.",
       "type": "object"
     },
     "whisper": {
@@ -386,7 +386,7 @@
         ],
         "type": "object"
       },
-      "description": "whisper.cpp ggml model weights. Model file name → {url, revision, hash}. No package manager ships these; the lockfile is the only pin authority.",
+      "description": "whisper.cpp ggml model weights. Model file name \u2192 {url, revision, hash}. No package manager ships these; the lockfile is the only pin authority.",
       "type": "object"
     },
     "winget": {
@@ -394,8 +394,25 @@
         "minLength": 1,
         "type": "string"
       },
-      "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only `nucleus-update lockfile` may change WinGet versions.",
+      "description": "WinGet package identifiers and versions. Package ID \u2192 version string. Lockfile is the sole version authority \u2014 only `nucleus-update lockfile` may change WinGet versions.",
       "type": "object"
+    },
+    "nix-index-database": {
+      "description": "Pinned prebuilt nix-index database files by platform.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aarch64-darwin": {
+          "$ref": "#/$defs/nixIndexDatabaseEntry"
+        },
+        "x86_64-linux": {
+          "$ref": "#/$defs/nixIndexDatabaseEntry"
+        }
+      },
+      "required": [
+        "aarch64-darwin",
+        "x86_64-linux"
+      ]
     }
   },
   "required": [
@@ -403,6 +420,7 @@
     "cargo-binstall",
     "cursor",
     "deepfilternet",
+    "nix-index-database",
     "psgallery",
     "rustup",
     "scoop",
@@ -415,5 +433,25 @@
     "winget"
   ],
   "title": "nucleus lockfile",
-  "type": "object"
+  "type": "object",
+  "$defs": {
+    "nixIndexDatabaseEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "hash",
+        "url"
+      ]
+    }
+  }
 }

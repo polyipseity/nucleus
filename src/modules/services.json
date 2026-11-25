@@ -688,8 +688,8 @@
     "firing": "timer"
   },
   "nix-index-update": {
-    "description": "Daily nix-index rebuild so pay-respects can suggest nix profile install commands",
-    "displayName": "nix-index Update",
+    "description": "Refresh a pinned prebuilt nix-index database so pay-respects can suggest nix profile install commands",
+    "displayName": "nix-index Database Refresh",
     "logging": {
       "capture": "all",
       "dirs": {

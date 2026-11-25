@@ -150,16 +150,14 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   };
 
   home.activation = {
-    # build-nix-index: start a background nix-index build on first provision so
-    # the database is ready before the daily systemd timer fires, and later
-    # refreshes come from that timer.  A full build takes minutes, so it is
-    # backgrounded, and stdout is dropped because nix-index prints per-channel
-    # progress that would swamp the activation log.  A failed build is benign:
-    # pay-respects falls back to suggesting nothing and the timer retries.
+    # build-nix-index: refresh the pinned prebuilt nix-index database on first
+    # provision so the database is ready before the daily timer fires.
     build-nix-index = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/packages/update-nix-index.sh" \
-        "${pkgs.nix-index}/bin/nix-index" \
-        ""
+        "$HOME/.cache/nix-index" \
+        "${pkgs.coreutils}/bin/sha256sum" \
+        "${pkgs.jq}/bin/jq" \
+        "${config.home.homeDirectory}/.config/nucleus/src/lockfiles/lockfile.json"
     '';
 
     # ensure-dev-directory: create ~/dev when absent, mirroring macOS, since
@@ -171,18 +169,26 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   };
 
   # nix-index-update service and timer, keeping the file database current so
-  # pay-respects can suggest `nix profile install` for an unknown command.  Daily
-  # at 12:00 with Persistent=true, so the database stays fresh on machines that
-  # sit off overnight; the first-provision build covers the initial case.
+  # pay-respects can suggest `nix profile install` for an unknown command. The
+  # refresh downloads a pinned prebuilt database only when the local hash differs.
   systemd.user.services."nix-index-update" = {
     Unit = {
-      Description = "Rebuild nix-index file database";
-      # After network.target so channel index fetches succeed.
+      Description = "Refresh nix-index file database";
       After = "network.target";
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${pkgs.nix-index}/bin/nix-index";
+      ExecStart = "${
+        pkgs.writeNucleusShellApplication {
+          name = "nix-index-update";
+          runtimeInputs = [
+            pkgs.coreutils
+            pkgs.curl
+            pkgs.jq
+          ];
+          scriptName = "src/scripts/packages/update-nix-index";
+        }
+      }/bin/nucleus-nix-index-update ${config.home.homeDirectory}/.cache/nix-index ${pkgs.coreutils}/bin/sha256sum ${pkgs.jq}/bin/jq ${config.home.homeDirectory}/.config/nucleus/src/lockfiles/lockfile.json";
     };
   };
 
