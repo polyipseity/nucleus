@@ -386,6 +386,50 @@
             "tcp"
           ],
           "type": "string"
+        },
+        "health": {
+          "description": "Optional liveness probe contract. When absent, a probe checks transport only. When present, a probe GETs path and requires the declared expect match.",
+          "properties": {
+            "path": {
+              "description": "HTTP path to GET for the liveness probe, for example \"/health\".",
+              "type": "string"
+            },
+            "expect": {
+              "description": "Expected response match. Body assertions must stay generic.",
+              "properties": {
+                "status": {
+                  "description": "Exact expected HTTP status code.",
+                  "type": "integer"
+                },
+                "statusClass": {
+                  "description": "Expected HTTP status class.",
+                  "type": "string",
+                  "enum": [
+                    "2xx",
+                    "3xx",
+                    "4xx",
+                    "5xx"
+                  ]
+                },
+                "bodyJsonSubset": {
+                  "description": "Generic JSON subset that the response body must contain.",
+                  "type": "object"
+                }
+              },
+              "additionalProperties": false,
+              "type": "object"
+            },
+            "timeoutSeconds": {
+              "description": "Probe timeout in seconds.",
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "additionalProperties": false,
+          "type": "object"
         }
       },
       "required": [

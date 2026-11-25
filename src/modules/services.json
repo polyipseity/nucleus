@@ -579,7 +579,13 @@
       "default": {
         "host": "127.0.0.1",
         "port": 4000,
-        "protocol": "http"
+        "protocol": "http",
+        "health": {
+          "path": "/health/liveliness",
+          "expect": {
+            "status": 200
+          }
+        }
       }
     },
     "hosts": {
@@ -744,7 +750,13 @@
       "default": {
         "host": "127.0.0.1",
         "port": 11434,
-        "protocol": "http"
+        "protocol": "http",
+        "health": {
+          "path": "/api/version",
+          "expect": {
+            "status": 200
+          }
+        }
       }
     },
     "hosts": {
