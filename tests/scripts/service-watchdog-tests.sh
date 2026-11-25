@@ -309,6 +309,13 @@ supervisor_repair() {
   esac
 }
 
+# shellcheck disable=SC2329 # reason: mock function invoked by eval'd watchdog code
+svc_liveness_probe_endpoint() {
+  printf '%s\n' "${1:-}" >>"${FAKE_LIVENESS_LOG:?}"
+  printf '%s\n' "${FAKE_LIVENESS_REASON:-live}"
+  return "${FAKE_LIVENESS_RC:-0}"
+}
+
 # ── Mock lib.sh primitives ─────────────────────────────────────────────────
 # shellcheck disable=SC2329,SC2120 # reason: mock functions invoked by eval'd watchdog code
 derive_repo_root() { printf '%s' "$_tmp/repo"; }
@@ -407,6 +414,8 @@ FAKE_BOOTED_OUT="$_tmp/booted-out.txt"
 export FAKE_LAUNCHCTL_LOG FAKE_BOOTED_OUT
 FAKE_SYSTEMCTL_LOG="$_tmp/systemctl.log"
 export FAKE_SYSTEMCTL_LOG
+FAKE_LIVENESS_LOG="$_tmp/liveness.log"
+export FAKE_LIVENESS_LOG
 
 # ── Section 1: Healthy instance is left alone ──────────────────────────────
 section 1 "Healthy instance is left alone"
@@ -1592,5 +1601,80 @@ FAKE_STATE=""
 FAKE_EXIT_CODE=0
 FAKE_RUNS=0
 export FAKE_LIVE FAKE_LIST FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS
+
+# ── Section 27: liveness probe drives repair for wedged services (C5) ──────
+section 27 "Liveness probe drives repair only when endpoint is dead"
+
+liveness_entry='{"type":"macos-launchctl","scope":"user","launchdDomain":"gui","service":"local.test-liveness"}'
+liveness_endpoint='{"host":"127.0.0.1","port":65530,"protocol":"tcp"}'
+liveness_record="$state_dir/test-liveness.json"
+rm -f "$liveness_record"
+FAKE_LIVE="local.test-liveness"
+FAKE_STATE="running"
+FAKE_EXIT_CODE=0
+FAKE_RUNS=1
+FAKE_DISABLED=""
+FAKE_ABSENT=""
+export FAKE_LIVE FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_DISABLED FAKE_ABSENT
+
+# supervisor live + liveness dead => repair called
+FAKE_LIVENESS_RC=1
+FAKE_LIVENESS_REASON="dead:connect-failed"
+export FAKE_LIVENESS_RC FAKE_LIVENESS_REASON
+: >"$_tmp/launchctl.log"
+: >"$_tmp/liveness.log"
+run_check_instance "test-liveness" "macos-launchctl" "$liveness_entry" "test-liveness" "local.test-liveness" false "$liveness_endpoint"
+assert_eq "liveness dead exits 0" 0 "$captured_status"
+assert_contains "liveness dead is reported" "$captured_output" "liveness probe failed (dead:connect-failed); repairing"
+assert_contains "liveness dead triggers repair bootout" "$(cat "$_tmp/launchctl.log")" "bootout"
+assert_contains "liveness dead triggers repair bootstrap" "$(cat "$_tmp/launchctl.log")" "bootstrap"
+assert_eq "liveness dead probes endpoint" 1 "$(calls_made "$_tmp/liveness.log")"
+assert_eq "liveness dead does not block record" "false" "$(jq -r '.state == "blocked"' "$liveness_record" 2>/dev/null || printf 'false')"
+
+# supervisor live + liveness unknown => no repair
+FAKE_LIVENESS_RC=2
+FAKE_LIVENESS_REASON="unknown:timeout"
+export FAKE_LIVENESS_RC FAKE_LIVENESS_REASON
+: >"$_tmp/launchctl.log"
+: >"$_tmp/liveness.log"
+run_check_instance "test-liveness" "macos-launchctl" "$liveness_entry" "test-liveness" "local.test-liveness" false "$liveness_endpoint"
+assert_eq "liveness unknown exits 0" 0 "$captured_status"
+assert_contains "liveness unknown is reported" "$captured_output" "liveness probe unreadable (unknown:timeout); not restarting"
+assert_eq "liveness unknown does not repair" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "liveness unknown probes endpoint" 1 "$(calls_made "$_tmp/liveness.log")"
+
+# supervisor live + liveness live => no repair
+FAKE_LIVENESS_RC=0
+FAKE_LIVENESS_REASON="live"
+export FAKE_LIVENESS_RC FAKE_LIVENESS_REASON
+: >"$_tmp/launchctl.log"
+: >"$_tmp/liveness.log"
+run_check_instance "test-liveness" "macos-launchctl" "$liveness_entry" "test-liveness" "local.test-liveness" false "$liveness_endpoint"
+assert_eq "liveness live exits 0" 0 "$captured_status"
+assert_not_contains "liveness live is silent about liveness" "$captured_output" "liveness probe"
+assert_eq "liveness live does not repair" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "liveness live probes endpoint" 1 "$(calls_made "$_tmp/liveness.log")"
+
+# no endpoint => no probe
+FAKE_LIVENESS_RC=1
+FAKE_LIVENESS_REASON="dead:connect-failed"
+export FAKE_LIVENESS_RC FAKE_LIVENESS_REASON
+: >"$_tmp/launchctl.log"
+: >"$_tmp/liveness.log"
+run_check_instance "test-liveness" "macos-launchctl" "$liveness_entry" "test-liveness" "local.test-liveness" false ""
+assert_eq "no endpoint exits 0" 0 "$captured_status"
+assert_not_contains "no endpoint does not mention liveness" "$captured_output" "liveness probe"
+assert_eq "no endpoint does not repair" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "no endpoint does not probe" 0 "$(calls_made "$_tmp/liveness.log")"
+
+rm -f "$liveness_record"
+unset FAKE_LIVENESS_RC FAKE_LIVENESS_REASON
+FAKE_LIVE=""
+FAKE_STATE=""
+FAKE_EXIT_CODE=0
+FAKE_RUNS=0
+FAKE_DISABLED=""
+FAKE_ABSENT=""
+export FAKE_LIVE FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS FAKE_DISABLED FAKE_ABSENT
 
 finish_tests

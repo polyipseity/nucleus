@@ -67,6 +67,7 @@ $ModulesDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 
 . (Join-Path $ModulesDir 'Get-NucleusServiceInstance.ps1')
 . (Join-Path $ModulesDir 'ServiceHealth.ps1')
+. (Join-Path $RepoRoot 'src\scripts\lib\ServiceLiveness.ps1')
 
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 if (-not (Test-Path $ServicesJson)) {
@@ -216,7 +217,8 @@ function Test-ServiceInstance {
     [Parameter(Mandatory)][string]$Instance,
     [Parameter(Mandatory)][string]$Target,
     [Parameter(Mandatory)][bool]$IsConfigured,
-    [Parameter(Mandatory)][hashtable]$HostEntry
+    [Parameter(Mandatory)][hashtable]$HostEntry,
+    [object]$Endpoint = $null
   )
 
   # Rule 1: user-disabled or not registered is not ours to start.
@@ -296,6 +298,31 @@ function Test-ServiceInstance {
         Write-NucleusWarning -CommandName 'service-watchdog' -Message "could not repair $Instance (status $repairStatus)"
       }
       return
+    }
+
+    # Rule 6: a supervisor-live service that fails its declared liveness probe
+    # is wedged. Repair it with the same bound as other repairs. Unknown means
+    # the probe could not decide, so do not restart on it.
+    if ($null -ne $Endpoint) {
+      $epHost = Get-SlProp -InputObject $Endpoint -Name 'host'
+      $epPort = Get-SlProp -InputObject $Endpoint -Name 'port'
+      $epProto = Get-SlProp -InputObject $Endpoint -Name 'protocol'
+      if (-not [string]::IsNullOrWhiteSpace([string]$epHost) -and $null -ne $epPort -and -not [string]::IsNullOrWhiteSpace([string]$epProto)) {
+        $probe = Invoke-ServiceLivenessProbe -Endpoint $Endpoint
+        if ($probe.Status -eq 'dead') {
+          Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance liveness probe failed ($($probe.Reason)); repairing it"
+          $repairTimeout = $WatchdogRepairTimeoutSeconds
+          $repairStatus = Invoke-BoundedRepair -Target $Target -TimeoutSeconds $repairTimeout
+          if ($repairStatus -eq 124) {
+            Write-NucleusWarning -CommandName 'service-watchdog' -Message "repair of $Instance timed out after ${repairTimeout}s"
+          } elseif ($repairStatus -ne 0) {
+            Write-NucleusWarning -CommandName 'service-watchdog' -Message "could not repair $Instance (status $repairStatus)"
+          }
+          return
+        } elseif ($probe.Status -eq 'unknown') {
+          Write-NucleusWarning -CommandName 'service-watchdog' -Message "$Instance liveness probe unreadable ($($probe.Reason)); not restarting"
+        }
+      }
     }
 
     return
@@ -381,8 +408,17 @@ function Invoke-WatchdogIteration {
     }
     Import-SupervisorAdapter -Kind $kind
 
+    $endpoint = $null
+    $svcEntry = $RegistryRaw[$svc.key]
+    if ($svcEntry -is [hashtable]) {
+      $network = $svcEntry['network']
+      if ($network -is [hashtable]) {
+        $endpoint = $network['default']
+      }
+    }
+
     foreach ($target in (Get-InstanceTargetList -Service $svc)) {
-      Test-ServiceInstance -Instance $target.Instance -Target $target.Target -IsConfigured $target.IsConfigured -HostEntry $target.HostEntry
+      Test-ServiceInstance -Instance $target.Instance -Target $target.Target -IsConfigured $target.IsConfigured -HostEntry $target.HostEntry -Endpoint $endpoint
     }
   }
 }

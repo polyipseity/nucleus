@@ -24,6 +24,8 @@ _WATCHDOG_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$_WATCHDOG_DIR/../lib/svc-instances.sh"
 # shellcheck source=../lib/store-lock.sh
 [ -n "${_NUCLEUS_STORE_LOCK_SOURCED-}" ] || . "$_WATCHDOG_DIR/../lib/store-lock.sh"
+# shellcheck source=../lib/service-liveness.sh
+[ -n "${_NUCLEUS_SERVICE_LIVENESS_SOURCED-}" ] || . "$_WATCHDOG_DIR/../lib/service-liveness.sh"
 
 # WHY constants: the tick cadence and repair bound are properties of the
 #   watchdog itself. They were read from services.json's cloud-drive.lifecycle
@@ -182,15 +184,19 @@ _watchdog_tick() {
     on_demand="$(_watchdog_entry_field "$host_entry" '.onDemand' 'false')"
     [ "$on_demand" = "true" ] && continue
 
+    local endpoint_json
+    # check-suppress:suppression_doc: best-effort endpoint read; missing endpoint means no liveness probe
+    endpoint_json=$(jq -c --arg key "$svc_key" '.[$key].network.default // empty' "$services_json" 2>/dev/null || true)
+
     local prefix_match
     prefix_match="$(_watchdog_entry_field "$host_entry" '.prefixMatch' 'false')"
 
     if [ "$prefix_match" = "true" ]; then
-      _watchdog_check_prefix "$svc_key" "$svc_type" "$host_entry"
+      _watchdog_check_prefix "$svc_key" "$svc_type" "$host_entry" "$endpoint_json"
     else
       local unit_name
       unit_name="$(_watchdog_entry_field "$host_entry" '.service' "$svc_key")"
-      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$svc_key" "$unit_name"
+      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$svc_key" "$unit_name" false "$endpoint_json"
     fi
   done
 
@@ -211,7 +217,7 @@ _watchdog_tick() {
 # prefix directly: a launchd target is "<domain>/<uid>/<label>" and `launchctl
 # list` prints labels only.
 _watchdog_check_prefix() {
-  local svc_key="$1" svc_type="$2" host_entry="$3"
+  local svc_key="$1" svc_type="$2" host_entry="$3" endpoint_json="${4:-}"
   local service_name scope live_instances configured_instances instance
 
   service_name="$(_watchdog_entry_field "$host_entry" '.service' '')"
@@ -238,7 +244,7 @@ _watchdog_check_prefix() {
 
   while IFS= read -r instance; do
     [ -n "$instance" ] || continue
-    _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance"
+    _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance" "$instance" false "$endpoint_json"
   done <<<"$live_instances"
 
   # Instances the registry declares that the supervisor does not have. Passed as
@@ -248,7 +254,7 @@ _watchdog_check_prefix() {
   while IFS= read -r instance; do
     [ -n "$instance" ] || continue
     svc_list_contains "$live_instances" "$instance" && continue
-    _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance" "$instance" true
+    _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance" "$instance" true "$endpoint_json"
   done <<<"$configured_instances"
 }
 
@@ -278,11 +284,13 @@ _watchdog_scope_selected() {
 }
 
 # Args: $1 svc key, $2 host type, $3 host entry JSON, $4 health-record instance id,
-# $5 supervisor unit name (defaults to $4), $6 configured (defaults to false).
+# $5 supervisor unit name (defaults to $4), $6 configured (defaults to false),
+# $7 network.default endpoint JSON (optional; absent/empty means no liveness probe).
 _watchdog_check_instance() {
   local svc_key="$1" svc_type="$2" host_entry="$3" instance="$4"
   [ -n "$instance" ] || return 0
   local is_configured="${6:-false}"
+  local endpoint_json="${7:-}"
 
   local target scope declared_unit_path unit_id
   # The supervisor addresses the declared unit name, which is not the health record
@@ -445,6 +453,34 @@ _watchdog_check_instance() {
       return 0
       ;;
     esac
+
+    # Rule 6: a supervisor-live service that fails its declared liveness probe
+    # is wedged. Repair it with the same bound as other repairs. Unknown means
+    # the probe could not decide, so do not restart on it.
+    if [ -n "$endpoint_json" ] && [ "$endpoint_json" != "null" ] &&
+      printf '%s' "$endpoint_json" | jq -e 'type == "object" and .host and .port and .protocol' >/dev/null 2>&1; then
+      local liveness_reason liveness_rc=0
+      liveness_reason="$(svc_liveness_probe_endpoint "$endpoint_json")" || liveness_rc=$?
+      case "$liveness_rc" in
+      0)
+        ;;
+      1)
+        notice "watchdog: $instance liveness probe failed ($liveness_reason); repairing"
+        repair_timeout="$_WATCHDOG_REPAIR_TIMEOUT_SECONDS"
+        repair_rc=0
+        svc_run_bounded "$repair_timeout" supervisor_repair "$target" "$declared_unit_path" "$scope" || repair_rc=$?
+        if [ "$repair_rc" -eq 124 ]; then
+          warn "watchdog: repair of $instance timed out after ${repair_timeout}s"
+        elif [ "$repair_rc" -ne 0 ]; then
+          warn "watchdog: could not repair $instance (status $repair_rc)"
+        fi
+        return 0
+        ;;
+      *)
+        warn "watchdog: $instance liveness probe unreadable ($liveness_reason); not restarting"
+        ;;
+      esac
+    fi
 
     return 0
   fi
