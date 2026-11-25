@@ -37,9 +37,10 @@ try {
   $ng = New-Item -ItemType Directory -Path (Join-Path $tmp.FullName 'nongit')
   Add-ApplyHistoryRecord -Result success -Phase $null -RepoRoot $ng.FullName -HostName TestHost -User testuser
   $path = Get-ApplyHistoryPath
-  $rawLines = @(Get-Content -LiteralPath $path | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-  $raw = $rawLines[0]
-  $ok = ($rawLines.Count -eq 1 -and
+  $rawLines = @(Get-Content -LiteralPath $path -ErrorAction Stop | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  $rawLineCount = @($rawLines).Count
+  $raw = if ($rawLineCount -gt 0) { [string]$rawLines[0] } else { '' }
+  $ok = ($rawLineCount -eq 1 -and
     $raw -match '"version":1' -and
     $raw -match '"result":"success"' -and
     $raw -match '"phase":null' -and
@@ -56,7 +57,7 @@ try {
     $raw -match '"isDirty":null' -and
     $raw -match '"appliedAt":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"')
   if ($ok) { Assert-Pass "non-git success record has correct shape and null git fields" }
-  else { Assert-Fail "non-git success record shape" "raw=[$raw]" }
+  else { Assert-Fail "non-git success record shape" "count=$rawLineCount raw=[$raw]" }
 
   # 2) failure record carries phase and reader newest-first/count/json
   Add-ApplyHistoryRecord -Result failure -Phase rebuild -RepoRoot $ng.FullName -HostName TestHost -User testuser
