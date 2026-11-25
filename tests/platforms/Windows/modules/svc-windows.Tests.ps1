@@ -1412,13 +1412,14 @@ Describe 'svc unblock action dispatch' {
       $args[0].Condition.Extent.Text -eq '$Action'
     }, $true) | ForEach-Object {
       $_.Clauses | Where-Object {
-        $_.Item.Extent.Text -match "'unblock'"
+        $_.Item1.Extent.Text -match "'unblock'"
       }
     } | Select-Object -First 1
     if ($null -eq $actionArm) {
       throw 'could not locate the service-action switch arm containing unblock'
     }
-    $Script:UnblockActionArm = $actionArm.Pipeline.Extent.Text
+    $body = $actionArm.Item2.Extent.Text.Trim()
+    $Script:UnblockActionArm = $body.Substring(1, $body.Length - 2)
   }
 
   It 'clears and reports a configured but not loaded target for unblock action' {
@@ -1433,6 +1434,7 @@ Describe 'svc unblock action dispatch' {
     })
     $null = $Action, $ServiceName, $resolved
     $overallExit = 0
+    Mock Resolve-ServiceName { return @($resolved) }
 
     $output = & ([scriptblock]::Create($Script:UnblockActionArm))
 
