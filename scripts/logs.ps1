@@ -159,6 +159,9 @@ $script:EventKeys = @(
 )
 
 $repoRoot = $env:NUCLEUS_REPO_ROOT
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+  $repoRoot = Split-Path -Parent $PSScriptRoot
+}
 if ($script:IsEntryScript -and [string]::IsNullOrWhiteSpace($repoRoot) -and [string]::IsNullOrWhiteSpace($env:NUCLEUS_LOG_DIR)) {
   Write-NucleusError -CommandName logs 'NUCLEUS_REPO_ROOT not set'
   exit 1

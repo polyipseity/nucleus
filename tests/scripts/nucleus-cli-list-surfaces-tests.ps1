@@ -84,10 +84,12 @@ $specOk = (($foundFlags -join ',') -eq ($expected -join ','))
 Assert-True -cond $specOk -name 'spec --list-* inventory matches expected set' -detail ($foundFlags -join '|')
 
 function Invoke-ListFlag([string]$label, [scriptblock]$cmd) {
-  $out = @(& $cmd 2>$null)
+  $out = @(& $cmd 2>&1)
   $rc = $LASTEXITCODE
+  $textOut = (($out | ForEach-Object { "$_" }) -join "`n")
   $ok = ($rc -eq 0 -and $out.Count -gt 0)
-  Assert-True -cond $ok -name "$label rc=0 and produces output" -detail ("rc=$rc out=" + (($out | Select-Object -First 1) -join ''))
+  $detail = "rc=$rc out=$((($out | Select-Object -First 3 | ForEach-Object { "$_" }) -join ' | '))"
+  Assert-True -cond $ok -name "$label rc=0 and produces output" -detail $detail
 }
 
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cli-conformance-" + [Guid]::NewGuid().ToString('n'))
@@ -146,7 +148,12 @@ foreach ($k in $kebabCases) {
   $rc = $LASTEXITCODE
   $txt = (($out | ForEach-Object { "$_" }) -join "`n")
   $hasParamErr = $txt -match 'parameter cannot be found|A parameter cannot be found'
-  Assert-True -cond ($rc -eq 0 -and -not $hasParamErr) -name $k.name -detail ("rc={0}" -f $rc)
+  $detail = "rc={0}" -f $rc
+  if ($rc -ne 0 -or $hasParamErr) {
+    $tail = (($out | Select-Object -Last 5 | ForEach-Object { "$_" }) -join ' | ')
+    $detail = "rc={0} out={1}" -f $rc, $tail
+  }
+  Assert-True -cond ($rc -eq 0 -and -not $hasParamErr) -name $k.name -detail $detail
 }
 
 # svc regression: --lines must bind as a parameter, not cause a binding error.

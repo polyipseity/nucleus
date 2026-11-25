@@ -312,6 +312,7 @@ function Assert-NucleusCliAction {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory = $true)]
+    [AllowEmptyString()]
     [string]$Action,
 
     [Parameter(Mandatory = $true)]
