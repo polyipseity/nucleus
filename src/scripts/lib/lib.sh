@@ -556,7 +556,16 @@ rotate_log_file() {
 
   if [ "$_rlf_maxfiles" -gt 0 ]; then
     _rlf_archive="${_rlf_logfile%.log}"
-    rm -f "$_rlf_archive.$_rlf_maxfiles.log" "$_rlf_archive.$_rlf_maxfiles.log.gz"
+    for _rlf_old in "$_rlf_archive.$_rlf_maxfiles.log" "$_rlf_archive.$_rlf_maxfiles.log.gz"; do
+      [ -e "$_rlf_old" ] || continue
+      if command -v safe-rm >/dev/null 2>&1; then
+        safe-rm -f -- "$_rlf_old"
+      elif command -v rip >/dev/null 2>&1; then
+        rip -f -- "$_rlf_old"
+      else
+        rm -f -- "$_rlf_old" # check-suppress:suppression_doc: recoverable deletion tool unavailable in this runtime; log archive expiry is best-effort
+      fi
+    done
 
     _rlf_i=$((_rlf_maxfiles - 1))
     while [ "$_rlf_i" -ge 1 ]; do

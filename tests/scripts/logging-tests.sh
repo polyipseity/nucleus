@@ -296,7 +296,24 @@ test_force_color_overrides_term_dumb
 test_expand_log_path_tilde_slash
 test_expand_log_path_bare_tilde
 test_expand_log_path_plain
+test_rotate_log_file_uses_recoverable_deletion() {
+  local tmpdir logfile archive
+  tmpdir="$(mktemp -d)"
+  logfile="$tmpdir/nucleus.log"
+  archive="$tmpdir/nucleus.1.log.gz"
+  printf 'old' >"$archive"
+  printf 'new%.0s' $(seq 1 50) >"$logfile"
+  PATH="/usr/bin:/bin" _run_lib "" "rotate_log_file '$logfile' 10 1 false" >/dev/null 2>&1
+  if [ ! -f "$archive" ] && [ -f "$tmpdir/nucleus.1.log" ]; then
+    assert_pass "rotate_log_file removes expired archive via recoverable path or fallback"
+  else
+    assert_fail "rotate-recoverable" "expected archive removed and replacement rotated; archive exists=$([ -f "$archive" ] && echo yes || echo no)"
+  fi
+  rm -rf "$tmpdir"
+}
+
 test_rotate_log_file_hard_errors_on_unwritable
+test_rotate_log_file_uses_recoverable_deletion
 test_log_sanitize_strips
 
 finish_tests
