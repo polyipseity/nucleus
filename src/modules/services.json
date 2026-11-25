@@ -237,7 +237,13 @@
       "mountAttachTimeoutSeconds": 45
     },
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "cloud-drive"
+        ]
+      }
     },
     "hosts": {
       "MacBook": {
@@ -282,13 +288,20 @@
         },
         "scope": "user"
       }
-    }
+    },
+    "firing": "daemon"
   },
   "discord-music-rpc": {
     "description": "Discord Rich Presence for music players",
     "displayName": "Discord Music RPC",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "discord-music-rpc"
+        ]
+      }
     },
     "network": {
       "oauth": {
@@ -322,13 +335,20 @@
         "justification": "Per-user scheduled task running Discord RPC in user session",
         "scope": "user"
       }
-    }
+    },
+    "firing": "daemon"
   },
   "ds-store-gc": {
     "description": "Daily removal of stale .DS_Store files from dev checkouts",
     "displayName": "DS Store cleanup",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "ds-store-gc"
+        ]
+      }
     },
     "hosts": {
       "MacBook": {
@@ -350,13 +370,14 @@
         "platform": "Windows",
         "type": "omitted"
       }
-    }
+    },
+    "firing": "timer"
   },
   "gui-env": {
     "description": "Login agent that publishes the managed env and PATH into the launchd GUI domain",
     "displayName": "GUI environment",
     "logging": {
-      "capture": "all"
+      "capture": "none"
     },
     "hosts": {
       "MacBook": {
@@ -378,7 +399,8 @@
         "platform": "Windows",
         "type": "omitted"
       }
-    }
+    },
+    "firing": "daemon"
   },
   "hermes-agent": {
     "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
@@ -423,7 +445,7 @@
     "description": "Hourly correction of Finder metadata-ignore markers on iCloud Drive roots",
     "displayName": "iCloud exclusions",
     "logging": {
-      "capture": "all"
+      "capture": "none"
     },
     "hosts": {
       "MacBook": {
@@ -445,7 +467,8 @@
         "platform": "Windows",
         "type": "omitted"
       }
-    }
+    },
+    "firing": "timer"
   },
   "jellyfin": {
     "description": "Media server",
@@ -588,7 +611,13 @@
     "description": "Daily removal of expired system-scope log archives",
     "displayName": "Log rotation (system)",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [
+          "log-gc-system"
+        ],
+        "user": []
+      }
     },
     "hosts": {
       "MacBook": {
@@ -614,13 +643,20 @@
         "type": "windows-schtask",
         "scope": "system"
       }
-    }
+    },
+    "firing": "timer"
   },
   "log-gc-user": {
     "description": "Daily removal of expired user-scope log archives",
     "displayName": "Log rotation (user)",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "log-gc-user"
+        ]
+      }
     },
     "hosts": {
       "MacBook": {
@@ -648,7 +684,8 @@
         "scope": "user",
         "justification": "Runs as a Daily scheduled task with RunOnlyIfLoggedOn true (scheduler.dsc.yml)."
       }
-    }
+    },
+    "firing": "timer"
   },
   "nix-index-update": {
     "description": "Daily nix-index rebuild so pay-respects can suggest nix profile install commands",
@@ -685,7 +722,8 @@
         "type": "omitted",
         "platform": "Windows"
       }
-    }
+    },
+    "firing": "timer"
   },
   "ollama": {
     "description": "LLM inference server",
@@ -780,7 +818,7 @@
     "description": "Remote Desktop Protocol server",
     "displayName": "Remote Desktop",
     "logging": {
-      "capture": "all",
+      "capture": "none",
       "eventLog": {
         "provider": "Microsoft-Windows-TerminalServices-RemoteConnectionManager"
       }
@@ -809,13 +847,14 @@
         "platform": "Windows",
         "scope": "system"
       }
-    }
+    },
+    "firing": "daemon"
   },
   "sccache-gc": {
     "description": "Daily clearing of the sccache compilation cache",
     "displayName": "sccache cleanup",
     "logging": {
-      "capture": "all"
+      "capture": "none"
     },
     "hosts": {
       "MacBook": {
@@ -843,7 +882,8 @@
         "scope": "user",
         "justification": "Runs as a Daily scheduled task with RunOnlyIfLoggedOn true (scheduler.dsc.yml)."
       }
-    }
+    },
+    "firing": "timer"
   },
   "service-watchdog": {
     "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
@@ -921,7 +961,13 @@
     "description": "Daily reapplication of Spotlight metadata-ignore markers to build output dirs",
     "displayName": "Spotlight exclusions",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "spotlight-exclusions"
+        ]
+      }
     },
     "hosts": {
       "MacBook": {
@@ -943,13 +989,14 @@
         "platform": "Windows",
         "type": "omitted"
       }
-    }
+    },
+    "firing": "timer"
   },
   "ssh-agent": {
     "description": "SSH key authentication agent",
     "displayName": "SSH Agent",
     "logging": {
-      "capture": "all",
+      "capture": "none",
       "eventLog": {
         "provider": "OpenSSH"
       }
@@ -979,13 +1026,14 @@
         "platform": "Windows",
         "scope": "system"
       }
-    }
+    },
+    "firing": "daemon"
   },
   "sshd": {
     "description": "Remote shell access via SSH",
     "displayName": "SSH Server",
     "logging": {
-      "capture": "all",
+      "capture": "none",
       "eventLog": {
         "provider": "OpenSSH"
       }
@@ -1019,6 +1067,7 @@
         "platform": "Windows",
         "scope": "system"
       }
-    }
+    },
+    "firing": "daemon"
   }
 }

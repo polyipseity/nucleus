@@ -58,6 +58,15 @@
             }
           }
         ]
+      },
+      "firing": {
+        "description": "Service firing model. daemon services are long-running and may be revived by the watchdog; timer services run on a schedule and must not be restarted by the watchdog when idle.",
+        "type": "string",
+        "enum": [
+          "daemon",
+          "timer"
+        ],
+        "default": "daemon"
       }
     },
     "required": [
@@ -65,7 +74,61 @@
       "hosts",
       "logging"
     ],
-    "type": "object"
+    "type": "object",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "logging": {
+              "properties": {
+                "capture": {
+                  "const": "none"
+                }
+              },
+              "required": [
+                "capture"
+              ]
+            }
+          }
+        },
+        "then": {},
+        "else": {
+          "properties": {
+            "logging": {
+              "required": [
+                "dirs"
+              ],
+              "properties": {
+                "dirs": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "system": {
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "system"
+                      ]
+                    },
+                    {
+                      "properties": {
+                        "user": {
+                          "minItems": 1
+                        }
+                      },
+                      "required": [
+                        "user"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
   },
   "definitions": {
     "hostLogRoots": {
@@ -234,7 +297,7 @@
           "$ref": "#/definitions/loggingEntry"
         },
         "onDemand": {
-          "description": "Service is intentionally on-demand — the watchdog must not auto-restart it when it is not running. Use for services with KeepAlive=false that are started explicitly by apply/vm/svc.",
+          "description": "Service is intentionally on-demand \u2014 the watchdog must not auto-restart it when it is not running. Use for services with KeepAlive=false that are started explicitly by apply/vm/svc.",
           "type": "boolean",
           "default": false
         },
@@ -280,7 +343,7 @@
           "$ref": "#/definitions/loggingEntry"
         },
         "onDemand": {
-          "description": "Service is intentionally on-demand — the watchdog must not auto-restart it when it is not running. Use for services with KeepAlive=false that are started explicitly by apply/vm/svc.",
+          "description": "Service is intentionally on-demand \u2014 the watchdog must not auto-restart it when it is not running. Use for services with KeepAlive=false that are started explicitly by apply/vm/svc.",
           "type": "boolean",
           "default": false
         },

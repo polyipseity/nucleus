@@ -324,6 +324,9 @@ _watchdog_check_instance() {
     return 0
   fi
 
+  local firing
+  firing="$(_watchdog_entry_field "$host_entry" '.firing' 'daemon')"
+
   if svc_health_is_blocked "$instance"; then
     local class remedy _blocked_state
     class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
@@ -486,6 +489,10 @@ _watchdog_check_instance() {
         warn "watchdog: could not record the repair for $instance"
       fi
     fi
+    return 0
+  fi
+
+  if [ "$firing" = "timer" ]; then
     return 0
   fi
 

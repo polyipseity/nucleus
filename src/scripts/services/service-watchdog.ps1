@@ -173,7 +173,7 @@ function Get-InstanceTargetList {
 
   if (-not $Service.prefixMatch) {
     $target = if ($Service.type -eq 'windows-schtask') { $Service.taskPath } else { $Service.service }
-    return @(@{ Instance = $Service.key; Target = $target; IsConfigured = $false })
+    return @(@{ Instance = $Service.key; Target = $target; IsConfigured = $false; HostEntry = $Service.hostEntry })
   }
 
   $liveIds = @(Get-NucleusPrefixInstanceList -HostEntry $Service.hostEntry)
@@ -181,7 +181,7 @@ function Get-InstanceTargetList {
   $allIds = @($liveIds + $configuredIds | Sort-Object -Unique)
 
   return @($allIds | ForEach-Object {
-      @{ Instance = $_; Target = $_; IsConfigured = ($configuredIds -contains $_) }
+      @{ Instance = $_; Target = $_; IsConfigured = ($configuredIds -contains $_); HostEntry = $Service.hostEntry }
     })
 }
 
@@ -215,7 +215,8 @@ function Test-ServiceInstance {
   param(
     [Parameter(Mandatory)][string]$Instance,
     [Parameter(Mandatory)][string]$Target,
-    [Parameter(Mandatory)][bool]$IsConfigured
+    [Parameter(Mandatory)][bool]$IsConfigured,
+    [Parameter(Mandatory)][hashtable]$HostEntry
   )
 
   # Rule 1: user-disabled or not registered is not ours to start.
@@ -247,6 +248,8 @@ function Test-ServiceInstance {
     Write-NotLoadedNotice -Instance $Instance
     return
   }
+
+  $firing = if ($HostEntry.ContainsKey('firing') -and $HostEntry.firing) { [string]$HostEntry.firing } else { 'daemon' }
 
   $isLive = Supervisor-Live -Target $Target
   $generation = Supervisor-Generation -Target $Target
@@ -298,7 +301,10 @@ function Test-ServiceInstance {
     return
   }
 
-  # Rule 4: not live and not blocked: the only revival path.
+  # Rule 4: not live and not blocked: the only revival path. Timer jobs are
+  # probed for liveness but never started by the watchdog when idle.
+  if ($firing -eq 'timer') { return }
+
   Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is not running; starting it"
   Supervisor-Start -Target $Target
 }
@@ -376,7 +382,7 @@ function Invoke-WatchdogIteration {
     Import-SupervisorAdapter -Kind $kind
 
     foreach ($target in (Get-InstanceTargetList -Service $svc)) {
-      Test-ServiceInstance -Instance $target.Instance -Target $target.Target -IsConfigured $target.IsConfigured
+      Test-ServiceInstance -Instance $target.Instance -Target $target.Target -IsConfigured $target.IsConfigured -HostEntry $target.HostEntry
     }
   }
 }
