@@ -164,7 +164,9 @@ store_lock_watchdog_tick() {
   done < <(_store_lock_candidate_rows)
 
   # Drop state for pids that are gone, so the directory cannot grow without end.
-  local _slw_stale
+  # Keep dead-pid records while their reclaim cooldown is active, otherwise a
+  # reclaimed pid that disappears before the next tick loses its cooldown.
+  local _slw_stale _slw_stale_pid _slw_stale_lr
   for _slw_stale in "$_slw_dir"/*; do
     [ -f "$_slw_stale" ] || continue
     case "$_slw_stale" in */last-reclaim)
@@ -172,8 +174,15 @@ store_lock_watchdog_tick() {
       continue
       ;;
     esac
-    if ! kill -0 "$(basename "$_slw_stale")" 2>/dev/null; then
-      rm -f "$_slw_stale"
+    _slw_stale_pid="$(basename "$_slw_stale")"
+    if kill -0 "$_slw_stale_pid" 2>/dev/null; then
+      continue
     fi
+    read -r _ _ _slw_stale_lr <"$_slw_stale" || _slw_stale_lr=0
+    _slw_stale_lr="${_slw_stale_lr:-0}"
+    if [ "$_slw_stale_lr" -gt 0 ] && [ $((_slw_stale_lr + _slw_cooldown)) -gt "$_slw_now" ]; then
+      continue
+    fi
+    rm -f "$_slw_stale"
   done
 }

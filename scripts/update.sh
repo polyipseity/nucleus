@@ -265,7 +265,7 @@ EOF
   # vm-setup children. whisper and deepfilternet have no updater: a (revision,
   # hash) pair has to be chosen together, so nothing can recompute one from the
   # other.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,deepfilternet,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,deepfilternet,nix-index-database,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   SECTIONS=""
   VERIFY=false
