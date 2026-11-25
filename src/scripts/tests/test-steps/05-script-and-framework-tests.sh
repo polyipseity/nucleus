@@ -35,7 +35,7 @@ _discover_script_tests() {
     *) _base="$(basename "$_f" .sh)" ;;
     esac
     case "$_base" in
-    nix-test-eval-tests | check-pwsh-tests) continue ;;
+    nix-test-eval-tests) continue ;;
     esac
     local _already=false
     for _seen_f in "${_seen[@]}"; do

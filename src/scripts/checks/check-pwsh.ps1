@@ -81,12 +81,24 @@ if (-not $Paths -or $Paths.Count -eq 0) {
     Write-NucleusInfo -CommandName check-pwsh 'No PowerShell files to check (scoped mode).'
     exit 0
   }
-  $Paths = @(git ls-files '*.ps1' ':(exclude)vendor/')
+  $Paths = @(git -C $RepoRoot ls-files '*.ps1' ':(exclude)vendor/')
 }
 
 if (-not $Paths -or $Paths.Count -eq 0) {
   Write-NucleusInfo -CommandName check-pwsh 'No PowerShell files to check.'
   exit 0
+}
+
+# A caller may pass repo-relative or absolute paths. check.sh runs each step from
+# src/scripts/checks/check-steps, so resolving against the caller's working
+# directory silently missed every repo-relative path.
+$resolvedPaths = @($Paths | ForEach-Object {
+  if ([System.IO.Path]::IsPathRooted($_)) { $_ } else { Join-Path $RepoRoot $_ }
+})
+$missingPaths = @($resolvedPaths | Where-Object { -not (Test-Path -LiteralPath $_) })
+if ($missingPaths.Count -gt 0) {
+  Write-NucleusError -CommandName check-pwsh ("path not found: {0}" -f ($missingPaths -join ', '))
+  exit 1
 }
 
 $knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
@@ -118,12 +130,8 @@ $runSyntax = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('Syntax')
 if ($runSyntax) {
   $syntaxSw = $null
   if ($profileEnabled) { $syntaxSw = [System.Diagnostics.Stopwatch]::StartNew() }
-  $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
+  $parseErrors = @($resolvedPaths | Sort-Object -Unique | ForEach-Object -Parallel {
     $path = $_
-    if (-not (Test-Path -Path $path)) {
-      return
-    }
-
     $tokens = $null
     $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)  # check-suppress:suppression_doc: ParseFile returns AST, discarded; only token/error refs needed
@@ -134,7 +142,7 @@ if ($runSyntax) {
   } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
 
   if ($profileEnabled) {
-    Write-CheckPwshProfile ("phase=syntax files={0} errors={1} total_ms={2}" -f $Paths.Count, $parseErrors.Count, $syntaxSw.ElapsedMilliseconds)
+    Write-CheckPwshProfile ("phase=syntax files={0} errors={1} total_ms={2}" -f $resolvedPaths.Count, $parseErrors.Count, $syntaxSw.ElapsedMilliseconds)
   }
 
   if ($parseErrors.Count -gt 0) {
@@ -150,7 +158,7 @@ if ($runSyntax) {
     exit 1
   }
 
-  Write-NucleusInfo -CommandName check-pwsh ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
+  Write-NucleusInfo -CommandName check-pwsh ("PowerShell syntax check passed for {0} files." -f $resolvedPaths.Count)
 }
 
 # PSScriptAnalyzer lint.
@@ -172,7 +180,7 @@ if ($runPssa) {
 
     $settingsFile = $Settings
 
-    $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
+    $files = @($resolvedPaths | Sort-Object -Unique)
 
     $settingsTable = try { Import-PowerShellDataFile $settingsFile } catch {
       throw "Failed to load PSSA settings from ${settingsFile}: $($_.Exception.Message)"
@@ -352,7 +360,7 @@ if ($runPssa) {
       exit 1
     }
 
-    Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
+    Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $resolvedPaths.Count)
 }
 
 # The success path must exit explicitly: check.ps1 reads $LASTEXITCODE straight

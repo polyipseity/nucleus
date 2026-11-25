@@ -7,7 +7,7 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
   $testDir = Join-Path -Path $RepoRoot -ChildPath 'tests' -AdditionalChildPath 'scripts'
 
   $priorityNames = @('step-runner-unit-tests', 'test-lib-unit-tests', 'deny-list-tests')
-  $excludeNames = @('nix-test-eval-tests', 'check-pwsh-tests')
+  $excludeNames = @('nix-test-eval-tests')
 
   $allTests = @(Get-ChildItem -Path $testDir -Recurse -Filter '*-tests.ps1' -File |
     Sort-Object -Property FullName)
