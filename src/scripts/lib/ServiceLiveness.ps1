@@ -90,6 +90,17 @@ function Test-SlJsonSubset {
   return ($Subset -eq $Actual)
 }
 
+function Close-SlClient {
+  # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- a probe must not fail because closing its own socket did
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
+  param(
+    [Parameter(Mandatory)][object]$Client
+  )
+  try { $Client.Close() } catch {
+    # WHY: the probe's verdict is already decided at this point; a close failure cannot change it.
+  }
+}
+
 function Invoke-ServiceLivenessProbe {
   [CmdletBinding()]
   param(
@@ -107,9 +118,7 @@ function Invoke-ServiceLivenessProbe {
   $protocolLc = ([string]$protocol).ToLowerInvariant()
   $hostStr = [string]$endpointHost
   $portInt = 0
-  try {
-    $portInt = [int]$port
-  } catch {
+  if (-not [int]::TryParse([string]$port, [ref]$portInt)) {
     return [pscustomobject]@{ Status = 'unknown'; Reason = 'unknown:invalid-port' }
   }
 
@@ -124,10 +133,10 @@ function Invoke-ServiceLivenessProbe {
   if ($null -ne $health) {
     $hsTimeout = Get-SlProp -InputObject $health -Name 'timeoutSeconds'
     if ($null -ne $hsTimeout) {
-      try {
-        $t = [int]$hsTimeout
-        if ($t -ge 1) { $timeoutSec = $t }
-      } catch { # check-suppress:suppression_doc: invalid timeout falls back to default }
+      $parsedTimeout = 0
+      if ([int]::TryParse([string]$hsTimeout, [ref]$parsedTimeout) -and $parsedTimeout -ge 1) {
+        $timeoutSec = $parsedTimeout
+      }
     }
   }
 
@@ -137,17 +146,17 @@ function Invoke-ServiceLivenessProbe {
       $task = $client.ConnectAsync($hostProbe, $portInt)
       $completed = $task.Wait([TimeSpan]::FromSeconds($timeoutSec))
       if (-not $completed) {
-        try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+        Close-SlClient -Client $client
         return [pscustomobject]@{ Status = 'unknown'; Reason = 'unknown:timeout' }
       }
       if ($task.IsFaulted) {
-        try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+        Close-SlClient -Client $client
         return [pscustomobject]@{ Status = 'dead'; Reason = 'dead:connect-failed' }
       }
-      try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+      Close-SlClient -Client $client
       return [pscustomobject]@{ Status = 'live'; Reason = 'live' }
     } catch {
-      try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+      Close-SlClient -Client $client
       return [pscustomobject]@{ Status = 'dead'; Reason = 'dead:connect-failed' }
     }
   }
@@ -160,17 +169,17 @@ function Invoke-ServiceLivenessProbe {
         $task = $client.ConnectAsync($hostProbe, $portInt)
         $completed = $task.Wait([TimeSpan]::FromSeconds($timeoutSec))
         if (-not $completed) {
-          try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+          Close-SlClient -Client $client
           return [pscustomobject]@{ Status = 'unknown'; Reason = 'unknown:timeout' }
         }
         if ($task.IsFaulted) {
-          try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+          Close-SlClient -Client $client
           return [pscustomobject]@{ Status = 'dead'; Reason = 'dead:connect-failed' }
         }
-        try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+        Close-SlClient -Client $client
         return [pscustomobject]@{ Status = 'live'; Reason = 'live' }
       } catch {
-        try { $client.Close() } catch { # check-suppress:suppression_doc: best-effort TCP client close }
+        Close-SlClient -Client $client
         return [pscustomobject]@{ Status = 'dead'; Reason = 'dead:connect-failed' }
       }
     }
