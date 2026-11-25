@@ -320,10 +320,27 @@ function Initialize-WaveTempDir {
   Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-WaveTempDir } > $null
 }
 
+function Save-WaveStepOutput {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
+  $outputDir = $env:NUCLEUS_STEP_OUTPUT_DIR
+  if ([string]::IsNullOrWhiteSpace($outputDir)) { return }
+  if (-not $script:WaveTmpDir -or -not (Test-Path -LiteralPath $script:WaveTmpDir)) { return }
+  try {
+    $null = New-Item -ItemType Directory -Path $outputDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    Get-ChildItem -LiteralPath $script:WaveTmpDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'step-*' -or $_.Name -eq 'pipeline.wall_ms' } | ForEach-Object {
+      Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $outputDir $_.Name) -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort artifact preservation; copy failure must not mask run result
+    }
+  } catch {
+    [Console]::Error.WriteLine("warning: failed to preserve step output to ${outputDir}: $($_.Exception.Message)")
+  }
+}
+
 function Remove-WaveTempDir {
   [CmdletBinding(SupportsShouldProcess)]
   param()
   if ($script:WaveTmpDir -and (Test-Path $script:WaveTmpDir)) {
+    Save-WaveStepOutput
     # check-suppress:suppression_doc: best-effort temp-dir cleanup at exit; dir may already be gone.
     Remove-Item -Path $script:WaveTmpDir -Recurse -Force -ErrorAction SilentlyContinue
   }

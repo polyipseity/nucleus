@@ -72,6 +72,13 @@ BeforeAll {
     foreach ($name in @('Format-NucleusOutput.psm1', 'Get-NucleusHostPlatform.ps1', 'Invoke-LogManagement.ps1')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath "src\platforms\Windows\modules\$name") -Destination (Join-Path -Path $modulesCopy -ChildPath $name)
     }
+    # logs.ps1 dot-sources these relative to its own location; without them the
+    # audit append fails in the fixture and the shared audit log is never written.
+    $scriptLibCopy = Join-Path -Path (Join-Path -Path $root 'src\scripts') -ChildPath 'lib'
+    $null = New-Item -ItemType Directory -Path $scriptLibCopy -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    foreach ($name in @('pwsh-guard.ps1', 'nucleus-cli-flags.ps1')) {
+      Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath "src\scripts\lib\$name") -Destination (Join-Path -Path $scriptLibCopy -ChildPath $name)
+    }
     return $root
   }
 
@@ -332,16 +339,25 @@ Describe 'safe-delete filter settings' {
     }
   }
 
-  It 'classifies an escaped deletion word as a redirect question' {
-    # WHY: a leading backslash escapes the word name, so the word it forms is
-    # still a deletion that resolves through PATH. Whether that redirect is proven
-    # is the host's answer, so only the redirect family is asserted here; the
-    # bun suite injects both resolvers and pins the decisions.
+  It 'classifies an escaped deletion word according to platform path semantics' {
+    # WHY: on Windows a backslash is a path separator, so `\rm` is a native-path
+    # deletion and must be denied. On POSIX a leading backslash escapes the word
+    # name, so the word still resolves through PATH and the redirect proof decides;
+    # the host may prove or not prove that redirect, but it is never a native-path
+    # denial.
     foreach ($payload in @('{"command":"\\rm x"}', '{"command":"\\RM -Recurse x"}')) {
       $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload $payload
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-      $document['hookSpecificOutput']['permissionDecision'] | Should -Not -Be 'deny'
-      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'redirect'
+      $decision = $document['hookSpecificOutput']['permissionDecision']
+      $reason = $document['hookSpecificOutput']['permissionDecisionReason']
+      if ($IsWindows) {
+        $decision | Should -Be 'deny'
+        $reason | Should -Match 'native-path'
+      }
+      else {
+        $decision | Should -Not -Be 'deny'
+        $reason | Should -Match 'redirect'
+      }
     }
   }
 }

@@ -209,8 +209,23 @@ _wave_init() {
   trap '_runner_abort_exit_trap' EXIT
 }
 
+_preserve_step_outputs() {
+  [ -n "${NUCLEUS_STEP_OUTPUT_DIR:-}" ] || return 0
+  $_wave_tmpdir_created || return 0
+  [ -n "$_wave_tmpdir" ] || return 0
+  mkdir -p -- "$NUCLEUS_STEP_OUTPUT_DIR" || {
+    printf '%s\n' "warning: failed to create NUCLEUS_STEP_OUTPUT_DIR=$NUCLEUS_STEP_OUTPUT_DIR" >&2
+    return 0
+  }
+  # WHY copy not move: cleanup still owns the tempdir lifecycle; the artifact
+  # directory is a best-effort diagnostic snapshot.
+  # check-suppress:suppression_doc: best-effort artifact preservation; missing files or copy failures must not mask the run result
+  cp -a -- "$_wave_tmpdir"/step-* "$_wave_tmpdir"/pipeline.wall_ms "$NUCLEUS_STEP_OUTPUT_DIR"/ 2>/dev/null || true
+}
+
 _wave_cleanup() {
   if $_wave_tmpdir_created && [ -n "$_wave_tmpdir" ]; then
+    _preserve_step_outputs
     rm -rf -- "$_wave_tmpdir"
   fi
 }
