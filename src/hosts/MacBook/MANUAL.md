@@ -63,3 +63,8 @@ Apply installs the `harness-bridge` plugin. To provision a channel once: seal `T
 Approvals are asked in the terminal by default (`harness-approval.sources` is `["prompt"]`); `nucleus-config set harness-approval.sources '["prompt","hermes"]'` adds the remote channel, and `harness-approval.timeout-seconds.<source>` bounds each wait, `0` meaning until answered. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
 
 The rules behind those switches and the `/harness` commands are in `.agents/instructions/agents-and-skills.instructions.md`.
+
+## sandboxed rustc
+
+1. Repro the sccache socket bind: `sccache --stop-server && srt -- sccache "$(rustc --print sysroot)/bin/rustc" -vV`.
+2. Stopgap without caching: `RUSTC_WRAPPER= cargo build`. It bypasses sccache, so builds are slower and the cache is not populated.
