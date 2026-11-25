@@ -576,18 +576,42 @@ service_diagnostic() {
     local scope sudo_prefix="" target launchd_domain
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
-    [ "$scope" = "system" ] && sudo_prefix="sudo"
-    target=$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")
-    $sudo_prefix launchctl print "$target" 2>/dev/null |
-      awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
+    [ "$scope" = "system" ] && sudo_prefix="sudo -n"
+    # check-suppress:suppression_doc: diagnostics are best-effort; target resolution may fail for malformed entries.
+    target=$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id" 2>/dev/null) || {
+      printf 'unreadable\n'
+      return 0
+    }
+    local _diag_out="" _diag_rc=0
+    # check-suppress:suppression_doc: diagnostic probe is best-effort; a missing or unreadable service must not abort the caller.
+    _diag_out=$($sudo_prefix launchctl print "$target" 2>&1) || _diag_rc=$?
+    local _diag_fmt
+    _diag_fmt=$(printf '%s\n' "$_diag_out" | awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{if(s!=""){printf "state=%s", s; if(e!="") printf ", exit=%s", e; printf "\n"}}')
+    if [ -n "$_diag_fmt" ]; then
+      printf '%s\n' "$_diag_fmt"
+    else
+      printf 'unreadable\n'
+    fi
+    return 0
     ;;
   nixos-systemctl)
     local scope_flag=""
     [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
-    systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1 |
-      sed -n 's/.*Active: //p' | head -1
+    local _diag_out="" _diag_rc=0
+    # check-suppress:suppression_doc: diagnostic probe is best-effort; systemctl status exits non-zero for inactive units.
+    _diag_out=$(systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1) || _diag_rc=$?
+    local _diag_fmt
+    _diag_fmt=$(printf '%s\n' "$_diag_out" | sed -n 's/.*Active: //p' | head -1)
+    if [ -n "$_diag_fmt" ]; then
+      printf '%s\n' "$_diag_fmt"
+    else
+      printf 'unreadable\n'
+    fi
+    return 0
     ;;
   esac
+  printf 'unreadable\n'
+  return 0
 }
 
 # WHY: launchctl/systemctl can only terminate processes in their tracked tree,
@@ -761,7 +785,7 @@ svc_action() {
       else
         poll_service_ready "$name" "$entry_json" >/dev/null || {
           local _diag
-          _diag=$(service_diagnostic "$entry_json")
+          _diag=$(service_diagnostic "$entry_json") || _diag="unreadable"
           warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
           return 1
         }
@@ -831,7 +855,7 @@ svc_action() {
       else
         poll_service_ready "$name" "$entry_json" >/dev/null || {
           local _diag
-          _diag=$(service_diagnostic "$entry_json")
+          _diag=$(service_diagnostic "$entry_json") || _diag="unreadable"
           warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
           return 1
         }
@@ -876,7 +900,7 @@ svc_action() {
       systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
       poll_service_ready "$name" "$entry_json" >/dev/null || {
         local _diag
-        _diag=$(service_diagnostic "$entry_json")
+        _diag=$(service_diagnostic "$entry_json") || _diag="unreadable"
         warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
         return 1
       }
@@ -894,7 +918,7 @@ svc_action() {
       systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
       poll_service_ready "$name" "$entry_json" >/dev/null || {
         local _diag
-        _diag=$(service_diagnostic "$entry_json")
+        _diag=$(service_diagnostic "$entry_json") || _diag="unreadable"
         warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
         return 1
       }
@@ -1205,13 +1229,14 @@ do_verify() {
       continue
     fi
     local status_json
-    status_json=$(svc_status "$instance" "$svc_json")
+    # check-suppress:suppression_doc: probe failure must not abort verify; report inactive with an unreadable diagnostic.
+    status_json=$(svc_status "$instance" "$svc_json") || status_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}'
     local running
-    running=$(echo "$status_json" | jq -r '.running')
+    running=$(printf '%s' "$status_json" | jq -r '.running // "false"' 2>/dev/null) || running="false" # check-suppress:suppression_doc: malformed status JSON must not abort verify.
     if [ "$running" != "true" ]; then
       any_inactive=true
       local diag
-      diag=$(service_diagnostic "$svc_json")
+      diag=$(service_diagnostic "$svc_json") || diag="unreadable"
       warn "$instance — inactive ($diag); check 'nucleus-svc logs $instance'"
     fi
   done <<<"$entries"

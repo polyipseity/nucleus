@@ -74,12 +74,22 @@ JSON
 cat >"$_tmp/bin/launchctl" <<'FAKE'
 #!/usr/bin/env bash
 _gate() { cat "${FAKE_GATE_FILE:?}" 2>/dev/null || printf 'enabled\n'; }
+_failing() { printf '%s\n' "${FAKE_FAILING:-}" | tr ' ' '\n' | grep -qxF "$1"; }
 case "${1:-}" in
 list)
   printf 'PID\tStatus\tLabel\n'
   for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do printf '4242\t0\t%s\n' "$_label"; done
+  for _label in ${FAKE_FAILING:-}; do printf -- '-\t113\t%s\n' "$_label"; done
   ;;
 print)
+  for _label in ${FAKE_FAILING:-}; do
+    case "${2:-}" in
+    *"$_label")
+      printf 'Could not find service "%s" in domain\n' "$_label"
+      exit 113
+      ;;
+    esac
+  done
   for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do
     case "${2:-}" in
     *"$_label")
@@ -184,6 +194,7 @@ run_svc() { # <svc.sh args...>
     SUDO_USER="${SUDO_USER_OVERRIDE:-svc-test-nomounts}" \
     PATH="$_tmp/bin:$PATH" \
     FAKE_LIVE="${FAKE_LIVE:-}" \
+    FAKE_FAILING="${FAKE_FAILING:-}" \
     FAKE_UNITS="${FAKE_UNITS:-}" \
     FAKE_LOADED="$_FAKE_LOADED_FILE" \
     FAKE_GATE_FILE="$_FAKE_GATE_FILE" \
@@ -407,5 +418,14 @@ assert_eq "an undeclared instance id still fails" 1 "$captured_status"
 assert_contains "an undeclared instance id is reported as no such instance" "$captured_output" "no such instance"
 
 SUDO_USER_OVERRIDE=
+
+section 9 "verify reports unreadable diagnostics without aborting"
+FAKE_LIVE=""
+FAKE_FAILING="local.plain"
+run_cli verify plain-service
+assert_eq "verify exits 1 when a service diagnostic probe fails" 1 "$captured_status"
+assert_contains "verify warns that the service is inactive" "$captured_output" "plain-service"
+assert_contains "verify includes inactive diagnostic context" "$captured_output" "inactive"
+FAKE_FAILING=""
 
 finish_tests
