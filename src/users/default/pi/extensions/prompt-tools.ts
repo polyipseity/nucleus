@@ -57,6 +57,18 @@ function requirePiTui(): PiTuiModule {
 }
 // preload for sync rendering in interactive TUI
 void loadPiTui().catch(() => {});
+
+interface PiHostModule {
+	getSelectListTheme: () => SelectListTheme;
+}
+
+let piHost: PiHostModule | undefined;
+async function loadPiHost(): Promise<PiHostModule> {
+	if (!piHost) {
+		piHost = (await import("@earendil-works/pi-coding-agent")) as unknown as PiHostModule;
+	}
+	return piHost;
+}
 import { spawn } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -411,37 +423,32 @@ export interface PromptPickerComponent {
 
 interface PickerUiDeps {
 	readonly tui?: { requestRender?: () => void };
-	readonly theme?: {
-		fg?: (color: string, text: string) => string;
-		bold?: (text: string) => string;
-	};
 	readonly keybindings?: { matches?: (data: string, binding: string) => boolean };
 	readonly piTuiModule?: PiTuiModule;
+	readonly piHostModule?: PiHostModule;
 }
 
 const PICKER_VISIBLE_ROWS = 10;
 
-function promptPickerTheme(theme?: PickerUiDeps["theme"]): SelectListTheme {
-	const fg = theme?.fg ?? ((_color: string, text: string) => text);
-	return {
-		selectedPrefix: (text) => fg("accent", text),
-		selectedText: (text) => fg("accent", text),
-		description: (text) => fg("muted", text),
-		scrollInfo: (text) => fg("dim", text),
-		noMatch: (text) => fg("warning", text),
-	};
+// WHY delegate: pi's SelectList theme calls theme.fg through the live theme
+// object, so the receiver survives. Re-deriving the mapping here detached it and
+// crashed every render with "reading 'tokenAnsi'".
+function promptPickerTheme(host: PiHostModule): SelectListTheme {
+	return host.getSelectListTheme();
 }
 
-export function createPromptPickerComponent(
+export async function createPromptPickerComponent(
 	choices: readonly PromptChoice[],
 	done: (value: PromptChoice | undefined) => void,
 	initialQuery = "",
 	deps: PickerUiDeps = {},
-): PromptPickerComponent {
+): Promise<PromptPickerComponent> {
+	const host = deps.piHostModule ?? (await loadPiHost());
 	const tui = deps.piTuiModule ?? piTui;
 	if (!tui) {
 		throw new Error("pi-tui is not loaded");
 	}
+	const selectListTheme = promptPickerTheme(host);
 	const input = new tui.Input();
 	if (initialQuery !== "") {
 		input.setValue(initialQuery);
@@ -450,7 +457,7 @@ export function createPromptPickerComponent(
 	let filteredChoices: PromptChoice[] = [];
 	let currentItems: Array<SelectItem & { choice: PromptChoice }> = [];
 	let selectedIndex = 0;
-	let list = new tui.SelectList([], PICKER_VISIBLE_ROWS, promptPickerTheme(deps.theme));
+	let list = new tui.SelectList([], PICKER_VISIBLE_ROWS, selectListTheme);
 
 	const syncSelectedIndex = (): void => {
 		const selected = list.getSelectedItem();
@@ -477,7 +484,7 @@ export function createPromptPickerComponent(
 		list = new tui.SelectList(
 			currentItems.map(({ value, label, description }) => ({ value, label, description }) satisfies SelectItem),
 			PICKER_VISIBLE_ROWS,
-			promptPickerTheme(deps.theme),
+			selectListTheme,
 		);
 		selectedIndex = 0;
 		if (previousValue) {
@@ -571,8 +578,8 @@ async function pickPromptWithCustom(
 		return null;
 	}
 	await loadPiTui();
-	const selected = await ui.custom<PromptChoice | undefined>((tui, theme, keybindings, done) =>
-		createPromptPickerComponent(choices, done, initialQuery, { tui, theme, keybindings }),
+	const selected = await ui.custom<PromptChoice | undefined>((tui, _theme, keybindings, done) =>
+		createPromptPickerComponent(choices, done, initialQuery, { tui, keybindings }),
 	);
 	return selected === undefined ? "cancelled" : selected;
 }

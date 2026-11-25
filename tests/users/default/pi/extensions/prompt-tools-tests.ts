@@ -40,8 +40,10 @@ mock.module("@earendil-works/pi-tui", () => {
 			const lines: string[] = [];
 			for (let i = start; i < end; i++) {
 				const item = this.items[i];
-				const prefix = i === this.selectedIndex ? "> " : "  ";
-				lines.push(`${prefix}${item.label}`.slice(0, width));
+				const isSelected = i === this.selectedIndex;
+				const prefix = isSelected ? (this.theme.selectedPrefix?.("> ") ?? "> ") : "  ";
+				const label = isSelected ? (this.theme.selectedText?.(item.label) ?? item.label) : item.label;
+				lines.push(`${prefix}${label}`.slice(0, width));
 			}
 			if (start > 0 || end < this.items.length) lines.push(`(${this.selectedIndex + 1}/${this.items.length})`.slice(0, width));
 			return lines;
@@ -94,6 +96,16 @@ mock.module("@earendil-works/pi-tui", () => {
 
 	return { Input, SelectList, fuzzyFilter, truncateToWidth };
 });
+
+mock.module("@earendil-works/pi-coding-agent", () => ({
+	getSelectListTheme: () => ({
+		selectedPrefix: (text: string) => text,
+		selectedText: (text: string) => text,
+		description: (text: string) => text,
+		scrollInfo: (text: string) => text,
+		noMatch: (text: string) => text,
+	}),
+}));
 
 import promptTools, {
 	EMPTY_SESSION_MESSAGE,
@@ -767,9 +779,14 @@ describe("handle helpers", () => {
 function makePickerDeps() {
 	let renders = 0;
 	const tui = { requestRender: () => { renders += 1; } };
-	const theme = {
-		fg: (_color: string, text: string) => text,
-		bold: (text: string) => text,
+	const piHostModule = {
+		getSelectListTheme: () => ({
+			selectedPrefix: (text: string) => text,
+			selectedText: (text: string) => text,
+			description: (text: string) => text,
+			scrollInfo: (text: string) => text,
+			noMatch: (text: string) => text,
+		}),
 	};
 	const keybindings = {
 		matches: (data: string, binding: string) =>
@@ -802,14 +819,16 @@ function makePickerDeps() {
 			getSelectedItem() { return this.items[this.selectedIndex] ?? null; }
 			invalidate() {}
 			render(width: number) {
-				if (this.items.length === 0) return [("  No matches").slice(0, width)];
+				if (this.items.length === 0) return [(this.theme.noMatch?.("  No matches") ?? "  No matches").slice(0, width)];
 				const start = Math.max(0, Math.min(this.selectedIndex - Math.floor(this.maxVisible / 2), this.items.length - this.maxVisible));
 				const end = Math.min(start + this.maxVisible, this.items.length);
 				const lines: string[] = [];
 				for (let i = start; i < end; i++) {
 					const item = this.items[i];
-					const prefix = i === this.selectedIndex ? "> " : "  ";
-					lines.push(`${prefix}${item.label}`.slice(0, width));
+					const isSelected = i === this.selectedIndex;
+					const prefix = isSelected ? (this.theme.selectedPrefix?.("> ") ?? "> ") : "  ";
+					const label = isSelected ? (this.theme.selectedText?.(item.label) ?? item.label) : item.label;
+					lines.push(`${prefix}${label}`.slice(0, width));
 				}
 				if (start > 0 || end < this.items.length) lines.push(`(${this.selectedIndex + 1}/${this.items.length})`.slice(0, width));
 				return lines;
@@ -845,7 +864,7 @@ function makePickerDeps() {
 			return text.slice(0, Math.max(0, width - e.length)) + e;
 		},
 	};
-	return { tui, theme, keybindings, piTuiModule, renderCount: () => renders };
+	return { tui, keybindings, piTuiModule, piHostModule, renderCount: () => renders };
 }
 
 describe("prompt picker component", () => {
@@ -855,16 +874,44 @@ describe("prompt picker component", () => {
 		{ source: "sent", text: "gamma prompt" },
 	];
 
-	test("filter bar visible with current query", () => {
-		const component = createPromptPickerComponent(choices, () => {}, "alp", makePickerDeps());
+	test("picker theme keeps its receiver so a this-dependent host theme works", async () => {
+		// A theme whose selectedText reads `this`. The previous adapter extracted
+		// theme.fg into a bare local, so `this` was undefined at call time and pi's
+		// real Theme threw "Cannot read properties of undefined (reading 'tokenAnsi')".
+		class ThisDependentTheme {
+			private readonly token = "<accent>";
+			selectedText(text: string): string {
+				return `${this.token}${text}`;
+			}
+		}
+		const theme = new ThisDependentTheme();
+		const deps = {
+			...makePickerDeps(),
+			piHostModule: {
+				getSelectListTheme: () => ({
+					selectedPrefix: (text: string) => theme.selectedText(text),
+					selectedText: (text: string) => theme.selectedText(text),
+					description: (text: string) => text,
+					scrollInfo: (text: string) => text,
+					noMatch: (text: string) => text,
+				}),
+			},
+		};
+		const component = await createPromptPickerComponent(choices, () => {}, "", deps);
+		const rendered = component.render(80).join("\n");
+		expect(rendered).toContain("<accent>");
+	});
+
+	test("filter bar visible with current query", async () => {
+		const component = await createPromptPickerComponent(choices, () => {}, "alp", makePickerDeps());
 		const lines = component.render(80).join("\n");
 		expect(lines).toContain("Filter:");
 		expect(lines).toContain("alp");
 	});
 
-	test("empty filter shows all choices", () => {
+	test("empty filter shows all choices", async () => {
 		let doneValue: PromptChoice | undefined | "unset" = "unset";
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			doneValue = value;
 		}, "", makePickerDeps());
 		const lines = component.render(80).join("\n");
@@ -874,8 +921,8 @@ describe("prompt picker component", () => {
 		expect(doneValue).toBe("unset");
 	});
 
-	test("typing narrows by case-insensitive substring match on prompt text", () => {
-		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
+	test("typing narrows by case-insensitive substring match on prompt text", async () => {
+		const component = await createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
 		component.handleInput?.("B");
 		component.handleInput?.("E");
 		component.handleInput?.("T");
@@ -885,8 +932,8 @@ describe("prompt picker component", () => {
 		expect(lines.toLowerCase()).not.toContain("gamma prompt");
 	});
 
-	test("fuzzy match: query that is subsequence but not contiguous substring finds expected choice", () => {
-		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
+	test("fuzzy match: query that is subsequence but not contiguous substring finds expected choice", async () => {
+		const component = await createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
 		component.handleInput?.("g");
 		component.handleInput?.("p");
 		component.handleInput?.("t");
@@ -896,12 +943,12 @@ describe("prompt picker component", () => {
 		expect(lines).not.toContain("beta queued");
 	});
 
-	test("windowing: 30 choices renders at most fixed window, not 30 item lines", () => {
+	test("windowing: 30 choices renders at most fixed window, not 30 item lines", async () => {
 		const many: PromptChoice[] = Array.from({ length: 30 }, (_, i) => ({
 			source: i % 2 === 0 ? "sent" : "queued",
 			text: `prompt number ${String(i).padStart(2, "0")}`,
 		}));
-		const component = createPromptPickerComponent(many, () => {}, "", makePickerDeps());
+		const component = await createPromptPickerComponent(many, () => {}, "", makePickerDeps());
 		const lines = component.render(80);
 		expect(lines.length).toBeLessThanOrEqual(14);
 		for (let i = 10; i < 30; i++) {
@@ -915,8 +962,8 @@ describe("prompt picker component", () => {
 		expect(moved.toLowerCase()).toMatch(/\d+\/30|scroll|↑|↓|more/);
 	});
 
-	test("backspace restores previous filtered results", () => {
-		const component = createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
+	test("backspace restores previous filtered results", async () => {
+		const component = await createPromptPickerComponent(choices, () => {}, "", makePickerDeps());
 		component.handleInput?.("b");
 		component.handleInput?.("e");
 		component.handleInput?.("t");
@@ -929,9 +976,9 @@ describe("prompt picker component", () => {
 		expect(lines).toContain("gamma prompt");
 	});
 
-	test("up/down moves selection and clamps to filtered bounds", () => {
+	test("up/down moves selection and clamps to filtered bounds", async () => {
 		const selected: Array<PromptChoice | undefined> = [];
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
 		}, "", makePickerDeps());
 		component.handleInput?.("\x1b[A");
@@ -939,9 +986,9 @@ describe("prompt picker component", () => {
 		expect(selected).toEqual([choices[0]]);
 	});
 
-	test("enter returns selected PromptChoice", () => {
+	test("enter returns selected PromptChoice", async () => {
 		const selected: Array<PromptChoice | undefined> = [];
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
 		}, "", makePickerDeps());
 		component.handleInput?.("\x1b[B");
@@ -949,43 +996,43 @@ describe("prompt picker component", () => {
 		expect(selected).toEqual([choices[1]]);
 	});
 
-	test("escape cancels", () => {
+	test("escape cancels", async () => {
 		const selected: Array<PromptChoice | undefined | "unset"> = ["unset"];
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
 		}, "", makePickerDeps());
 		component.handleInput?.("\x1b");
 		expect(selected).toEqual(["unset", undefined]);
 	});
 
-	test("ctrl+c cancels when keybindings match tui.select.cancel", () => {
+	test("ctrl+c cancels when keybindings match tui.select.cancel", async () => {
 		const selected: Array<PromptChoice | undefined | "unset"> = ["unset"];
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
 		}, "", makePickerDeps());
 		component.handleInput?.("\x03");
 		expect(selected).toEqual(["unset", undefined]);
 	});
 
-	test("requestRender called after input", () => {
+	test("requestRender called after input", async () => {
 		const deps = makePickerDeps();
-		const component = createPromptPickerComponent(choices, () => {}, "", deps);
+		const component = await createPromptPickerComponent(choices, () => {}, "", deps);
 		const before = deps.renderCount();
 		component.handleInput?.("a");
 		expect(deps.renderCount()).toBeGreaterThan(before);
 	});
 
-	test("pre-filter seed: initialQuery shows it and filters", () => {
-		const component = createPromptPickerComponent(choices, () => {}, "beta", makePickerDeps());
+	test("pre-filter seed: initialQuery shows it and filters", async () => {
+		const component = await createPromptPickerComponent(choices, () => {}, "beta", makePickerDeps());
 		const lines = component.render(80).join("\n");
 		expect(lines).toContain("beta");
 		expect(lines.toLowerCase()).toContain("beta queued");
 		expect(lines.toLowerCase()).not.toContain("alpha prompt");
 	});
 
-	test("no-match shows message and enter does not select", () => {
+	test("no-match shows message and enter does not select", async () => {
 		const selected: Array<PromptChoice | undefined> = [];
-		const component = createPromptPickerComponent(choices, (value) => {
+		const component = await createPromptPickerComponent(choices, (value) => {
 			selected.push(value);
 		}, "", makePickerDeps());
 		for (const char of "zzz") {
@@ -997,14 +1044,14 @@ describe("prompt picker component", () => {
 		expect(selected).toEqual([]);
 	});
 
-	test("renders long or multiline prompt as a single preview line", () => {
+	test("renders long or multiline prompt as a single preview line", async () => {
 		const longMultiline: readonly PromptChoice[] = [
 			{
 				source: "sent",
 				text: "line one\nline two\nline three with extra words to make it long enough for preview behavior",
 			},
 		];
-		const component = createPromptPickerComponent(longMultiline, () => {}, "", makePickerDeps());
+		const component = await createPromptPickerComponent(longMultiline, () => {}, "", makePickerDeps());
 		const lines = component.render(120);
 		const choiceLines = lines.filter((line) => line.includes("Sent:"));
 		expect(choiceLines).toHaveLength(1);
