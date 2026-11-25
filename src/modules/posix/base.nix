@@ -28,7 +28,6 @@ let
     # min-free matches the health-check limit in scripts/health-check.{sh,ps1}
     # so the daemon starts reclaiming where pre-flight starts blocking.
     min-free = 16000000000; # 16 GB
-    max-free = 64000000000; # 64 GB
   };
 
   gitconfigActivation = ''
@@ -116,7 +115,7 @@ in
         launchd.daemons.nixStoreOptimise = {
           serviceConfig = {
             ProgramArguments = [
-              "/run/current-system/sw/bin/nix-store"
+              "${pkgs.nix}/bin/nix-store"
               "--optimise"
             ];
             StartCalendarInterval = [
