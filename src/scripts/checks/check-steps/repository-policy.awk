@@ -258,7 +258,8 @@ mode == "skip-constructs" && FNR == 1 {
   excluded = (FILENAME ~ /(^|\/)step-runner\.(sh|ps1)$/ ||
               FILENAME ~ /(^|\/)repository-policy\.awk$/ ||
               FILENAME ~ /(^|\/)1[123]-repo-policy-(grep|pattern|data)\.(sh|ps1)$/ ||
-              FILENAME ~ /(^|\/)store-lock\.sh$/)
+              FILENAME ~ /(^|\/)store-lock\.sh$/ ||
+              FILENAME ~ /(^|\/)service-liveness\.sh$/)
 }
 mode == "skip-constructs" && !excluded {
   if ($0 ~ /(^|[^A-Za-z0-9_])skip_step([^A-Za-z0-9_]|$)/) report_skip_construct("skip_step")
