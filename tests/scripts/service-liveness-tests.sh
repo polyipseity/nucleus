@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/lib/service-liveness.sh
 #
-# Run with: /run/current-system/sw/bin/bash tests/scripts/service-liveness-tests.sh
+# Run with: bash tests/scripts/service-liveness-tests.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -99,7 +99,7 @@ _t_lib_exists
 _t_tcp_closed() {
   local port rc out
   port="$(free_port)"
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"tcp\"}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"tcp\"}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 1 ] && [ "$out" = "dead:connect-failed" ]; then
     assert_pass "tcp transport-only closed port returns dead:connect-failed rc=1"
@@ -116,7 +116,7 @@ _t_tcp_open() {
   /usr/bin/nc -l 127.0.0.1 "$port" >/dev/null 2>&1 &
   _cleanup_pids+=("$!")
   sleep 0.2
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"tcp\"}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"tcp\"}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 0 ] && [ "$out" = "live" ]; then
     assert_pass "tcp transport-only open port returns live rc=0"
@@ -131,7 +131,7 @@ _t_http_200_live() {
   local port rc out
   port="$(free_port)"
   start_http_server_status "$port" 200
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200}}}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200}}}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 0 ] && [ "$out" = "live" ]; then
     assert_pass "http 200 with expect status 200 returns live rc=0"
@@ -146,7 +146,7 @@ _t_http_503_dead() {
   local port rc out
   port="$(free_port)"
   start_http_server_status "$port" 503
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200}}}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200}}}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 1 ] && [ "$out" = "dead:status=503" ]; then
     assert_pass "http 503 returns dead:status=503 rc=1"
@@ -161,7 +161,7 @@ _t_status_class_2xx() {
   local port rc out
   port="$(free_port)"
   start_http_server_status "$port" 201
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"statusClass\":\"2xx\"}}}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"statusClass\":\"2xx\"}}}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 0 ] && [ "$out" = "live" ]; then
     assert_pass "http 201 with expect statusClass 2xx returns live rc=0"
@@ -176,7 +176,7 @@ _t_body_subset_match() {
   local port rc out
   port="$(free_port)"
   start_http_server_json "$port" '{"ok":true,"version":"1.2.3","extra":1}'
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200,\"bodyJsonSubset\":{\"ok\":true}}}}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200,\"bodyJsonSubset\":{\"ok\":true}}}}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 0 ] && [ "$out" = "live" ]; then
     assert_pass "bodyJsonSubset match returns live rc=0"
@@ -191,7 +191,7 @@ _t_body_subset_mismatch() {
   local port rc out
   port="$(free_port)"
   start_http_server_json "$port" '{"ok":true,"version":"1.2.3","extra":1}'
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200,\"bodyJsonSubset\":{\"ok\":false}}}}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\",\"health\":{\"path\":\"/\",\"expect\":{\"status\":200,\"bodyJsonSubset\":{\"ok\":false}}}}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 1 ] && [ "$out" = "dead:body-mismatch" ]; then
     assert_pass "bodyJsonSubset mismatch returns dead:body-mismatch rc=1"
@@ -206,7 +206,7 @@ _t_http_missing_health_transport_only() {
   local port rc out
   port="$(free_port)"
   start_http_server_status "$port" 200
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\"}'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '{\"host\":\"127.0.0.1\",\"port\":$port,\"protocol\":\"http\"}'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 0 ] && [ "$out" = "live" ]; then
     assert_pass "missing health on http does transport-only TCP connect returns live rc=0"
@@ -248,7 +248,7 @@ finally:
   fi
   local ep_json
   ep_json="$(jq -nc --argjson port "$port" '{host:"127.0.0.1",port:$port,protocol:"http",health:{path:"/",timeoutSeconds:1,expect:{status:200}}}')"
-  out="$(/run/current-system/sw/bin/bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '$ep_json'" 2>&1)" || rc=$?
+  out="$(bash -c "source '$LIVENESS_LIB'; svc_liveness_probe_endpoint '$ep_json'" 2>&1)" || rc=$?
   rc="${rc:-0}"
   if [ "$rc" -eq 2 ] && [ "$out" = "unknown:timeout" ]; then
     assert_pass "http timeout returns unknown:timeout rc=2"
