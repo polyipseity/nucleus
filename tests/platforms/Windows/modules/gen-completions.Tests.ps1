@@ -19,14 +19,14 @@
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gen-completions.Tests.ps1 -Passthru"
 #>
 
-function Test-NucleusFlagAppliesToWindows($f) {
-  $p = if ($f -is [System.Collections.IDictionary]) { $f['platforms'] } else { $prop = $f.PSObject.Properties['platforms']; if ($null -eq $prop) { $null } else { $prop.Value } }
-  if ($null -eq $p) { return $true }
-  $vals = @($p)
-  return ($vals.Count -eq 0 -or $vals -contains 'windows')
-}
-
 BeforeAll {
+  function Test-NucleusFlagAppliesToWindows($f) {
+    $p = if ($f -is [System.Collections.IDictionary]) { $f['platforms'] } else { $prop = $f.PSObject.Properties['platforms']; if ($null -eq $prop) { $null } else { $prop.Value } }
+    if ($null -eq $p) { return $true }
+    $vals = @($p)
+    return ($vals.Count -eq 0 -or $vals -contains 'windows')
+  }
+
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
   $Script:RealProfilePath = Join-Path $PSScriptRoot '../../../../src/scripts/shell/profile.ps1'
