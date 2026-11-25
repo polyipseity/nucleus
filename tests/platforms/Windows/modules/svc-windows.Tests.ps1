@@ -1301,18 +1301,18 @@ Describe 'Get-ServiceLogDirList with instances' {
 # ---------------------------------------------------------------------------
 
 Describe 'svc unblock CLI surface' {
-  It 'includes unblock in the Action ValidateSet' {
-    $paramAst = $ast.Find({
-      $args[0] -is [System.Management.Automation.Language.ParameterAst] -and
-      $args[0].Name.VariablePath.UserPath -eq 'Action'
+  It 'includes unblock in ValidActions' {
+    $assignment = $ast.Find({
+      $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+      $args[0].Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+      $args[0].Left.VariablePath.UserPath -eq 'ValidActions'
     }, $true)
-    $paramAst | Should -Not -BeNullOrEmpty
-    $validateSet = $paramAst.Attributes | Where-Object {
-      $_ -is [System.Management.Automation.Language.AttributeAst] -and
-      $_.TypeName.Name -eq 'ValidateSet'
-    }
-    $validateSet | Should -Not -BeNullOrEmpty
-    $values = @($validateSet.PositionalArguments | ForEach-Object { $_.Value })
+    $assignment | Should -Not -BeNullOrEmpty
+    $values = @(
+      $assignment.Right.FindAll({
+        $args[0] -is [System.Management.Automation.Language.StringConstantExpressionAst]
+      }, $true) | ForEach-Object { $_.Value }
+    )
     $values | Should -Contain 'unblock'
   }
 
