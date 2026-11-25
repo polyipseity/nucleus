@@ -88,7 +88,7 @@ function Invoke-ListFlag([string]$label, [scriptblock]$cmd) {
   $rc = $LASTEXITCODE
   $textOut = (($out | ForEach-Object { "$_" }) -join "`n")
   $ok = ($rc -eq 0 -and $out.Count -gt 0)
-  $detail = "rc=$rc out=$((($out | Select-Object -First 3 | ForEach-Object { "$_" }) -join ' | '))"
+  $detail = "rc=$rc out=$textOut"
   Assert-True -cond $ok -name "$label rc=0 and produces output" -detail $detail
 }
 

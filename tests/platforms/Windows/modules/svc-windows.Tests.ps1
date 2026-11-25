@@ -163,7 +163,7 @@ BeforeAll {
   function Disable-ScheduledTask { throw 'stub: Disable-ScheduledTask' }
   function Invoke-ServiceLivenessProbe {
     param([object]$Endpoint)
-    throw 'stub: Invoke-ServiceLivenessProbe'
+    throw "stub: Invoke-ServiceLivenessProbe($Endpoint)"
   }
 
   # Mock external dependencies for log functions.

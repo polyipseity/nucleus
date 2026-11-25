@@ -137,7 +137,7 @@ BeforeAll {
         return $state
     }
 
-    function Get-GcDeclaredSwitches {
+    function Get-GcDeclaredSwitch {
         $tokens = $null
         $errors = $null
         $ast = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -152,7 +152,7 @@ BeforeAll {
 
 Describe 'nucleus-gc parameter block' {
     It 'covers every declared no-* and mode switch in gc.ps1' {
-        $declared = @(Get-GcDeclaredSwitches | Where-Object { $_ -like 'No*' -or $_ -in @('DryRun', 'GCVMData') })
+        $declared = @(Get-GcDeclaredSwitch | Where-Object { $_ -like 'No*' -or $_ -in @('DryRun', 'GCVMData') })
         $covered = @($Script:SwitchMap.Switch)
         $missing = @($declared | Where-Object { $_ -notin $covered })
         $extra = @($covered | Where-Object { $_ -notin $declared })
