@@ -76,6 +76,7 @@ let
   caddyRunAsUser = parsedServices.caddy.hosts.MacBook.runAsUser;
   jellyfinRunAsUser = parsedServices.jellyfin.hosts.MacBook.runAsUser;
   litellmRunAsUser = parsedServices.litellm.hosts.MacBook.runAsUser;
+  redisRunAsUser = parsedServices.redis.hosts.MacBook.runAsUser;
   camillaHeartbeatScope = parsedServices."camilladsp-heartbeat".hosts.MacBook.scope;
   camillaRunScope = parsedServices.camilladsp.hosts.MacBook.scope;
 
@@ -222,6 +223,7 @@ let
     (assert' caddyRunAsUser "caddy: runAsUser=true")
     (assert' jellyfinRunAsUser "jellyfin: runAsUser=true")
     (assert' litellmRunAsUser "litellm: runAsUser=true")
+    (assert' redisRunAsUser "redis: runAsUser=true")
     (assert' (camillaHeartbeatScope == "user") "camilladsp-heartbeat: scope=user")
     (assert' (camillaRunScope == "system") "camilladsp: scope=system")
   ];

@@ -381,7 +381,7 @@
     }
   },
   "hermes-agent": {
-    "description": "AI agent gateway — messaging integrations (Telegram, Discord, Slack) and cron jobs",
+    "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
     "displayName": "Hermes Agent",
     "logging": {
       "capture": "all",
@@ -758,7 +758,8 @@
         "service": "local.redis",
         "type": "macos-launchctl",
         "platform": "macOS",
-        "unitPath": "/Library/LaunchDaemons/local.redis.plist"
+        "unitPath": "/Library/LaunchDaemons/local.redis.plist",
+        "runAsUser": true
       },
       "NixOS": {
         "scope": "system",
@@ -910,7 +911,7 @@
         "unitPath": "~/.config/systemd/user/nucleus-service-watchdog-user.service"
       },
       "Windows": {
-        "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope",
+        "justification": "User-scope watchdog not needed on Windows \u2014 scheduled task runs with system scope",
         "type": "omitted",
         "platform": "Windows"
       }
