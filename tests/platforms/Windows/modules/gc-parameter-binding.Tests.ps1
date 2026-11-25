@@ -17,9 +17,10 @@
     it is the binding that is under test, not the spelling of the default.
 
     The switch-to-variable map is spelled out rather than derived, because
-    the names do not follow a mechanical rule. NoNixGc reads NUCLEUS_GC_NO_NIX
-    but NoToolCacheGc reads NUCLEUS_GC_NO_TOOL_CACHE_GC, so any transform
-    wide enough to cover the second is wrong somewhere else.
+    The switch map is spelled out rather than derived, because the test
+    exercises binding behaviour and a small explicit list keeps the intent
+    obvious. It covers the skip switches declared in scripts/gc.ps1 plus
+    GCVMData and DryRun, which bind through the same param block.
 
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gc-parameter-binding.Tests.ps1 -Passthru"
 #>
@@ -30,8 +31,6 @@ BeforeAll {
     $Script:GcScript = Join-Path -Path $Script:RepoRoot -ChildPath 'scripts\gc.ps1'
 
     $Script:SwitchMap = @(
-        [pscustomobject]@{ Switch = 'NoNixGc' }
-        [pscustomobject]@{ Switch = 'NoHmGc' }
         [pscustomobject]@{ Switch = 'NoToolCacheGc' }
         [pscustomobject]@{ Switch = 'NoGitCacheGc' }
         [pscustomobject]@{ Switch = 'NoOllamaGc' }
@@ -40,7 +39,6 @@ BeforeAll {
         [pscustomobject]@{ Switch = 'NoWallpaperGc' }
         [pscustomobject]@{ Switch = 'NoVMGc' }
         [pscustomobject]@{ Switch = 'NoLogGc' }
-        [pscustomobject]@{ Switch = 'NoJournaldGc' }
         [pscustomobject]@{ Switch = 'GCVMData' }
         # WHY: DryRun is a mode switch rather than a no-* skip switch, but it
         # binds through the same param block and defaults the same way, so it
@@ -48,11 +46,10 @@ BeforeAll {
         [pscustomobject]@{ Switch = 'DryRun' }
     )
 
-    # The eleven env vars the switches used to default from, named here rather
-    # than derived from the map because GCVMData is positive and names none.
+    # The NUCLEUS_GC_NO_* variables the switches used to default from, named
+    # here rather than derived from the map because GCVMData and DryRun are
+    # positive/mode switches and name none.
     $Script:RemovedEnvVars = @(
-        'NUCLEUS_GC_NO_NIX'
-        'NUCLEUS_GC_NO_HM'
         'NUCLEUS_GC_NO_TOOL_CACHE_GC'
         'NUCLEUS_GC_NO_GIT_CACHE_GC'
         'NUCLEUS_GC_NO_OLLAMA_GC'
@@ -61,7 +58,6 @@ BeforeAll {
         'NUCLEUS_GC_NO_WALLPAPER_GC'
         'NUCLEUS_GC_NO_VM_GC'
         'NUCLEUS_GC_NO_LOG_GC'
-        'NUCLEUS_GC_NO_JOURNALD_GC'
     )
 
     function Get-GcParamBlock {
