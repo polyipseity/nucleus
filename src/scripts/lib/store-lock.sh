@@ -106,11 +106,11 @@ _store_lock_candidate_rows() {
   ps -axo pid=,etime=,time=,command= |
     while read -r _slr_pid _slr_etime _slr_time _slr_command; do
       case "$_slr_command" in
-      *"nix store gc"* | *nix-collect-garbage*) ;;
+      *"nix store gc"* | *nix-collect-garbage* | *"nix-store --gc"* | *"nix-store -gc"*) ;;
       *) continue ;;
       esac
       case "$_slr_command" in
-      *--dry-run*) continue ;;
+      *--dry-run* | *--print-dead*) continue ;;
       esac
       printf '%s %s %s %s\n' "$_slr_pid" "$(_store_lock_epoch_to_seconds "$_slr_etime")" \
         "$(_store_lock_epoch_to_seconds "$_slr_time")" "$_slr_command"
@@ -120,30 +120,32 @@ _store_lock_candidate_rows() {
 # Args: $1 state dir, $2 stall seconds, $3 reclaim grace seconds, $4 cooldown seconds.
 store_lock_watchdog_tick() {
   local _slw_dir="$1" _slw_stall="${2:-3600}" _slw_grace="${3:-30}" _slw_cooldown="${4:-21600}"
-  local _slw_now _slw_cooldown_until=0 _slw_pid _slw_age _slw_cpu _slw_command
-  local _slw_record _slw_prev_cpu
+  local _slw_now _slw_pid _slw_age _slw_cpu _slw_command
+  local _slw_record _slw_prev_cpu _slw_last_reclaim _slw_cooldown_until
 
   mkdir -p "$_slw_dir"
   _slw_now="$(date +%s)"
-  if [ -f "$_slw_dir/last-reclaim" ]; then
-    read -r _slw_cooldown_until <"$_slw_dir/last-reclaim"
-  fi
 
   while read -r _slw_pid _slw_age _slw_cpu _slw_command; do
     [ -n "$_slw_pid" ] || continue
     _slw_record="$_slw_dir/$_slw_pid"
     if [ ! -f "$_slw_record" ]; then
-      printf '%s %s\n' "$_slw_cpu" "$_slw_now" >"$_slw_record"
+      printf '%s %s 0\n' "$_slw_cpu" "$_slw_now" >"$_slw_record"
       continue
     fi
-    read -r _slw_prev_cpu _ <"$_slw_record" || _slw_prev_cpu=0
-    printf '%s %s\n' "$_slw_cpu" "$_slw_now" >"$_slw_record"
+    read -r _slw_prev_cpu _ _slw_last_reclaim <"$_slw_record" || {
+      _slw_prev_cpu=0
+      _slw_last_reclaim=0
+    }
+    _slw_last_reclaim="${_slw_last_reclaim:-0}"
+    printf '%s %s %s\n' "$_slw_cpu" "$_slw_now" "$_slw_last_reclaim" >"$_slw_record"
 
     if [ "$_slw_age" -lt "$_slw_stall" ]; then continue; fi
     if [ "$_slw_cpu" -gt "$_slw_prev_cpu" ]; then continue; fi
 
-    if [ "$_slw_cooldown_until" -gt "$_slw_now" ]; then
-      notice "store collection $_slw_pid (${_slw_age}s old) looks stalled, but the reclaim cooldown is active until $(date -r "$_slw_cooldown_until" '+%H:%M' 2>/dev/null || date -d "@$_slw_cooldown_until" '+%H:%M' 2>/dev/null || printf '%s' "$_slw_cooldown_until"); leaving it alone"
+    _slw_cooldown_until=$((_slw_last_reclaim + _slw_cooldown))
+    if [ "$_slw_last_reclaim" -gt 0 ] && [ "$_slw_cooldown_until" -gt "$_slw_now" ]; then
+      notice "store collection $_slw_pid (${_slw_age}s old) looks stalled, but its reclaim cooldown is active until $(date -r "$_slw_cooldown_until" '+%H:%M' 2>/dev/null || date -d "@$_slw_cooldown_until" '+%H:%M' 2>/dev/null || printf '%s' "$_slw_cooldown_until"); leaving it alone"
       continue
     fi
 
@@ -158,16 +160,18 @@ store_lock_watchdog_tick() {
       warn "store collection $_slw_pid ignored SIGTERM for ${_slw_grace}s; sending SIGKILL"
       kill -KILL "$_slw_pid" 2>/dev/null || warn "store collection $_slw_pid vanished before SIGKILL"
     fi
-    printf '%s\n' "$((_slw_now + _slw_cooldown))" >"$_slw_dir/last-reclaim"
-    _slw_cooldown_until=$((_slw_now + _slw_cooldown))
-    rm -f "$_slw_record"
+    printf '%s %s %s\n' "$_slw_cpu" "$_slw_now" "$_slw_now" >"$_slw_record"
   done < <(_store_lock_candidate_rows)
 
   # Drop state for pids that are gone, so the directory cannot grow without end.
   local _slw_stale
   for _slw_stale in "$_slw_dir"/*; do
     [ -f "$_slw_stale" ] || continue
-    case "$_slw_stale" in */last-reclaim) continue ;; esac
+    case "$_slw_stale" in */last-reclaim)
+      rm -f "$_slw_stale"
+      continue
+      ;;
+    esac
     if ! kill -0 "$(basename "$_slw_stale")" 2>/dev/null; then
       rm -f "$_slw_stale"
     fi
