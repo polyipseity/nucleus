@@ -51,9 +51,43 @@ Describe "Windows VM disk-model parity (P8)" {
 
   It "gc.ps1 Step 6 delegates VM-artifact GC to vm.sh gc" {
     $content = Get-GcPs1Content
+
+    # Behavioral: evaluate the VM GC arg-building logic with controlled inputs.
+    $tokens = $null; $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($content, [ref]$tokens, [ref]$parseErrors)
+    $parseErrors.Count | Should -Be 0
+
+    $vmGcInit = $ast.FindAll({
+        param($n)
+        $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $n.Left.VariablePath.UserPath -eq 'vmGcArgs' -and
+        $n.Right.Extent.Text -match "@\(\s*'gc'\s*\)"
+      }, $true) | Select-Object -First 1
+    $vmGcInit | Should -Not -BeNullOrEmpty
+
+    $vmGcDataIf = $ast.FindAll({
+        param($n)
+        $n -is [System.Management.Automation.Language.IfStatementAst] -and
+        $n.Extent.StartOffset -gt $vmGcInit.Extent.StartOffset -and
+        $n.Clauses.Count -ge 1 -and
+        $n.Clauses[0].Item1.Extent.Text -match '\bGCVMData\b' -and
+        $n.Clauses[0].Item2.Extent.Text -match '\bvmGcArgs\b'
+      }, $true) | Select-Object -First 1
+    $vmGcDataIf | Should -Not -BeNullOrEmpty
+
+    $buildVmGcArgs = [scriptblock]::Create(@"
+param([bool]`$GCVMData, [bool]`$NoVMDataGc)
+$($vmGcInit.Extent.Text)
+$($vmGcDataIf.Extent.Text)
+, `$vmGcArgs
+"@)
+
+    (& $buildVmGcArgs -GCVMData $true -NoVMDataGc $false) | Should -Be @('gc', '--gc-data')
+    (& $buildVmGcArgs -GCVMData $true -NoVMDataGc $true) | Should -Be @('gc')
+    (& $buildVmGcArgs -GCVMData $false -NoVMDataGc $false) | Should -Be @('gc')
+
     $content | Should -Match ([regex]::Escape('& bash $vmSh @vmGcArgs'))
-    $content | Should -Match ([regex]::Escape("if (`$GCVMData) { `$vmGcArgs += '--gc-data' }"))
-    $content | Should -Match ([regex]::Escape("`$vmGcArgs = @('gc')"))
     $content | Should -Not -Match ([regex]::Escape('$_.enabled -eq $true'))
     $content | Should -Not -Match ([regex]::Escape('-Filter "*.qcow2"'))
   }
