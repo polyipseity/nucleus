@@ -16,7 +16,11 @@ _uni_sha256sum_bin="${NIX_INDEX_SHA256SUM:-${2:?usage: update-nix-index.sh <mode
 _uni_jq_bin="${NIX_INDEX_JQ:-${3:?usage: update-nix-index.sh <model_dir> <sha256sum_bin> <jq_bin> <lockfile>}}"
 _uni_lockfile="${NIX_INDEX_LOCKFILE:-${4:?usage: update-nix-index.sh <model_dir> <sha256sum_bin> <jq_bin> <lockfile>}}"
 
-_uni_platform="$(uname -m)-$(uname -s | tr '[:upper:]' '[:lower:]')"
+_uni_machine="$(uname -m)"
+case "$_uni_machine" in
+arm64) _uni_machine="aarch64" ;;
+esac
+_uni_platform="$_uni_machine-$(uname -s | tr '[:upper:]' '[:lower:]')"
 case "$_uni_platform" in
 aarch64-darwin | x86_64-linux) ;;
 *)
