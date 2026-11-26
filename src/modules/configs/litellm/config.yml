@@ -92,20 +92,20 @@ model_list:
 
   # Order is the failover tier: the lowest order that is healthy serves the request.
 
-  - model_name: default
-    litellm_params:
-      model: openai/mimo-v2.5-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/KEY_AI_OPENCODE_ZEN
-      order: 1
-      reasoning_effort: high
-      model_info:
-        max_input_tokens: 256000
-        max_output_tokens: 16000
+  # - model_name: default
+  #   litellm_params:
+  #     model: openai/deepseek-v4.1-flash-free
+  #     api_base: https://opencode.ai/zen/v1
+  #     api_key: os.environ/KEY_AI_OPENCODE_ZEN
+  #     order: 1
+  #     reasoning_effort: high
+  #     model_info:
+  #       max_input_tokens: 256000
+  #       max_output_tokens: 16000
 
   - model_name: default
     litellm_params:
-      model: cline/cline-pass/mimo-v2.5
+      model: cline/cline-pass/mimo-v2.6-flash
       api_base: https://api.cline.bot/api/v1
       api_key: os.environ/KEY_AI_CLINE
       order: 2
@@ -118,7 +118,7 @@ model_list:
 
   - model_name: default
     litellm_params:
-      model: openai/deepseek/deepseek-v4-flash
+      model: openai/deepseek/deepseek-v4.1-flash
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/KEY_AI_COMMAND_CODE
       order: 2
@@ -135,7 +135,7 @@ model_list:
 
   - model_name: default
     litellm_params:
-      model: openai/mimo-v2.5
+      model: openai/deepseek-v4.1-flash
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/KEY_AI_OPENCODE_GO
       order: 2
@@ -146,9 +146,37 @@ model_list:
 
   - model_name: default
     litellm_params:
-      model: openrouter/xiaomi/mimo-v2.5
+      model: openrouter/deepseek/deepseek-v4.1-flash-1017
       api_key: os.environ/KEY_AI_OPENROUTER
       order: 3
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 256000
+        max_output_tokens: 16000
+
+  - model_name: default-free
+    litellm_params:
+      model: openai/stealth/glyph-cluster:free
+      api_base: https://api.commandcode.ai/provider/v1
+      api_key: os.environ/KEY_AI_COMMAND_CODE
+      order: 1
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 256000
+        max_output_tokens: 16000
+    # CommandCode reports credit exhaustion as HTTP 400, which litellm never cools down.
+    # WHY: litellm reads allowed_fails_policy only from the deployment's own model_info
+    # (cooldown_handlers._get_deployment_cooldown_policy); under litellm_params it is inert.
+    model_info:
+      allowed_fails_policy:
+        BadRequestErrorAllowedFails: 0
+
+  - model_name: default-free
+    litellm_params:
+      model: openai/iceman-contributor-free
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/KEY_AI_OPENCODE_GO
+      order: 1
       reasoning_effort: high
       model_info:
         max_input_tokens: 256000
