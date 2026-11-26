@@ -130,6 +130,62 @@ if ($env:HARNESS_PY_EXIT) {
         }
     }
 
+    It 'accepts an empty PythonExe and reaches the function body' {
+        Set-Content -Path $script:argsLog -Value ''
+        $lines = @(Sync-HarnessModel -Enabled:$false -RepoRoot $script:repoRoot -PythonExe '' -HostName 'Windows' -HomeDirectory $script:homeDir)
+        ($lines -join "`n") | Should -Match 'disabled - skipping harness model provisioning'
+        (Get-Content -LiteralPath $script:argsLog -Raw).Trim() | Should -BeNullOrEmpty
+    }
+
+    It 'resolves the managed interpreter when PythonExe is empty' {
+        $managedLocalAppData = Join-Path -Path $script:tempRoot -ChildPath 'managed-user-root'
+        $managedUserRoot = Join-Path -Path $managedLocalAppData -ChildPath 'nucleus'
+        $managedPython = Get-NucleusHarnessPythonExe -UserRoot $managedUserRoot
+        $null = New-Item -ItemType Directory -Path (Split-Path -Path $managedPython -Parent) -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $markerPath = Join-Path -Path $script:tempRoot -ChildPath 'managed-python.log'
+        Set-Content -LiteralPath $markerPath -Value ''
+        if ($IsWindows) {
+            $typeName = 'ManagedHarnessPythonStub' + [guid]::NewGuid().ToString('N')
+            $source = @"
+using System;
+using System.IO;
+public static class $typeName
+{
+  public static void Main()
+  {
+    string marker = Environment.GetEnvironmentVariable("NUCLEUS_TEST_MANAGED_PY_MARKER");
+    if (!string.IsNullOrEmpty(marker))
+    {
+      File.AppendAllText(marker, "managed-python\n");
+    }
+  }
+}
+"@
+            $null = Add-Type -TypeDefinition $source -OutputAssembly $managedPython -OutputType ConsoleApplication # check-suppress:suppression_doc: Add-Type returns the generated type, discarded in test setup
+        } else {
+            $body = "#!/bin/sh`nprintf 'managed-python\n' >> `"`$NUCLEUS_TEST_MANAGED_PY_MARKER`"`nexit 0`n"
+            $null = Set-Content -LiteralPath $managedPython -Value $body -NoNewline # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+            [System.IO.File]::SetUnixFileMode($managedPython, [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute)
+        }
+        $unusedArgsLog = Join-Path -Path $script:tempRoot -ChildPath 'fallback-python-args.log'
+        $savedLocalAppData = $env:LOCALAPPDATA
+        $savedMarker = $env:NUCLEUS_TEST_MANAGED_PY_MARKER
+        $savedArgsLog = $env:HARNESS_PY_ARGS_LOG
+        try {
+            $env:LOCALAPPDATA = $managedLocalAppData
+            $env:NUCLEUS_TEST_MANAGED_PY_MARKER = $markerPath
+            $env:HARNESS_PY_ARGS_LOG = $unusedArgsLog
+            $lines = @(Sync-HarnessModel -Enabled:$true -RepoRoot $script:repoRoot -PythonExe '' -HostName 'Windows' -HomeDirectory $script:homeDir)
+        } finally {
+            $env:LOCALAPPDATA = $savedLocalAppData
+            $env:NUCLEUS_TEST_MANAGED_PY_MARKER = $savedMarker
+            $env:HARNESS_PY_ARGS_LOG = $savedArgsLog
+        }
+        ($lines -join "`n") | Should -Match 'merged model slots for 2 harness'
+        (Get-Content -LiteralPath $markerPath -Raw) | Should -Match 'managed-python'
+        (Test-Path -LiteralPath $unusedArgsLog) | Should -BeFalse
+    }
+
     It 'does nothing when disabled' {
         Set-Content -Path $script:argsLog -Value ''
         @(Sync-HarnessModel -Enabled:$false -RepoRoot $script:repoRoot -PythonExe $script:pythonStub -HostName 'Windows' -HomeDirectory $script:homeDir) > $null

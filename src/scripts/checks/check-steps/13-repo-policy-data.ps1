@@ -315,17 +315,30 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   }
   . $resolverPath
   $managedPython = [string](Resolve-HarnessPythonExe)
-  $pythonExe = if ([string]::IsNullOrWhiteSpace($managedPython)) { 'python3' } else { $managedPython }
-  $driftOutput = & $pythonExe $validatorPath --repo-root $r 2>&1
-  $driftExit = $LASTEXITCODE
-  if ($driftExit -ne 0) {
-    foreach ($line in @($driftOutput)) {
-      if ([string]$line) { Write-ErrorMessage ([string]$line) }
+  $pythonExe = if (-not [string]::IsNullOrWhiteSpace($managedPython) -and
+    (Test-Path -LiteralPath $managedPython -PathType Leaf)) { $managedPython } else { $null }
+  if (-not $pythonExe) {
+    $fallback = Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional fallback interpreter; absence is a hard error below
+    if ($null -eq $fallback) {
+      Write-ErrorMessage 'harness model drift needs a Python interpreter: the managed harness venv is unavailable and python3 is not on PATH'
+      $failed = $true
     }
-    Write-ErrorMessage 'harness model drift failed.'
-    $failed = $true
-  } else {
-    Write-Message 'harness model drift passed.'
+    else {
+      $pythonExe = $fallback.Source
+    }
+  }
+  if ($pythonExe) {
+    $driftOutput = & $pythonExe $validatorPath --repo-root $r 2>&1
+    $driftExit = $LASTEXITCODE
+    if ($driftExit -ne 0) {
+      foreach ($line in @($driftOutput)) {
+        if ([string]$line) { Write-ErrorMessage ([string]$line) }
+      }
+      Write-ErrorMessage 'harness model drift failed.'
+      $failed = $true
+    } else {
+      Write-Message 'harness model drift passed.'
+    }
   }
 
   if ($failed) {
@@ -337,4 +350,4 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   return $true
 }
 
-Register-StepToolManifest -Id "repo-policy-data" -Tool "git python3"
+Register-StepToolManifest -Id "repo-policy-data" -Tool "git"

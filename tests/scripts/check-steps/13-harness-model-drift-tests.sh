@@ -321,7 +321,8 @@ checks = {
   "POSIX registration": 'harness model drift|run_harness_model_drift|ctx' in sh,
   "POSIX python tool": 'register_step_tools "repo-policy-data" "bun git jq nix python3"' in sh,
   "PowerShell section": "--- harness model drift ---" in ps1,
-  "PowerShell python tool": 'Register-StepToolManifest -Id "repo-policy-data" -Tool "git python3"' in ps1,
+  "PowerShell git tool": 'Register-StepToolManifest -Id "repo-policy-data" -Tool "git"' in ps1,
+  "PowerShell missing-interpreter error": 'harness model drift needs a Python interpreter' in ps1,
 }
 for name, ok in checks.items():
     if not ok:
@@ -329,9 +330,9 @@ for name, ok in checks.items():
 PY
   )"
   if [ -z "$out" ]; then
-    assert_pass "both step twins wire the validator and declare python3"
+    assert_pass "both step twins wire the validator with their own tool manifests"
   else
-    assert_fail "both step twins wire the validator and declare python3" "$out"
+    assert_fail "both step twins wire the validator with their own tool manifests" "$out"
   fi
 }
 

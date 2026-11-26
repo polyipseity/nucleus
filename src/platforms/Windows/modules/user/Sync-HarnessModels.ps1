@@ -74,6 +74,7 @@ function Sync-HarnessModel {
     [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
+    [AllowEmptyString()]
     [string]$PythonExe,
 
     [Parameter(Mandatory = $true)]
