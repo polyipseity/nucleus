@@ -22,12 +22,34 @@ _POLICY_DATA_CHECKS=(
   "release age uniformity|run_release_age_uniformity|files"
   "upstream workaround staleness|run_upstream_workaround_staleness|ctx"
   "provisioned tools instruction drift|run_provisioned_tools_instruction_drift|ctx"
+  "harness model drift|run_harness_model_drift|ctx"
 )
 
 run_repo_policy_data() {
   local _ctx_name="$1"
   shift
   run_policy_checks "$_ctx_name" "repository policy (data-driven)" _POLICY_DATA_CHECKS "$@"
+}
+
+# run_harness_model_drift: the shared Python validator owns the alias, payload,
+# registry, and merge --check rules, so both check twins run the same code.
+run_harness_model_drift() {
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  cd "$_repo_root" || return 1
+  local _output _rc=0
+  _output=$(python3 "$_repo_root/src/scripts/lib/harness-model-drift.py" --repo-root "$_repo_root" 2>&1) || _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    local _line
+    while IFS= read -r _line; do
+      [ -z "$_line" ] || error "$_line"
+    done <<<"$_output"
+    error "harness model drift failed."
+    return 1
+  fi
+  say "harness model drift passed."
+  return 0
 }
 
 run_dummy_key_uniformity() {

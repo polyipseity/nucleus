@@ -626,6 +626,21 @@ else
   assert_fail "yaml: missing file is created" "rc=$yaml_rc err=$(cat "$yaml_err")"
 fi
 
+cp "$yaml_missing_target" "$WORK/yaml-created.before"
+yaml_rc="$(run_merge "$yaml_registry" "$yaml_missing_home" "$yaml_out" "$yaml_err")"
+if [ "$yaml_rc" -eq 0 ] && cmp -s "$WORK/yaml-created.before" "$yaml_missing_target"; then
+  assert_pass "yaml: created file remerges without a rewrite"
+else
+  assert_fail "yaml: created file remerges without a rewrite" "rc=$yaml_rc changed=$(cmp -s "$WORK/yaml-created.before" "$yaml_missing_target" && echo no || echo yes) err=$(cat "$yaml_err")"
+fi
+
+yaml_rc="$(run_merge "$yaml_registry" "$yaml_missing_home" "$yaml_out" "$yaml_err" --check)"
+if [ "$yaml_rc" -eq 0 ]; then
+  assert_pass "yaml: created file passes --check"
+else
+  assert_fail "yaml: created file passes --check" "rc=$yaml_rc out=$(cat "$yaml_out") err=$(cat "$yaml_err")"
+fi
+
 toml_missing_home="$WORK/toml-missing-home"
 toml_missing_target="$toml_missing_home/.codex/config.toml"
 toml_rc="$(run_merge "$toml_registry" "$toml_missing_home" "$toml_out" "$toml_err")"

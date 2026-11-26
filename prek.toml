@@ -65,6 +65,8 @@ hooks = [
   # Uses default behavior (accumulate-all) since check runs on every commit.
   { id = "repo-check", name = "repository checks", language = "python", always_run = true, require_serial = true, entry = "python scripts/prek-hooks.py check", args = [
     "--scoped",
+  ], additional_dependencies = [
+    "pyyaml",
   ] },
   # Repository test suite — runs Nix test suite evaluation under tests/.
   # Uses default behavior (fail-fast). CI explicitly passes --no-fail-fast.

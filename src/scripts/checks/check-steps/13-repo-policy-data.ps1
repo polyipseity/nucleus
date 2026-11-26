@@ -306,6 +306,20 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     $failed = $true
   }
 
+  Write-Message "--- harness model drift ---"
+  $validatorPath = Join-Path $r 'src\scripts\lib\harness-model-drift.py'
+  $driftOutput = & python3 $validatorPath --repo-root $r 2>&1
+  $driftExit = $LASTEXITCODE
+  if ($driftExit -ne 0) {
+    foreach ($line in @($driftOutput)) {
+      if ([string]$line) { Write-ErrorMessage ([string]$line) }
+    }
+    Write-ErrorMessage 'harness model drift failed.'
+    $failed = $true
+  } else {
+    Write-Message 'harness model drift passed.'
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (data-driven) check failed"
     return $false
@@ -315,4 +329,4 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   return $true
 }
 
-Register-StepToolManifest -Id "repo-policy-data" -Tool "git"
+Register-StepToolManifest -Id "repo-policy-data" -Tool "git python3"

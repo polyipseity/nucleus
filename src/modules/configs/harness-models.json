@@ -46,11 +46,7 @@
         "matchKey": "name",
         "matchValue": "LiteLLM"
       },
-      "payload": {
-        "MacBook": "src/users/default/vscode/chatLanguageModels.MacBook.json",
-        "NixOS": "src/users/default/vscode/chatLanguageModels.NixOS.json",
-        "Windows": "src/users/default/vscode/chatLanguageModels.Windows.json"
-      }
+      "payload": "src/users/default/vscode/litellm-entry.json"
     },
     {
       "harness": "copilot",

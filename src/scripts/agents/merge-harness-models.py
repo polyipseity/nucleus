@@ -560,7 +560,7 @@ def _yaml_item_range(text: str, list_key: str, item_key: str, item_name: str, pa
     """Find start/end span of a mapping item in a top-level-ish YAML sequence.
 
     The YAML merge contract is narrow: custom_providers is a list keyed by name.
-    We scan textually for '- name: <item_name>' at the indentation of list items
+    We scan textually for '- name: <item_name>' at either sequence indentation
     and replace that whole item block up to next item or end of list block.
     """
     # Locate list key line.
@@ -572,18 +572,24 @@ def _yaml_item_range(text: str, list_key: str, item_key: str, item_name: str, pa
     item_indent = list_indent + "  "
     # Find items after list key.
     pos = m.end()
-    # Scan forward for first list item or next top-level key.
-    item_re = re.compile(rf"^(?P<ind>{re.escape(item_indent)})-\s+{re.escape(item_key)}:\s*{re.escape(item_name)}\s*(?:#.*)?$", re.M)
-    next_item_re = re.compile(rf"^(?P<ind>{re.escape(item_indent)})-\s+\S", re.M)
-    next_top_re = re.compile(rf"^(?P<ind>{re.escape(list_indent)})\S", re.M)
+    # WHY: PyYAML emits indentless sequence dashes when a minimal target is
+    # created, while _render_yaml_item and existing configs use two spaces.
+    # Both spell the same slot, and create-then-remerge must converge.
+    dash_indent = rf"(?:{re.escape(item_indent)}|{re.escape(list_indent)})"
+    item_re = re.compile(rf"^(?P<ind>{dash_indent})-\s+{re.escape(item_key)}:\s*{re.escape(item_name)}\s*(?:#.*)?$", re.M)
 
     # Find target item.
     im = item_re.search(text, pos)
     if not im:
         raise MergeError(f"missing YAML item {item_key}={item_name} in {list_key} in {path}")
     start = im.start()
+    # End is the next item at the target's own indentation, the next key at
+    # list indentation, or EOF. Deriving this from the match keeps an
+    # indentless created file stable across repeated merges.
+    target_indent = im.group("ind")
+    next_item_re = re.compile(rf"^(?P<ind>{re.escape(target_indent)})-\s+\S", re.M)
+    next_top_re = re.compile(rf"^(?P<ind>{re.escape(list_indent)})\S", re.M)
 
-    # End is next item at same indent or next key at list indent or EOF.
     end = len(text)
     for nm in next_item_re.finditer(text, im.end()):
         if nm.start() > start:
