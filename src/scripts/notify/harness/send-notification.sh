@@ -8,7 +8,7 @@
 # config the gateway already owns (~/.hermes/.env, ~/.hermes/config.yaml). nucleus
 # stores no bot tokens of its own and needs no running gateway.
 #
-# Usage: harness-notify <harness> <event> [text]
+# Usage: nucleus-utils harness send-notification <harness> <event> [text]
 #   harness  pi | opencode | cursor | copilot
 #   event    done | needs-input | approval | error
 #   text     Optional body. When omitted, stdin is read: raw text, or a hook

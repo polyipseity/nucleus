@@ -488,7 +488,7 @@ try {
       $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../scripts/utils.ps1'
       if (Test-Path -LiteralPath $utilsPath -PathType Leaf) {
         $pwshPath = [Environment]::ProcessPath
-        $null = $payload | & $pwshPath -NoProfile -File $utilsPath report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+        $null = $payload | & $pwshPath -NoProfile -File $utilsPath harness report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
       } elseif (Get-Command -Name 'nucleus-utils' -ErrorAction SilentlyContinue) {
         $null = $payload | & nucleus-utils harness report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
       }

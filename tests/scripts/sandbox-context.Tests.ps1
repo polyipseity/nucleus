@@ -107,7 +107,7 @@ BeforeAll {
       $stderrFile = [System.IO.Path]::GetTempFileName()
       $stdinFile = $null
       try {
-        $argList = @('-NoProfile', '-File', $script:UtilsPs1, 'sandbox-context') + $Arguments
+        $argList = @('-NoProfile', '-File', $script:UtilsPs1, 'harness', 'report-sandbox') + $Arguments
         # Start-Process array arguments can mishandle paths with spaces on Unix;
         # pass a single quoted argument string.
         $argString = ($argList | ForEach-Object {

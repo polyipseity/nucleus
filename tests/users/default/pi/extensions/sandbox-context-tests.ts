@@ -82,7 +82,8 @@ describe("sandbox context CLI-driven injection", () => {
 		expect(calls).toHaveLength(1);
 		expect(calls[0]?.command).toBe("nucleus-utils");
 		expect(calls[0]?.args).toEqual([
-			"sandbox-context",
+			"harness",
+			"report-sandbox",
 			"pi",
 			"--format",
 			"text",
@@ -164,7 +165,8 @@ describe("sandbox context CLI-driven injection", () => {
 		);
 		await events.context?.(contextEvent([userMessage("hello")]));
 		expect(calls[0]?.args).toEqual([
-			"sandbox-context",
+			"harness",
+			"report-sandbox",
 			"pi",
 			"--format",
 			"text",

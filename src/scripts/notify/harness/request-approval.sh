@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Requests an approval decision for a harness tool call from the enabled sources.
 #
-#   harness-approval <harness> <tool> <summary> [timeout-seconds]
+#   nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]
 #       Prints that harness's decision document, so one command serves a hook:
 #         cursor  -> {"permission":"allow"|"ask"|"deny"}
 #         copilot -> {"hookSpecificOutput":{...,"permissionDecision":"…"}}
 #         others  -> plain allow | deny | ask
-#   harness-approval --plain <harness> <tool> <summary> [timeout-seconds]
+#   nucleus-utils harness request-approval --plain <harness> <tool> <summary> [timeout-seconds]
 #       Prints the decision word alone, for a caller that renders its own
-#       document. `harness-filter` consults the sources that way, so a call no
+#       document. `nucleus-utils harness decide-call` consults the sources that way, so a call no
 #       filter decides is answered by the same gate every other call uses.
 #
 # `ask` means "no source decided" and the harness falls back to its own local

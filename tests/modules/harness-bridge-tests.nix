@@ -1,9 +1,9 @@
 # tests/modules/harness-bridge-tests.nix: harness bridge wiring and default parity.
 #
-# Hook JSON files call nucleus-utils subcommands (harness-filter, harness-drive)
-# by bare PATH name, so one shared hook definition drives every platform. The
-# implementations stay in src/scripts/notify/ and are dispatched by
-# scripts/utils.sh/.ps1.
+# Hook JSON files call nested nucleus-utils harness subcommands (harness decide-call,
+# harness continue-turn) by bare PATH name, so one shared hook definition drives
+# every platform. The implementations stay in src/scripts/notify/harness/
+# and are dispatched by scripts/utils.sh and scripts/utils.ps1.
 #
 # Failures this test makes loud:
 #   1. a hook that names a command/shape no platform deploys: silent no-op;
@@ -20,10 +20,10 @@ let
 
   # Implementation scripts remain the source of truth for harness bridge logic.
   harnessImpls = [
-    "harness-approval"
-    "harness-drive"
-    "harness-filter"
-    "harness-notify"
+    "harness/continue-turn"
+    "harness/decide-call"
+    "harness/request-approval"
+    "harness/send-notification"
   ];
 
   guardPolicy = "/src/scripts/notify/filters/safe-delete.ts";
@@ -68,7 +68,7 @@ let
   # Filter/drive hooks are now invoked as: nucleus-utils harness decide-call <harness>
   # and nucleus-utils harness continue-turn <harness>.
   isUtilsSubcommand =
-    subcommand: command: builtins.match "nucleus-utils ${subcommand}( [a-z0-9_-]+)?" command != null;
+    subcommand: command: builtins.match "nucleus-utils ${subcommand}( [a-z0-9_-]+)+" command != null;
   filterEntries = builtins.filter (
     entry:
     isUtilsSubcommand "harness" entry.command
@@ -78,12 +78,12 @@ in
 {
   tests = builtins.filter (x: x != null) [
     # --- Implementation scripts exist for both platforms ---
-    (assert' (all (
-      name: builtins.pathExists (root + "/src/scripts/notify/${name}.sh")
-    ) harnessImpls) "every harness bridge implementation needs a POSIX script in src/scripts/notify/")
-    (assert' (all (
-      name: builtins.pathExists (root + "/src/scripts/notify/${name}.ps1")
-    ) harnessImpls) "every harness bridge implementation needs a Windows script in src/scripts/notify/")
+    (assert' (all (name: builtins.pathExists (root + "/src/scripts/notify/${name}.sh"))
+      harnessImpls
+    ) "every harness bridge implementation needs a POSIX script in src/scripts/notify/harness/")
+    (assert' (all (name: builtins.pathExists (root + "/src/scripts/notify/${name}.ps1"))
+      harnessImpls
+    ) "every harness bridge implementation needs a Windows script in src/scripts/notify/harness/")
 
     # --- Hooks resolve nucleus-utils by bare PATH name ---
     (assert' (all (entry: entryPointOf entry.command == "nucleus-utils") (

@@ -3,7 +3,7 @@
 # hook payload is forwarded verbatim to `send-notification.sh <harness> done`, so
 # the notification half has one definition.
 #
-# Usage: harness-drive <harness>
+# Usage: nucleus-utils harness continue-turn <harness>
 #   harness  pi | opencode | cursor | copilot
 #   stdin    the harness stop-hook payload, if any (JSON)
 #

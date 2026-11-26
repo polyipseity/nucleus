@@ -48,8 +48,8 @@ const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
  * `harness-notify.enable` is the master kill switch: with it off, this gate must
  * not add prompts pi would not otherwise show. The gate itself
  * (`harness-approval.sources`, `["prompt"]` by default) is read by the
- * `harness-approval` command this extension calls, so an empty list leaves pi's
- * own confirm.
+ * `nucleus-utils harness request-approval` command this extension calls, so
+ * an empty list leaves pi's own confirm.
  */
 function approvalEnabled(): boolean {
   try {

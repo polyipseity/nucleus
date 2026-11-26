@@ -443,7 +443,9 @@ _dispatch_subcommand_labels() {
 # completions (state-dispatched _subcmds arrays) or legacy 1:subcommand:((...)) specs.
 _completion_subcommand_labels() {
   if grep -q "1:subcommand:->subcmd" "$1" 2>/dev/null; then
-    sed -n '/subcmd)/,/^[[:space:]]*args)/p' "$1" |
+    # WHY: only the first _subcmds array is the top-level surface. Nested harness
+    # verbs have their own array later in the same generated file.
+    awk '/_subcmds=\(/ { in_list = 1; next } in_list && /^[[:space:]]*\)/ { exit } in_list { print }' "$1" |
       grep -oE "'[a-z][a-z0-9-]*:" |
       sed "s/^'//; s/:$//" |
       LC_ALL=C sort -u

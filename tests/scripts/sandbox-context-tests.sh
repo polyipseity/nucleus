@@ -41,9 +41,9 @@ _run_sc() { # <home> <sandbox_runtime|UNSET> [args...]
   local home="$1" runtime="$2"
   shift 2
   if [ "$runtime" = "UNSET" ]; then
-    env -u SANDBOX_RUNTIME HOME="$home" bash "$UTILS_SH" sandbox-context "$@"
+    env -u SANDBOX_RUNTIME HOME="$home" bash "$UTILS_SH" harness report-sandbox "$@"
   else
-    HOME="$home" SANDBOX_RUNTIME="$runtime" bash "$UTILS_SH" sandbox-context "$@"
+    HOME="$home" SANDBOX_RUNTIME="$runtime" bash "$UTILS_SH" harness report-sandbox "$@"
   fi
 }
 
@@ -51,9 +51,9 @@ _run_sc_stdin() { # <home> <runtime|UNSET> <stdin> [args...]
   local home="$1" runtime="$2" input="$3"
   shift 3
   if [ "$runtime" = "UNSET" ]; then
-    printf '%s' "$input" | env -u SANDBOX_RUNTIME HOME="$home" bash "$UTILS_SH" sandbox-context "$@"
+    printf '%s' "$input" | env -u SANDBOX_RUNTIME HOME="$home" bash "$UTILS_SH" harness report-sandbox "$@"
   else
-    printf '%s' "$input" | HOME="$home" SANDBOX_RUNTIME="$runtime" bash "$UTILS_SH" sandbox-context "$@"
+    printf '%s' "$input" | HOME="$home" SANDBOX_RUNTIME="$runtime" bash "$UTILS_SH" harness report-sandbox "$@"
   fi
 }
 

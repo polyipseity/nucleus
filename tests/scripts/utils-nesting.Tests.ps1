@@ -31,6 +31,19 @@ BeforeAll {
     }
   }
 
+  function Set-UtilsTestConfig {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param([Parameter(Mandatory)][string]$HomePath)
+    $path = Join-Path -Path $HomePath -ChildPath '.local/state/nucleus/config.json'
+    if (-not $PSCmdlet.ShouldProcess($path, 'write utils test config')) { return }
+    $config = @{
+      'harness-notify'   = @{ enable = $true }
+      'harness-approval' = @{ sources = @() }
+    }
+    $json = ConvertTo-Json -InputObject $config -Compress -Depth 10
+    [System.IO.File]::WriteAllText($path, $json, [System.Text.UTF8Encoding]::new($false))
+  }
+
   function Invoke-UtilsScript {
     param(
       [Parameter(Mandatory)][string]$HomePath,
@@ -157,31 +170,121 @@ Describe 'nucleus-utils harness nesting (PowerShell)' {
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
-  It 'reports merge-models as not implemented' {
+  It 'seeds an isolated home with merge-models and passes --check' {
     $testHome = New-UtilsTestHome
     try {
-      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'merge-models', '--check')
-      $result.ExitCode | Should -Not -Be 0
-      ($result.Stdout + $result.Stderr) | Should -Match 'not implemented'
+      $null = New-Item -ItemType Directory -Path (Join-Path -Path $testHome -ChildPath '.pi/agent') -Force
+      $target = Join-Path -Path $testHome -ChildPath '.pi/agent/models.json'
+      $seed = Invoke-UtilsScript -HomePath $testHome -Arguments @(
+        'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi'
+      )
+      $seed.ExitCode | Should -Be 0
+      Test-Path -LiteralPath $target -PathType Leaf | Should -BeTrue
+
+      $actual = Get-Content -LiteralPath $target -Raw | ConvertFrom-Json -AsHashtable
+      $payloadPath = Join-Path -Path $script:RepoRoot -ChildPath 'src/users/default/pi/litellm-models.json'
+      $expected = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json -AsHashtable
+      ($actual['providers']['litellm'] | ConvertTo-Json -Depth 10 -Compress) |
+        Should -Be ($expected | ConvertTo-Json -Depth 10 -Compress)
+
+      $check = Invoke-UtilsScript -HomePath $testHome -Arguments @(
+        'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi', '--check'
+      )
+      $check.ExitCode | Should -Be 0
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
-  It 'keeps legacy top-level harness-notify alias dispatching during A1/A2 transition' {
+  It 'fails --check after the isolated home config drifts' {
     $testHome = New-UtilsTestHome
     try {
-      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness-notify', 'pi', 'done', 'hello') -ExtraEnv @{ NUCLEUS_NOTIFY_DRY_RUN = '1' }
-      $result.ExitCode | Should -Be 0
-      ($result.Stdout + $result.Stderr) | Should -Not -Match 'unknown harness verb|is not recognized|Cannot validate argument'
+      $null = New-Item -ItemType Directory -Path (Join-Path -Path $testHome -ChildPath '.pi/agent') -Force
+      $target = Join-Path -Path $testHome -ChildPath '.pi/agent/models.json'
+      $seed = Invoke-UtilsScript -HomePath $testHome -Arguments @(
+        'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi'
+      )
+      $seed.ExitCode | Should -Be 0
+      $data = Get-Content -LiteralPath $target -Raw | ConvertFrom-Json -AsHashtable
+      $data['providers']['litellm']['api'] = 'stale-api'
+      [System.IO.File]::WriteAllText($target, ($data | ConvertTo-Json -Depth 10), [System.Text.UTF8Encoding]::new($false))
+
+      $check = Invoke-UtilsScript -HomePath $testHome -Arguments @(
+        'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi', '--check'
+      )
+      $check.ExitCode | Should -Not -Be 0
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
-  It 'keeps legacy top-level harness-approval -Plain alias forwarding' {
+  It 'forwards --command to check-deletion' {
     $testHome = New-UtilsTestHome
     try {
-      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness-approval', '-Plain', 'pi', 'run_command', 'ls')
+      Set-UtilsTestConfig -HomePath $testHome
+      $deletionWord = 'r' + 'm'
+      $commandText = "env -i $deletionWord -rf forwarding-probe"
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'check-deletion', '--command', $commandText)
       $result.ExitCode | Should -Be 0
-      $result.Stdout.Trim() | Should -Match '^(allow|deny|ask)$'
-      ($result.Stdout + $result.Stderr) | Should -Not -Match 'Cannot process argument transformation|TimeoutSeconds'
+      $result.Stdout | Should -Match '^ask\tunproven-redirect\tdeletion command: rm runs under env -i'
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'forwards --settings and --command to check-deletion' {
+    $testHome = New-UtilsTestHome
+    try {
+      Set-UtilsTestConfig -HomePath $testHome
+      $deletionWord = 'r' + 'm'
+      $commandText = "env -i $deletionWord -rf forwarding-settings"
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'check-deletion', '--settings', '{"unproven":"allow"}', '--command', $commandText)
+      $result.ExitCode | Should -Be 0
+      $result.Stdout | Should -Match '^allow\tunproven-redirect'
+      $result.Stdout | Should -Match 'settings.unproven allows an unproven redirect'
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'forwards --hook and stdin payload to check-deletion' {
+    $testHome = New-UtilsTestHome
+    try {
+      Set-UtilsTestConfig -HomePath $testHome
+      $nativeWord = '/bin/' + 'r' + 'm'
+      $payload = '{"tool_input":{"command":"' + $nativeWord + ' forwarding-hook"}}'
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'check-deletion', '--hook') -StdinText $payload
+      $result.ExitCode | Should -Be 2
+      $result.Stderr | Should -Match 'BLOCKED: native rm bypasses safe-delete protection'
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'forwards --plain to request-approval' {
+    $testHome = New-UtilsTestHome
+    try {
+      Set-UtilsTestConfig -HomePath $testHome
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'request-approval', '--plain', 'cursor', 'shelltool', 'forwarding summary')
+      $result.ExitCode | Should -Be 0
+      $result.Stdout.Trim() | Should -Be 'ask'
+      $result.Stderr | Should -Not -Match 'usage:'
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'forwards --format to report-sandbox' {
+    $testHome = New-UtilsTestHome
+    try {
+      Set-UtilsTestConfig -HomePath $testHome
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'report-sandbox', 'pi', '--format', 'claude', '--session-id', 'format-probe') -ExtraEnv @{ SANDBOX_RUNTIME = '1' }
+      $result.ExitCode | Should -Be 0
+      $doc = $result.Stdout | ConvertFrom-Json -AsHashtable
+      $doc.hookSpecificOutput.hookEventName | Should -Be 'UserPromptSubmit'
+      $record = Join-Path -Path $testHome -ChildPath '.local/share/nucleus/state/harness-bridge/sandbox/pi.json'
+      if ($IsMacOS) { $record = Join-Path -Path $testHome -ChildPath 'Library/Application Support/nucleus/state/harness-bridge/sandbox/pi.json' }
+      elseif ($IsWindows) { $record = Join-Path -Path $testHome -ChildPath 'AppData/Local/nucleus/state/harness-bridge/sandbox/pi.json' }
+      (Get-Content -LiteralPath $record -Raw | ConvertFrom-Json -AsHashtable).sessions.ContainsKey('format-probe') | Should -BeTrue
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'rejects every legacy top-level alias' {
+    $testHome = New-UtilsTestHome
+    try {
+      foreach ($alias in @('harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')) {
+        $result = Invoke-UtilsScript -HomePath $testHome -Arguments @($alias)
+        $result.ExitCode | Should -Not -Be 0
+        ($result.Stdout + $result.Stderr) | Should -Match 'unknown subcommand|Cannot validate argument|not a valid value for the Action variable'
+      }
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 }

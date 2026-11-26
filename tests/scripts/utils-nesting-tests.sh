@@ -9,9 +9,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-UTILS_SH="$SCRIPT_DIR/../../scripts/utils.sh"
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+UTILS_SH="$REPO_ROOT/scripts/utils.sh"
 
+require_command bash "utils harness tests run the dispatcher with bash from PATH"
 require_command jq "utils harness tests need jq"
+require_command python3 "the merge-models round trip reads and mutates JSON with Python"
+TEST_BASH="$(command -v bash)"
 
 # Run utils with a clean PATH that still has required tools but no nucleus-utils
 # side effects. Keep repo root stable for scripts that derive it.
@@ -20,7 +24,7 @@ run_utils_capture() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  /run/current-system/sw/bin/bash "$UTILS_SH" "$@" >"$out" 2>"$err" || rc=$?
+  "$TEST_BASH" "$UTILS_SH" "$@" >"$out" 2>"$err" || rc=$?
   printf '%s\t%s\t%s\n' "$rc" "$out" "$err"
 }
 
@@ -62,7 +66,7 @@ test_unknown_harness_verb_is_hard_error() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  /run/current-system/sw/bin/bash "$UTILS_SH" harness no-such-verb >"$out" 2>"$err" || rc=$?
+  "$TEST_BASH" "$UTILS_SH" harness no-such-verb >"$out" 2>"$err" || rc=$?
   if [ "$rc" -ne 0 ] &&
     grep -qi 'unknown' "$out" "$err" &&
     grep -q 'send-notification' "$out" "$err" &&
@@ -85,7 +89,7 @@ test_report_sandbox_reaches_sandbox_context_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  env -u SANDBOX_RUNTIME HOME="$home" /run/current-system/sw/bin/bash "$UTILS_SH" harness report-sandbox pi --format text --session-id s1 >"$out" 2>"$err" || rc=$?
+  env -u SANDBOX_RUNTIME HOME="$home" "$TEST_BASH" "$UTILS_SH" harness report-sandbox pi --format text --session-id s1 >"$out" 2>"$err" || rc=$?
   local record_linux record_macos found
   record_linux="$home/.local/share/nucleus/state/harness-bridge/sandbox/pi.json"
   record_macos="$home/Library/Application Support/nucleus/state/harness-bridge/sandbox/pi.json"
@@ -107,7 +111,7 @@ test_check_deletion_reaches_safe_delete_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  printf '%s' '{"tool_input":{"command":"echo hi"}}' | /run/current-system/sw/bin/bash "$UTILS_SH" harness check-deletion --hook >"$out" 2>"$err" || rc=$?
+  printf '%s' '{"tool_input":{"command":"echo hi"}}' | "$TEST_BASH" "$UTILS_SH" harness check-deletion --hook >"$out" 2>"$err" || rc=$?
   # hook mode: allow verdict exits 0 with no stdout; deny exits 2 with stderr.
   if [ "$rc" -eq 0 ]; then
     assert_pass "check-deletion reaches safe-delete implementation"
@@ -126,7 +130,7 @@ test_send_notification_reaches_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  /run/current-system/sw/bin/bash "$UTILS_SH" harness send-notification >"$out" 2>"$err" || rc=$?
+  "$TEST_BASH" "$UTILS_SH" harness send-notification >"$out" 2>"$err" || rc=$?
   # send-notification.sh exits 0 but warns on missing args
   if grep -qi 'send-notification\|usage' "$out" "$err"; then
     assert_pass "send-notification reaches send-notification implementation"
@@ -141,7 +145,7 @@ test_decide_call_reaches_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  printf '{}' | /run/current-system/sw/bin/bash "$UTILS_SH" harness decide-call cursor >"$out" 2>"$err" || rc=$?
+  printf '{}' | "$TEST_BASH" "$UTILS_SH" harness decide-call cursor >"$out" 2>"$err" || rc=$?
   if [ "$rc" -eq 0 ] && grep -q '"permission"' "$out"; then
     assert_pass "decide-call reaches decide-call implementation"
   else
@@ -158,7 +162,7 @@ test_request_approval_reaches_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  HOME="$home" /run/current-system/sw/bin/bash "$UTILS_SH" harness request-approval cursor bash ls 0 >"$out" 2>"$err" || rc=$?
+  HOME="$home" "$TEST_BASH" "$UTILS_SH" harness request-approval cursor bash ls 0 >"$out" 2>"$err" || rc=$?
   if [ "$rc" -eq 0 ] && grep -Eq '"permission"|"hookSpecificOutput"|allow|deny|ask' "$out"; then
     assert_pass "request-approval reaches request-approval implementation"
   else
@@ -175,7 +179,7 @@ test_continue_turn_reaches_implementation() {
   out="$(mktemp)"
   err="$(mktemp)"
   rc=0
-  HOME="$home" /run/current-system/sw/bin/bash "$UTILS_SH" harness continue-turn cursor >"$out" 2>"$err" || rc=$?
+  HOME="$home" "$TEST_BASH" "$UTILS_SH" harness continue-turn cursor >"$out" 2>"$err" || rc=$?
   # cursor with no queued prompt returns {}
   if [ "$rc" -eq 0 ] && grep -Eq '^\{\}|^\{\s*\}$' "$out"; then
     assert_pass "continue-turn reaches continue-turn implementation"
@@ -185,31 +189,82 @@ test_continue_turn_reaches_implementation() {
   rm -rf "$home" "$out" "$err"
 }
 
-test_merge_models_is_clear_not_implemented_error() {
-  local rc out err
-  out="$(mktemp)"
-  err="$(mktemp)"
+test_merge_models_round_trip_with_isolated_home() {
+  local home target out err rc payload_ok
+  home="$(mktemp -d)"
+  mkdir -p "$home/.pi/agent"
+  target="$home/.pi/agent/models.json"
+  out="$home/merge.out"
+  err="$home/merge.err"
+
   rc=0
-  /run/current-system/sw/bin/bash "$UTILS_SH" harness merge-models --check >"$out" 2>"$err" || rc=$?
-  if [ "$rc" -ne 0 ] && grep -qi 'not implemented' "$out" "$err"; then
-    assert_pass "merge-models fails clearly as not implemented"
-  else
-    assert_fail "merge-models fails clearly as not implemented" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+  "$TEST_BASH" "$UTILS_SH" harness merge-models --home "$home" --repo-root "$REPO_ROOT" --harness pi >"$out" 2>"$err" || rc=$?
+  payload_ok=0
+  if [ "$rc" -eq 0 ] && [ -f "$target" ]; then
+    if python3 - "$target" "$REPO_ROOT/src/users/default/pi/litellm-models.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+target = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+payload = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+assert target["providers"]["litellm"] == payload
+PY
+    then
+      payload_ok=1
+    fi
   fi
-  rm -f "$out" "$err"
+  if [ "$payload_ok" -eq 1 ]; then
+    assert_pass "merge-models seeds the LiteLLM payload into an isolated home"
+  else
+    assert_fail "merge-models seeds the LiteLLM payload into an isolated home" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+  fi
+
+  rc=0
+  "$TEST_BASH" "$UTILS_SH" harness merge-models --home "$home" --repo-root "$REPO_ROOT" --harness pi --check >"$out" 2>"$err" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    assert_pass "merge-models --check accepts the merged isolated home"
+  else
+    assert_fail "merge-models --check accepts the merged isolated home" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+  fi
+
+  python3 - "$target" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+data["providers"]["litellm"]["api"] = "stale-api"
+path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+PY
+  rc=0
+  "$TEST_BASH" "$UTILS_SH" harness merge-models --home "$home" --repo-root "$REPO_ROOT" --harness pi --check >"$out" 2>"$err" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "merge-models --check rejects a drifted isolated home"
+  else
+    assert_fail "merge-models --check rejects a drifted isolated home" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+  fi
+
+  rm -rf "$home"
 }
 
-test_legacy_top_level_alias_dispatches() {
-  local rc out err
+test_legacy_top_level_aliases_are_rejected() {
+  local alias rc out err detail
   out="$(mktemp)"
   err="$(mktemp)"
-  rc=0
-  NUCLEUS_NOTIFY_DRY_RUN=1 /run/current-system/sw/bin/bash "$UTILS_SH" harness-notify pi 'done' 'hello' >"$out" 2>"$err" || rc=$?
-  # harness-notify dry-run emits nothing; contract is exit 0 and no hard error.
-  if [ "$rc" -eq 0 ] && ! grep -qi 'error\|unknown harness' "$out" "$err"; then
-    assert_pass "legacy top-level harness-notify alias dispatches"
+  detail=""
+  for alias in harness-notify harness-approval harness-filter harness-drive sandbox-context safe-delete-guard; do
+    rc=0
+    "$TEST_BASH" "$UTILS_SH" "$alias" >"$out" 2>"$err" || rc=$?
+    if [ "$rc" -eq 0 ] || ! grep -qi 'unknown subcommand' "$out" "$err"; then
+      detail="$detail $alias(rc=$rc out=$(cat "$out") err=$(cat "$err"))"
+    fi
+  done
+  if [ -z "$detail" ]; then
+    assert_pass "legacy top-level aliases are rejected as unknown subcommands"
   else
-    assert_fail "legacy top-level harness-notify alias dispatches" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+    assert_fail "legacy top-level aliases are rejected as unknown subcommands" "$detail"
   fi
   rm -f "$out" "$err"
 }
@@ -223,7 +278,7 @@ test_send_notification_reaches_implementation
 test_decide_call_reaches_implementation
 test_request_approval_reaches_implementation
 test_continue_turn_reaches_implementation
-test_merge_models_is_clear_not_implemented_error
-test_legacy_top_level_alias_dispatches
+test_merge_models_round_trip_with_isolated_home
+test_legacy_top_level_aliases_are_rejected
 
 finish_tests

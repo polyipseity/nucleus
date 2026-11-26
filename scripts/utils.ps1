@@ -26,15 +26,12 @@
 .NOTES
   Maps to the optimize-pdf --preset and --rm-bak and strip-metadata --rm-bak options.
   Harness verbs dispatch to implementations in src/scripts/notify/ and to the
-  sandbox-context implementation in this script.
+  report-sandbox implementation in this script.
 #>
 
 [CmdletBinding(PositionalBinding = $false)]
 param(
-  # WHY: A1 nests harness verbs; A2 sweeps external references. Keep old
-  # top-level names accepted during the slice so existing callers remain
-  # functional; they dispatch to the same current implementations as bash.
-  [ValidateSet('optimize-pdf', 'strip-metadata', 'harness', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')]
+  [ValidateSet('optimize-pdf', 'strip-metadata', 'harness')]
   [string]$Action,
 
   [Parameter()]
@@ -77,7 +74,7 @@ param(
 . (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
-# check-suppress:suppression_doc: parameters are consumed via $PSBoundParameters in subcommand dispatch below
+# check-suppress:suppression_doc: named nested flags are forwarded via $PSBoundParameters in the harness switch below.
 $null = $PSBoundParameters
 
 $ErrorActionPreference = 'Stop'
@@ -769,38 +766,13 @@ switch ($Action) {
   }
 
   'harness' {
-    Invoke-NucleusHarness -Arguments $File
-  }
-
-  # Legacy top-level aliases kept for A1/A2 transition (bash keeps same names).
-  'harness-notify' {
-    Invoke-NucleusHarness -Arguments (@('send-notification') + $File)
-  }
-  'harness-filter' {
-    Invoke-NucleusHarness -Arguments (@('decide-call') + $File)
-  }
-  'harness-approval' {
-    $haArgs = @('request-approval')
-    if ($Plain) { $haArgs += '--plain' }
-    if ($File) { $haArgs += @($File) }
-    Invoke-NucleusHarness -Arguments $haArgs
-  }
-  'harness-drive' {
-    Invoke-NucleusHarness -Arguments (@('continue-turn') + $File)
-  }
-  'sandbox-context' {
-    $scArgs = @('report-sandbox')
-    if ($PSBoundParameters.ContainsKey('Format')) { $scArgs += @('--format', $Format) }
-    if ($PSBoundParameters.ContainsKey('SessionId')) { $scArgs += @('--session-id', $SessionId) }
-    if ($File) { $scArgs += @($File) }
-    Invoke-NucleusHarness -Arguments $scArgs
-  }
-  'safe-delete-guard' {
-    $sdgArgs = @('check-deletion')
-    if ($PSBoundParameters.ContainsKey('Settings')) { $sdgArgs += @('--settings', $Settings) }
-    if ($PSBoundParameters.ContainsKey('TargetCommand')) { $sdgArgs += @('--command', $TargetCommand) }
-    if ($Hook) { $sdgArgs += '--hook' }
-    if ($File) { $sdgArgs += @($File) }
-    Invoke-NucleusHarness -Arguments $sdgArgs
+    $harnessArgs = @($File)
+    if ($PSBoundParameters.ContainsKey('Format')) { $harnessArgs += @('--format', $Format) }
+    if ($PSBoundParameters.ContainsKey('SessionId')) { $harnessArgs += @('--session-id', $SessionId) }
+    if ($PSBoundParameters.ContainsKey('Settings')) { $harnessArgs += @('--settings', $Settings) }
+    if ($PSBoundParameters.ContainsKey('TargetCommand')) { $harnessArgs += @('--command', $TargetCommand) }
+    if ($Plain) { $harnessArgs += '--plain' }
+    if ($Hook) { $harnessArgs += '--hook' }
+    Invoke-NucleusHarness -Arguments $harnessArgs
   }
 }

@@ -186,23 +186,23 @@ export function defaultProbeRedirect(
 ): RedirectProbeResult {
 	const result = spawnSync(
 		"nucleus-utils",
-		["safe-delete-guard", "--command", "rm -rf __nucleus_status_probe__"],
+		["harness", "check-deletion", "--command", "rm -rf __nucleus_status_probe__"],
 		{ encoding: "utf8", env, timeout: 10_000 },
 	);
 
 	if (result.error) {
 		const err = result.error as NodeJS.ErrnoException;
 		if (err.code === "ENOENT") {
-			return { kind: "unavailable", reason: "safe-delete-guard not on PATH" };
+			return { kind: "unavailable", reason: "nucleus-utils not on PATH" };
 		}
-		return { kind: "unavailable", reason: `safe-delete-guard error: ${err.message}` };
+		return { kind: "unavailable", reason: `harness check-deletion error: ${err.message}` };
 	}
 
 	if (result.status !== 0 || result.signal !== null) {
 		const detail = [result.stderr?.trim(), result.status !== null ? `exit ${String(result.status)}` : null, result.signal]
 			.filter((part): part is string => typeof part === "string" && part.length > 0)
 			.join(", ");
-		return { kind: "unavailable", reason: `safe-delete-guard error: ${detail || "unknown error"}` };
+		return { kind: "unavailable", reason: `harness check-deletion error: ${detail || "unknown error"}` };
 	}
 
 	const stdout = result.stdout ?? "";
@@ -213,7 +213,7 @@ export function defaultProbeRedirect(
 	const verdict = parseRedirectVerdictLine(lines[lines.length - 1] ?? "");
 	if (verdict === null) {
 		const detail = result.stderr?.trim() || "no verdict";
-		return { kind: "unavailable", reason: `safe-delete-guard error: ${detail}` };
+		return { kind: "unavailable", reason: `harness check-deletion error: ${detail}` };
 	}
 	return verdict;
 }

@@ -28,9 +28,9 @@ function Sync-VSCodeConfig {
 
     keybindings uses a host-specific repo source file (keybindings.Windows.json)
     so Windows shortcuts stay independent of the MacBook and NixOS files.
-    chatLanguageModels.Windows.json is managed by a name-keyed merge
+    The live chatLanguageModels.json is managed by a name-keyed merge
     (Merge-VSChatLanguageModel) instead of a symlink, so VS Code can write model
-    updates back without breaking the repo link.
+    updates back without breaking the repo link. Its repo source stays host-keyed.
 
     Conflict handling applied to each item:
       Correct symlink   - no-op.

@@ -266,7 +266,15 @@ def _check_vscode_hosts(root: Path, entries: list[dict[str, Any]], errors: list[
             return
 
         for host in sorted(paths):
-            source = canonical_path.parent / Path(str(paths[host])).name
+            live_name = Path(str(paths[host])).name
+            if live_name != "chatLanguageModels.json":
+                errors.append(
+                    f"vscode:{host}: registry path basename must be chatLanguageModels.json, got {live_name}"
+                )
+                continue
+            # WHY: VS Code reads one unsuffixed live file, while drift validation
+            # compares against the host-keyed payloads kept in the repo tree.
+            source = canonical_path.parent / f"chatLanguageModels.{host}.json"
             try:
                 host_data = _load_json(source, "VS Code host payload")
                 if not isinstance(host_data, list):

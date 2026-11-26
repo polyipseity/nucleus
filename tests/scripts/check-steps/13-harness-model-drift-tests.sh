@@ -176,6 +176,21 @@ test_divergent_vscode_host_entry_fails() {
   remove_tree "$FIXTURE"
 }
 
+test_vscode_suffixed_live_path_fails() {
+  make_fixture vscode-basename
+  mutate_json "$FIXTURE/src/modules/configs/harness-models.json" \
+    "next(h for h in data['harnesses'] if h['harness'] == 'vscode')['path']['MacBook'] = '~/Library/Application Support/Code/User/chatLanguageModels.MacBook.json'"
+  local out="$WORK/vscode-basename.out"
+  local rc
+  rc="$(run_validator "$FIXTURE" "$out")"
+  if [ "$rc" -ne 0 ] && grep -q 'vscode:MacBook: registry path basename must be chatLanguageModels.json' "$out"; then
+    assert_pass "a suffixed VS Code live registry path fails"
+  else
+    assert_fail "a suffixed VS Code live registry path fails" "rc=$rc output=[$(cat "$out")]"
+  fi
+  remove_tree "$FIXTURE"
+}
+
 test_claude_stale_pin_fails() {
   make_fixture claude
   mutate_json "$FIXTURE/src/users/default/claude/litellm-env.json" \
@@ -291,6 +306,7 @@ test_extra_alias_fails
 test_wrong_token_limit_fails
 test_null_vs_declared_limit_fails
 test_divergent_vscode_host_entry_fails
+test_vscode_suffixed_live_path_fails
 test_claude_stale_pin_fails
 test_codex_stale_pin_fails
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nucleus-utils: optimize-pdf (Ghostscript), strip-metadata (mat2/exiftool),
-# harness notify/approval/filter/drive, and safe-delete-guard.
+# and harness notify/approval/filter/drive verbs.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -749,27 +749,6 @@ main() {
     ;;
   harness)
     do_harness "$@"
-    ;;
-  # WHY: A1 nests harness verbs; A2 sweeps external references. Keep the old
-  # top-level names dispatching to the same implementations so existing hooks,
-  # tests, and callers remain functional during the slice.
-  harness-notify)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness/send-notification.sh" "$@"
-    ;;
-  harness-approval)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness/request-approval.sh" "$@"
-    ;;
-  harness-filter)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness/decide-call.sh" "$@"
-    ;;
-  harness-drive)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness/continue-turn.sh" "$@"
-    ;;
-  sandbox-context)
-    do_sandbox_context "$@"
-    ;;
-  safe-delete-guard)
-    exec "$SCRIPT_DIR/../src/scripts/notify/filters/safe-delete.ts" "$@"
     ;;
   *)
     error "unknown subcommand: $subcommand"

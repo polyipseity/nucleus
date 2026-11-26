@@ -47,7 +47,7 @@ import sys, yaml
 cfg = yaml.safe_load(open(sys.argv[1]))
 matches = [
     m for m in cfg.get('model_list', [])
-    if (m.get('litellm_params') or {}).get('model') == 'openai/deepseek/deepseek-v4-flash'
+    if (m.get('litellm_params') or {}).get('model') == 'openai/deepseek/deepseek-v4.1-flash'
 ]
 if len(matches) != 1:
     print('NO-MATCH')

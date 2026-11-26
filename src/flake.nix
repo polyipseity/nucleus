@@ -818,7 +818,8 @@
             runtimeInputs = [
               pkgs.ghostscript
               pkgs.perlPackages.ImageExifTool
-              pkgs.python3
+              # WHY: the nested harness merge-models verb parses YAML model payloads.
+              (pkgs.python3.withPackages (p: [ p.pyyaml ]))
             ];
           };
           nucleus-gc = nucleusApp {

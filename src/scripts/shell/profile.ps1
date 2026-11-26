@@ -920,6 +920,7 @@ $nucleusUpdateFlags = @(
 )
 
 $nucleusUtilsFlags = @(
+  '--check',
   '--command',
   '--dialog',
   '--format',

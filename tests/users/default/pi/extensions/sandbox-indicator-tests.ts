@@ -432,7 +432,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("sandbox-context.inject-on-change: true");
 	});
 
-	test("reports unavailable when safe-delete-guard cannot be run because command is missing", async () => {
+	test("reports unavailable when harness check-deletion cannot be run because command is missing", async () => {
 		const report = await buildSandboxStatusReport(
 			{ mode: "print" },
 			{
@@ -441,11 +441,11 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 				commandPath: () => "not found",
 				readRegistryUnproven: () => "unavailable",
 				readInjectOnChange: () => true,
-				probeRedirect: () => ({ kind: "unavailable", reason: "safe-delete-guard not on PATH" }),
+				probeRedirect: () => ({ kind: "unavailable", reason: "nucleus-utils not on PATH" }),
 			},
 		);
 
-		expect(report).toContain("rm redirected: unavailable (safe-delete-guard not on PATH)");
+		expect(report).toContain("rm redirected: unavailable (nucleus-utils not on PATH)");
 		expect(report).toContain("nucleus-utils: missing");
 	});
 
@@ -515,7 +515,7 @@ describe("defaultProbeRedirect spawn path", () => {
 			scriptPath,
 			[
 				"#!/bin/sh",
-				'if [ "$1" = "safe-delete-guard" ] && [ "$2" = "--command" ]; then',
+				'if [ "$1" = "harness" ] && [ "$2" = "check-deletion" ] && [ "$3" = "--command" ]; then',
 				"  printf 'allow\\tproven-redirect\\tdeletion command: rm resolves to the fake safe-delete wrapper at /fake/bin/rm\\n'",
 				"  exit 0",
 				"fi",

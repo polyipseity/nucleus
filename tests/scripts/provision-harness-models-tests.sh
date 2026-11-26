@@ -38,7 +38,7 @@ for target in \
   "$HOME_DIR/.pi/agent/models.json" \
   "$HOME_DIR/.config/opencode/opencode.jsonc" \
   "$HOME_DIR/.claude/settings.json" \
-  "$HOME_DIR/.config/Code/User/chatLanguageModels.NixOS.json"; do
+  "$HOME_DIR/.config/Code/User/chatLanguageModels.json"; do
   if [ -f "$target" ]; then
     assert_pass "created $target"
   else
@@ -72,7 +72,7 @@ pi = json.loads((home / '.pi/agent/models.json').read_text())
 assert 'litellm' in pi['providers']
 claude = json.loads((home / '.claude/settings.json').read_text())
 assert claude['env']['ANTHROPIC_MODEL'] == 'default'
-vscode = json.loads((home / '.config/Code/User/chatLanguageModels.NixOS.json').read_text())
+vscode = json.loads((home / '.config/Code/User/chatLanguageModels.json').read_text())
 assert [item['name'] for item in vscode] == ['LiteLLM']
 PY
 then

@@ -2,7 +2,7 @@
 # Turns a harness hook payload into that harness's native decision document by
 # running the filters declared in the registry.
 #
-#   harness-filter <harness>
+#   nucleus-utils harness decide-call <harness>
 #       Reads the JSON hook payload on stdin and prints exactly one document, so
 #       one command serves every harness's hook definition:
 #         cursor           -> {"permission":"allow"|"ask"|"deny"}

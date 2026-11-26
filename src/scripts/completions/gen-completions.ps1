@@ -91,6 +91,26 @@ function Test-NucleusSpecFlagPlatform {
   return $values -contains $Platform
 }
 
+function Add-NucleusSpecFlagSet {
+  param(
+    [Parameter(Mandatory)]
+    [object]$Command,
+    [Parameter(Mandatory)]
+    [System.Collections.Generic.HashSet[string]]$FlagSet,
+    [Parameter(Mandatory)]
+    [string]$Platform
+  )
+  foreach ($f in @($Command.flags)) {
+    if ($null -ne $f -and $null -ne $f.long -and (Test-NucleusSpecFlagPlatform -Flag $f -Platform $Platform)) {
+      $null = $FlagSet.Add([string]$f.long) # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+    }
+  }
+  foreach ($sc in @($Command.subcommands)) {
+    if ($null -eq $sc) { continue }
+    Add-NucleusSpecFlagSet -Command $sc -FlagSet $FlagSet -Platform $Platform
+  }
+}
+
 function Get-NucleusSpecMap {
   $map = @{}
   if (-not $specAvailable) {
@@ -107,11 +127,8 @@ function Get-NucleusSpecMap {
       }
     }
     foreach ($sc in @($app.subcommands)) {
-      foreach ($f in @($sc.flags)) {
-        if ($null -ne $f -and $null -ne $f.long -and (Test-NucleusSpecFlagPlatform -Flag $f -Platform 'windows')) {
-          $null = $flags.Add([string]$f.long) # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
-        }
-      }
+      if ($null -eq $sc) { continue }
+      Add-NucleusSpecFlagSet -Command $sc -FlagSet $flags -Platform 'windows'
     }
     # Every app supports --help at the CLI surface; ensure it is present in inventory.
     $null = $flags.Add('--help') # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded

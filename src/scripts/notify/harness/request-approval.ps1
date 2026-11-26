@@ -8,8 +8,8 @@
   PreToolUse, Cursor beforeShellExecution, pi tool_call, opencode permission)
   calls this, then maps the printed decision onto its own response shape. With
   no -Plain the document is that harness's own vocabulary; with -Plain it is the
-  decision word alone, which is how harness-filter consults the same sources for
-  a call no filter decides.
+  decision word alone, which is how `nucleus-utils harness decide-call` consults
+  the same sources for a call no filter decides.
 
   Sources are independent and race when more than one is enabled; the first
   answer wins and the other is dropped:

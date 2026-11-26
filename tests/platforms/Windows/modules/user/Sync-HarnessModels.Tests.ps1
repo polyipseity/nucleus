@@ -40,9 +40,9 @@ Describe 'Sync-HarnessModel' {
                 @{
                     harness = 'vscode'
                     path    = @{
-                        MacBook = '~/Library/Application Support/Code/User/chatLanguageModels.MacBook.json'
-                        NixOS   = '~/.config/Code/User/chatLanguageModels.NixOS.json'
-                        Windows = '~/AppData/Roaming/Code/User/chatLanguageModels.Windows.json'
+                        MacBook = '~/Library/Application Support/Code/User/chatLanguageModels.json'
+                        NixOS   = '~/.config/Code/User/chatLanguageModels.json'
+                        Windows = '~/AppData/Roaming/Code/User/chatLanguageModels.json'
                     }
                     format  = 'json'
                     slot    = @{ kind = 'named-array-item'; arrayPath = '$'; matchKey = 'name'; matchValue = 'LiteLLM' }
