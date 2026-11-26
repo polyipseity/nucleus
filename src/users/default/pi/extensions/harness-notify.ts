@@ -1,6 +1,6 @@
 /**
  * Pi extension that routes pi lifecycle events to the shared harness
- * notification entry point (`harness-notify`, deployed to ~/.local/bin) and
+ * notification entry point (`nucleus-utils harness send-notification`) and
  * delivers prompts queued from a messaging channel (`/harness send pi <text>`).
  *
  * Two events matter for notification purposes:
@@ -11,7 +11,7 @@
  *   - `ui_prompt_start` - pi is blocked on the user (select/confirm/input/...).
  *
  * Only *when* to speak is decided here; channel selection and message
- * formatting belong to `harness-notify`.  Delivery is best-effort: a failing or
+ * formatting belong to `nucleus-utils harness send-notification`.  Delivery is best-effort: a failing or
  * slow notification must never break, block, or lengthen a session, so every
  * error is discarded.  pi runs inside srt, so the notification endpoints are
  * allowlisted in src/users/default/srt/settings.json.
@@ -103,7 +103,7 @@ export default function (pi: ExtensionAPI) {
   ): Promise<void> => {
     if (failures >= FAILED_NOTIFICATION_CAP) return;
     try {
-      const result = await pi.exec(NOTIFY_COMMAND, ["harness-notify", "pi", event, text], {
+      const result = await pi.exec(NOTIFY_COMMAND, ["harness", "send-notification", "pi", event, text], {
         timeout: NOTIFY_TIMEOUT_MS,
       });
       if (result.code !== 0) failures += 1;

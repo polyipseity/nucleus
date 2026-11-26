@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Suite for the approval gate's sources (src/scripts/notify/harness-approval.sh)
-# and for the runner that consults them (src/scripts/notify/harness-filter.sh).
+# Suite for the approval gate's sources (src/scripts/notify/harness/request-approval.sh)
+# and for the runner that consults them (src/scripts/notify/harness/decide-call.sh).
 #
 # The gate has two independent sources and a matrix of ways to configure them, so
 # the cases run the shipped scripts against a config file this suite writes, and
@@ -26,8 +26,8 @@ readonly SCRIPT_DIR REPO_ROOT
 init_test_state
 ensure_safe_rm_env
 
-APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
-RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
+APPROVAL="$REPO_ROOT/src/scripts/notify/harness/request-approval.sh"
+RUNNER="$REPO_ROOT/src/scripts/notify/harness/decide-call.sh"
 readonly APPROVAL RUNNER
 
 require_command jq "the approval gate reads its config, writes requests, and parses responses with jq"

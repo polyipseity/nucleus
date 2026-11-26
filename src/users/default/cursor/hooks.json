@@ -1,1 +1,1 @@
-{"hooks":{"beforeMCPExecution":[{"command":"nucleus-utils harness-filter cursor","timeout":3600}],"beforeShellExecution":[{"command":"nucleus-utils harness-filter cursor","timeout":3600}],"stop":[{"command":"nucleus-utils harness-drive cursor","timeout":130}]},"version":1}
+{"hooks":{"beforeMCPExecution":[{"command":"nucleus-utils harness decide-call cursor","timeout":3600}],"beforeShellExecution":[{"command":"nucleus-utils harness decide-call cursor","timeout":3600}],"stop":[{"command":"nucleus-utils harness continue-turn cursor","timeout":130}]},"version":1}

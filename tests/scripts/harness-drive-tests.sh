@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test: harness-drive.sh contract, the turn-end entry point announces the
+# Test: continue-turn.sh contract, the turn-end entry point announces the
 # finished turn, consumes exactly one prompt queued by `/harness send`, and
 # renders the continuation in the calling harness's own document shape.
 #
@@ -12,7 +12,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-DRIVE="$SCRIPT_DIR/../../src/scripts/notify/harness-drive.sh"
+DRIVE="$SCRIPT_DIR/../../src/scripts/notify/harness/continue-turn.sh"
 
 require_command mktemp "temporary directories for the harness home"
 require_command jq "queue payloads and expected documents"

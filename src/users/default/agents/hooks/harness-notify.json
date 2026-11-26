@@ -1,1 +1,1 @@
-{"hooks":{"PreToolUse":[{"type":"command","command":"nucleus-utils harness-filter copilot","timeout":3600}],"Stop":[{"type":"command","command":"nucleus-utils harness-drive copilot","timeout":130}]}}
+{"hooks":{"PreToolUse":[{"type":"command","command":"nucleus-utils harness decide-call copilot","timeout":3600}],"Stop":[{"type":"command","command":"nucleus-utils harness continue-turn copilot","timeout":130}]}}

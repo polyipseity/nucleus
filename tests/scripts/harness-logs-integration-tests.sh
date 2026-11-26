@@ -16,9 +16,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 
-APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
-NOTIFY="$REPO_ROOT/src/scripts/notify/harness-notify.sh"
-RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
+APPROVAL="$REPO_ROOT/src/scripts/notify/harness/request-approval.sh"
+NOTIFY="$REPO_ROOT/src/scripts/notify/harness/send-notification.sh"
+RUNNER="$REPO_ROOT/src/scripts/notify/harness/decide-call.sh"
 LOGS="$REPO_ROOT/scripts/logs.sh"
 readonly APPROVAL NOTIFY RUNNER LOGS
 

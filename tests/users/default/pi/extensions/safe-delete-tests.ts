@@ -25,7 +25,7 @@ import createSafeDeleteExtension, {
 } from "../../../../../src/users/default/pi/extensions/safe-delete.ts";
 
 const REPO_ROOT = process.cwd();
-const RUNNER_PATH = join(REPO_ROOT, "src/scripts/notify/harness-filter.sh");
+const RUNNER_PATH = join(REPO_ROOT, "src/scripts/notify/harness/decide-call.sh");
 const ESC = String.fromCharCode(27);
 
 const originalNoColor = process.env.NO_COLOR;

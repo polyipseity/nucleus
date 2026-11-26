@@ -42,18 +42,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/bash-guard.sh
-. "$SCRIPT_DIR/../lib/bash-guard.sh"
-bash_guard_require 5 1 harness-approval
-# shellcheck source=../lib/lib.sh
-. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../../lib/bash-guard.sh
+. "$SCRIPT_DIR/../../lib/bash-guard.sh"
+bash_guard_require 5 1 request-approval
+# shellcheck source=../../lib/lib.sh
+. "$SCRIPT_DIR/../../lib/lib.sh"
 # WHY the shared library, not a log path: nucleus-logs owns the log root, the
 # line format, and the append, so the gate cannot drift from the log it writes
 # into.
-# shellcheck source=../lib/logs.sh
-. "$SCRIPT_DIR/../lib/logs.sh"
-# shellcheck source=../lib/harness-audit.sh
-. "$SCRIPT_DIR/../lib/harness-audit.sh"
+# shellcheck source=../../lib/logs.sh
+. "$SCRIPT_DIR/../../lib/logs.sh"
+# shellcheck source=../../lib/harness-audit.sh
+. "$SCRIPT_DIR/../../lib/harness-audit.sh"
 
 _ha_start_ms="$(harness_audit_now_ms)"
 # Which source answered: the audit line records it, and `none` means no source
@@ -64,7 +64,7 @@ _ha_decided_by=""
 _ha_id=""
 
 _ha_usage() {
-  warn "usage: harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds]"
+  warn "usage: nucleus-utils harness request-approval [--plain] <harness> <tool> <summary> [timeout-seconds]"
 }
 
 # WHY no flag parsing library: one modifier is the whole vocabulary, and a
@@ -290,7 +290,7 @@ if [ "$_ha_hermes" -eq 1 ]; then
   # WHY best-effort: the request file is the source of truth, so a failed
   # notification only means the user reads /harness status instead of being
   # pinged.
-  if ! "$SCRIPT_DIR/harness-notify.sh" "$_ha_harness" approval \
+  if ! "$SCRIPT_DIR/send-notification.sh" "$_ha_harness" approval \
     "$_ha_tool: $_ha_summary (reply /harness approve $_ha_id)"; then
     warn "approval notification failed: the request is still visible via /harness status"
   fi

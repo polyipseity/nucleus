@@ -30,18 +30,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/bash-guard.sh
-. "$SCRIPT_DIR/../lib/bash-guard.sh"
-bash_guard_require 5 1 harness-notify
-# shellcheck source=../lib/lib.sh
-. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../../lib/bash-guard.sh
+. "$SCRIPT_DIR/../../lib/bash-guard.sh"
+bash_guard_require 5 1 send-notification
+# shellcheck source=../../lib/lib.sh
+. "$SCRIPT_DIR/../../lib/lib.sh"
 # WHY the shared library, not a log path: nucleus-logs owns the log root, the
 # line format, and the append, so every notification lands where the gate's own
 # decisions do.
-# shellcheck source=../lib/logs.sh
-. "$SCRIPT_DIR/../lib/logs.sh"
-# shellcheck source=../lib/harness-audit.sh
-. "$SCRIPT_DIR/../lib/harness-audit.sh"
+# shellcheck source=../../lib/logs.sh
+. "$SCRIPT_DIR/../../lib/logs.sh"
+# shellcheck source=../../lib/harness-audit.sh
+. "$SCRIPT_DIR/../../lib/harness-audit.sh"
 
 _hn_start="$(harness_audit_now_ms)"
 
@@ -65,7 +65,7 @@ _hn_event="${2-}"
 _hn_text="${3-}"
 
 if [ -z "$_hn_harness" ] || [ -z "$_hn_event" ]; then
-  warn "usage: harness-notify <harness> <event> [text]"
+  warn "usage: nucleus-utils harness send-notification <harness> <event> [text]"
   exit 0
 fi
 

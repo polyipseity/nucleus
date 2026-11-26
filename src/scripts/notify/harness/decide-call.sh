@@ -39,18 +39,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/bash-guard.sh
-. "$SCRIPT_DIR/../lib/bash-guard.sh"
-bash_guard_require 5 1 harness-filter
-# shellcheck source=../lib/lib.sh
-. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../../lib/bash-guard.sh
+. "$SCRIPT_DIR/../../lib/bash-guard.sh"
+bash_guard_require 5 1 decide-call
+# shellcheck source=../../lib/lib.sh
+. "$SCRIPT_DIR/../../lib/lib.sh"
 # WHY the shared library, not a log path: nucleus-logs owns the log root, the
 # line format, and the append, so the runner cannot drift from the log it writes
 # into.
-# shellcheck source=../lib/logs.sh
-. "$SCRIPT_DIR/../lib/logs.sh"
-# shellcheck source=../lib/harness-audit.sh
-. "$SCRIPT_DIR/../lib/harness-audit.sh"
+# shellcheck source=../../lib/logs.sh
+. "$SCRIPT_DIR/../../lib/logs.sh"
+# shellcheck source=../../lib/harness-audit.sh
+. "$SCRIPT_DIR/../../lib/harness-audit.sh"
 
 _hf_start="$(harness_audit_now_ms)"
 
@@ -64,10 +64,10 @@ fi
 # reported to the next. Best-effort: recording must never affect the filter
 # decision.
 if [ -n "$_hf_harness" ]; then
-  if [ -f "$SCRIPT_DIR/../../../scripts/utils.sh" ]; then
-    printf '%s' "$_hf_payload" | bash "$SCRIPT_DIR/../../../scripts/utils.sh" sandbox-context "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+  if [ -f "$SCRIPT_DIR/../../../../scripts/utils.sh" ]; then
+    printf '%s' "$_hf_payload" | bash "$SCRIPT_DIR/../../../../scripts/utils.sh" harness report-sandbox "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
   elif command -v nucleus-utils >/dev/null 2>&1; then
-    printf '%s' "$_hf_payload" | nucleus-utils sandbox-context "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+    printf '%s' "$_hf_payload" | nucleus-utils harness report-sandbox "$_hf_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
   fi
 fi
 
@@ -136,7 +136,7 @@ _hf_finish() { # <decision> <reason> [runner-rule]
   # No filter decided, so the configured approval sources answer instead: the
   # same gate every harness hook passes through, asked for the decision word
   # alone because the reason below is this runner's to render.
-  _hf_resolver="$SCRIPT_DIR/harness-approval.sh"
+  _hf_resolver="$SCRIPT_DIR/request-approval.sh"
   if [ ! -f "$_hf_resolver" ]; then
     warn "no approval resolver at $_hf_resolver: asking locally"
   elif ! _hf_option="$("$_hf_resolver" --plain "$_hf_harness" "$_hf_tool" "$_hf_description")"; then
@@ -228,7 +228,7 @@ while IFS= read -r _hf_entry; do
   fi
   _hf_id="$(jq -r '.id' <<<"$_hf_entry")"
   _hf_settings="$(jq -c '.settings' <<<"$_hf_entry")"
-  _hf_filter="$SCRIPT_DIR/filters/$_hf_id.ts"
+  _hf_filter="$SCRIPT_DIR/../filters/$_hf_id.ts"
   _hf_line=""
   if [ ! -f "$_hf_filter" ]; then
     _hf_line="$(printf 'ask\tfilter-error\tno filter script at %s' "$_hf_filter")"

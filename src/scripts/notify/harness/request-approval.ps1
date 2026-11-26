@@ -4,7 +4,7 @@
   (Windows).
 
 .DESCRIPTION
-  Windows twin of harness-approval.sh. A harness hook (VS Code Copilot
+  Windows twin of request-approval.sh. A harness hook (VS Code Copilot
   PreToolUse, Cursor beforeShellExecution, pi tool_call, opencode permission)
   calls this, then maps the printed decision onto its own response shape. With
   no -Plain the document is that harness's own vocabulary; with -Plain it is the
@@ -25,7 +25,7 @@
   timeout is the ceiling: the hook files declare 3600 s, which outlasts any human
   answer and still ends a session that nobody is watching.
 
-  Invoked as `nucleus-utils harness-approval ...` via scripts/utils.{sh,ps1}.
+  Invoked as `nucleus-utils harness request-approval ...` via scripts/utils.{sh,ps1}.
   Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
   shim deployed by Sync-NucleusAppShim.ps1). The sibling harness-bridge-common.ps1
   is dot-sourced for shared helpers.
@@ -52,10 +52,10 @@
   Print the decision word alone instead of the harness's document.
 
 .EXAMPLE
-  pwsh -NoProfile -File harness-approval.ps1 cursor Shell 'git push --force'
+  pwsh -NoProfile -File request-approval.ps1 cursor Shell 'git push --force'
 
 .EXAMPLE
-  pwsh -NoProfile -File harness-approval.ps1 -Plain copilot runInTerminal 'rm -rf x'
+  pwsh -NoProfile -File request-approval.ps1 -Plain copilot runInTerminal 'rm -rf x'
 
 .NOTES
   Exit codes: always 0.
@@ -88,7 +88,7 @@ param(
   [switch]$Plain
 )
 
-. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+. (Join-Path $PSScriptRoot '..\..\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
@@ -96,7 +96,7 @@ $ErrorActionPreference = 'Stop'
 
 # WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
-. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
+. (Join-Path -Path $PSScriptRoot -ChildPath '../harness-bridge-common.ps1')
 
 # WHY script scope: the audit line is written once, at the single exit every
 # path funnels through, so the start time, the answering source, and the input
@@ -383,7 +383,7 @@ function Request-HarnessApproval {
     }
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not sweep stale harness-bridge state'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not sweep stale harness-bridge state'
   }
 
   $requestId = ([guid]::NewGuid().ToString('N')).Substring(0, 8)
@@ -413,11 +413,11 @@ function Request-HarnessApproval {
   # notification only means the user looks at /harness status instead of being
   # pinged.
   try {
-    & (Join-Path -Path $PSScriptRoot -ChildPath 'harness-notify.ps1') $Harness approval `
+    & (Join-Path -Path $PSScriptRoot -ChildPath 'send-notification.ps1') $Harness approval `
       "$Tool`: $Summary (reply /harness approve $requestId)"
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'approval notification failed: the request is still visible via /harness status'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'approval notification failed: the request is still visible via /harness status'
   }
 
   return @{ Id = $requestId; RequestPath = $requestPath; ResponsePath = $responsePath }
@@ -484,7 +484,7 @@ function Wait-HarnessApproval {
   if ($promptLive) {
     try { $console = Open-HarnessApprovalConsole }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'no console for the prompt source: asking locally'
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'no console for the prompt source: asking locally'
       $promptLive = $false
     }
   }
@@ -496,7 +496,7 @@ function Wait-HarnessApproval {
       $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length)
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not write to the console: asking locally'
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not write to the console: asking locally'
       $promptLive = $false
       $pending = $null
     }
@@ -521,7 +521,7 @@ function Wait-HarnessApproval {
         }
       }
       catch {
-        Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'unreadable approval response: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'unreadable approval response: asking locally'
       }
       if (-not [string]::IsNullOrEmpty($decision)) { break }
     }
@@ -543,12 +543,12 @@ function Wait-HarnessApproval {
       catch {
         # A closed console faults the pending read, which is the same situation as
         # a console that was never there.
-        Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the console closed before an answer: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
         $promptLive = $false
         $pending = $null
       }
       if ($answered -and $bytesRead -le 0) {
-        Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the console closed before an answer: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
         $promptLive = $false
         $pending = $null
       }
@@ -578,7 +578,7 @@ function Wait-HarnessApproval {
         # again rather than decide on either.
         try { $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length) }
         catch {
-          Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the console closed before an answer: asking locally'
+          Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
           $promptLive = $false
           $pending = $null
         }
@@ -599,7 +599,7 @@ function Wait-HarnessApproval {
       $closer.Flush()
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not write to the console'
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not write to the console'
     }
     $console.In.Dispose()
     $console.Out.Dispose()
@@ -655,7 +655,7 @@ function Complete-HarnessApproval {
       -StartTime $script:auditStart -Id $script:requestId
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
   Write-Output (ConvertTo-HarnessApprovalDocument -Harness $Harness -Decision $final -Plain:$Plain)
   exit 0
@@ -672,7 +672,7 @@ try {
   $script:auditDigest = Get-HarnessBridgeDigest -Text "$toolName`t$summaryText"
 
   if ([string]::IsNullOrWhiteSpace($harnessName)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'usage: harness-approval <harness> <tool> <summary> [timeout-seconds]'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'usage: nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]'
     Write-Output 'ask'
     exit 0
   }
@@ -680,17 +680,17 @@ try {
   $configPath = Get-HarnessBridgeConfigPath
 
   if ([string]::IsNullOrWhiteSpace($toolName)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'usage: harness-approval <harness> <tool> <summary> [timeout-seconds]'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'usage: nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]'
     Complete-HarnessApproval -Harness $harnessName -Tool '' -Summary '' -Decision 'ask' -Plain:$Plain
   }
   if ($TimeoutSeconds -lt -1) {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the timeout argument must be a whole number of seconds'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the timeout argument must be a whole number of seconds'
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
   try { $config = Get-HarnessBridgeApprovalConfig -ConfigPath $configPath }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not parse nucleus config: asking locally'
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not parse nucleus config: asking locally'
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
@@ -702,7 +702,7 @@ try {
   # call is answered `ask` at once and the harness keeps its own prompt.
   try { $sourceName = Resolve-HarnessApprovalSource -Config $config['harness-approval'] }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "$($_.Exception.Message): asking locally"
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "$($_.Exception.Message): asking locally"
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
   try {
@@ -710,7 +710,7 @@ try {
     $hermesTimeout = Get-HarnessApprovalSourceTimeout -Config $config['harness-approval'] -Source 'hermes'
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "$($_.Exception.Message): asking locally"
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "$($_.Exception.Message): asking locally"
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
   if ($TimeoutSeconds -ge 0) {
@@ -736,7 +736,7 @@ try {
         -WindowSeconds $windowSeconds -UserRoot (Get-HarnessBridgeUserRoot)
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not publish the approval request: asking locally ($($_.Exception.Message))"
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not publish the approval request: asking locally ($($_.Exception.Message))"
       Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
     }
     $requestPath = $request.RequestPath
@@ -761,7 +761,7 @@ try {
 catch {
   # Fail open: an unreachable broker or an unwritable state directory must not
   # wedge the harness, and must not silently authorise anything either.
-  Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message $_.Exception.Message
+  Write-HarnessBridgeWarning -CommandName 'request-approval' -Message $_.Exception.Message
   $fallbackHarness = if ([string]::IsNullOrWhiteSpace($harnessName)) { 'other' } else { $harnessName }
   # WHY its own try: this is the crash path a review looks for, so it is audited
   # rather than only printed, and logging here must not break the document either.
@@ -771,7 +771,7 @@ catch {
       -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
   Write-Output (ConvertTo-HarnessApprovalDocument -Harness $fallbackHarness -Decision 'ask' -Plain:$Plain)
 }

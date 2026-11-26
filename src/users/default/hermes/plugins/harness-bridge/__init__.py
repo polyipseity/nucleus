@@ -23,7 +23,7 @@ State lives under the nucleus user root (``<root>/state/harness-bridge``):
     commands/<harness>/   written by /harness send, read by the harness adapter
 
 The adapter side is a hook in each harness plus the shared
-``harness-notify``/``harness-approval`` scripts; the plugin never talks to a
+`nucleus-utils harness send-notification` / `nucleus-utils harness request-approval` scripts; the plugin never talks to a
 harness process directly, so a harness that is not running simply leaves its
 requests unanswered and the adapter falls back to asking locally.
 """
@@ -42,7 +42,7 @@ from typing import Any, Dict, List, Optional
 COMMAND_NAME = "harness"
 
 # Stale-request housekeeping deliberately lives in the writer/consumer rather
-# than here: harness-approval sweeps entries older than four times its approval
+# than here: request-approval sweeps entries older than four times its approval
 # window and removes its own request once it is answered or times out, so the
 # plugin has nothing to expire and must not grow a second, drifting lifetime.
 
@@ -343,7 +343,7 @@ def _record_sandbox_context_best_effort() -> None:
     handling."""
     try:
         subprocess.run(
-            ["nucleus-utils", "sandbox-context", "hermes", "--format", "check"],
+            ["nucleus-utils", "harness", "report-sandbox", "hermes", "--format", "check"],
             check=False,
             timeout=5,
             stdout=subprocess.DEVNULL,

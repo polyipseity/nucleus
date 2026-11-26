@@ -145,7 +145,7 @@ Describe 'nucleus-utils harness nesting (PowerShell)' {
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
-  It 'routes report-sandbox to sandbox-context implementation' {
+  It 'routes report-sandbox to report-sandbox implementation' {
     $testHome = New-UtilsTestHome
     try {
       $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'report-sandbox', 'pi', '--format', 'text', '--session-id', 's1') -ExtraEnv @{ SANDBOX_RUNTIME = '1' }

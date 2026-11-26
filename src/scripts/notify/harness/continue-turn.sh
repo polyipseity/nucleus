@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ends a harness turn: notify, then inject one queued remote prompt. The stdin
-# hook payload is forwarded verbatim to `harness-notify.sh <harness> done`, so
+# hook payload is forwarded verbatim to `send-notification.sh <harness> done`, so
 # the notification half has one definition.
 #
 # Usage: harness-drive <harness>
@@ -30,18 +30,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/bash-guard.sh
-. "$SCRIPT_DIR/../lib/bash-guard.sh"
-bash_guard_require 5 1 harness-drive
-# shellcheck source=../lib/lib.sh
-. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../../lib/bash-guard.sh
+. "$SCRIPT_DIR/../../lib/bash-guard.sh"
+bash_guard_require 5 1 continue-turn
+# shellcheck source=../../lib/lib.sh
+. "$SCRIPT_DIR/../../lib/lib.sh"
 # WHY the shared library, not a log path: nucleus-logs owns the log root, the
 # line format, and the append, so a dropped prompt is recorded beside every gate
 # decision.
-# shellcheck source=../lib/logs.sh
-. "$SCRIPT_DIR/../lib/logs.sh"
-# shellcheck source=../lib/harness-audit.sh
-. "$SCRIPT_DIR/../lib/harness-audit.sh"
+# shellcheck source=../../lib/logs.sh
+. "$SCRIPT_DIR/../../lib/logs.sh"
+# shellcheck source=../../lib/harness-audit.sh
+. "$SCRIPT_DIR/../../lib/harness-audit.sh"
 
 _hd_start="$(harness_audit_now_ms)"
 
@@ -63,7 +63,7 @@ _hd_audit() {
 _hd_harness="${1-}"
 
 if [ -z "$_hd_harness" ]; then
-  warn "usage: harness-drive <harness>"
+  warn "usage: nucleus-utils harness continue-turn <harness>"
   exit 0
 fi
 
@@ -129,16 +129,16 @@ fi
 # Record sandbox state for this harness so a transition seen by one agent is
 # reported to the next. Best-effort: recording must never affect driving.
 if [ -n "$_hd_harness" ]; then
-  if [ -f "$SCRIPT_DIR/../../../scripts/utils.sh" ]; then
-    printf '%s' "$_hd_payload" | bash "$SCRIPT_DIR/../../../scripts/utils.sh" sandbox-context "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+  if [ -f "$SCRIPT_DIR/../../../../scripts/utils.sh" ]; then
+    printf '%s' "$_hd_payload" | bash "$SCRIPT_DIR/../../../../scripts/utils.sh" harness report-sandbox "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
   elif command -v nucleus-utils >/dev/null 2>&1; then
-    printf '%s' "$_hd_payload" | nucleus-utils sandbox-context "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+    printf '%s' "$_hd_payload" | nucleus-utils harness report-sandbox "$_hd_harness" --format check >/dev/null 2>&1 || true # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
   fi
 fi
 
 # The notification half shares one implementation; an empty payload still means
 # "the turn finished", which is what harness-notify turns into its default body.
-if ! printf '%s' "$_hd_payload" | "$SCRIPT_DIR/harness-notify.sh" "$_hd_harness" "done"; then
+if ! printf '%s' "$_hd_payload" | "$SCRIPT_DIR/send-notification.sh" "$_hd_harness" "done"; then
   warn "notification failed: continuing to the queued prompt"
 fi
 

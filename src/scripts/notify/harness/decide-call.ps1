@@ -4,7 +4,7 @@
   running the filters declared in the registry (Windows).
 
 .DESCRIPTION
-  Windows twin of harness-filter.sh. Reads the JSON hook payload on stdin and
+  Windows twin of decide-call.sh. Reads the JSON hook payload on stdin and
   prints exactly one document, so one command serves every harness's hook
   definition:
 
@@ -37,7 +37,7 @@
   decision here" and is then put to the configured approval sources, which
   answer allow or deny for a call no filter decides: the runner never allows by
   omission, because that would remove prompting the harness would otherwise do.
-  The sources are consulted through the sibling harness-approval.ps1 with
+  The sources are consulted through the sibling request-approval.ps1 with
   -Plain, so this runner renders the document and the resolver only states the
   decision.
 
@@ -49,7 +49,7 @@
   Harness that called the hook (cursor, copilot, claude, opencode, pi, codex).
 
 .EXAMPLE
-  '{"command":"/bin/rm -rf x"}' | pwsh -NoProfile -File harness-filter.ps1 copilot
+  '{"command":"/bin/rm -rf x"}' | pwsh -NoProfile -File decide-call.ps1 copilot
 
 .NOTES
   Exit codes: always 0.
@@ -64,7 +64,7 @@ param(
   [string]$Harness
 )
 
-. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+. (Join-Path $PSScriptRoot '..\..\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
@@ -72,7 +72,7 @@ $ErrorActionPreference = 'Stop'
 
 # WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
-. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
+. (Join-Path -Path $PSScriptRoot -ChildPath '../harness-bridge-common.ps1')
 
 # WHY script scope: the runner records its verdict at the single exit it funnels
 # through, so the start time, the input fingerprint, and the filter that spoke
@@ -294,7 +294,7 @@ function Invoke-HarnessFilterList {
     [string]$Payload
   )
 
-  $filterDir = Join-Path -Path $PSScriptRoot -ChildPath 'filters'
+  $filterDir = Join-Path -Path $PSScriptRoot -ChildPath '../filters'
   # WHY an empty Decision: "no filter spoke" is not a verdict. The caller answers
   # ask for it, while a filter that allows deliberately still outranks it.
   $best = @{ Decision = ''; Reason = ''; Filter = ''; Rule = '' }
@@ -305,7 +305,7 @@ function Invoke-HarnessFilterList {
   if ($null -eq $bunCommand) {
     # WHY a warning and not a throw: a missing runtime must not abort the hook,
     # and this line is what reaches a human, matching the POSIX twin.
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'bun is not on PATH, so no filter can run: asking locally'
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'bun is not on PATH, so no filter can run: asking locally'
   }
 
   foreach ($item in $Entry) {
@@ -396,7 +396,7 @@ function Write-HarnessFilterAudit {
       -Summary $Summary -Digest $script:auditDigest -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not write the harness audit log: $($_.Exception.Message)"
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
 }
 
@@ -454,16 +454,16 @@ function Complete-HarnessFilter {
     exit 0
   }
 
-  $resolverPath = Join-Path -Path $PSScriptRoot -ChildPath 'harness-approval.ps1'
+  $resolverPath = Join-Path -Path $PSScriptRoot -ChildPath 'request-approval.ps1'
   if (-not (Test-Path -LiteralPath $resolverPath -PathType Leaf)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "no approval resolver at ${resolverPath}: asking locally"
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "no approval resolver at ${resolverPath}: asking locally"
   }
   else {
     $pwshPath = [Environment]::ProcessPath
     $lines = @(& $pwshPath -NoProfile -File $resolverPath -Plain -Harness $Harness -Tool $Tool -Summary $Summary |
         ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
     if ($LASTEXITCODE -ne 0) {
-      Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'the approval resolver failed: asking locally'
+      Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'the approval resolver failed: asking locally'
     }
     elseif ($lines.Count -ge 1 -and $lines[$lines.Count - 1] -cin @('allow', 'deny')) {
       Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $lines[$lines.Count - 1] -Reason 'harness-approval (source)')
@@ -485,12 +485,12 @@ try {
   # decision.
   if (-not [string]::IsNullOrEmpty($Harness)) {
     try {
-      $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../scripts/utils.ps1'
+      $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../scripts/utils.ps1'
       if (Test-Path -LiteralPath $utilsPath -PathType Leaf) {
         $pwshPath = [Environment]::ProcessPath
-        $null = $payload | & $pwshPath -NoProfile -File $utilsPath sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+        $null = $payload | & $pwshPath -NoProfile -File $utilsPath report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
       } elseif (Get-Command -Name 'nucleus-utils' -ErrorAction SilentlyContinue) {
-        $null = $payload | & nucleus-utils sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
+        $null = $payload | & nucleus-utils harness report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
       }
     } catch {
       # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change the filter decision
@@ -505,19 +505,19 @@ try {
   if ($summaryText.Length -gt 200) { $summaryText = $summaryText.Substring(0, 200) }
 
   if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'NUCLEUS_REPO_ROOT is unset: asking locally'
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'NUCLEUS_REPO_ROOT is unset: asking locally'
     Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read' -Rule registry-error
   }
   # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
   $registryPath = Join-Path -Path (Join-Path -Path (Join-Path -Path $env:NUCLEUS_REPO_ROOT -ChildPath 'src') -ChildPath 'modules') -ChildPath 'configs/harness-filters.json'
   if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "filter registry not found at ${registryPath}: asking locally"
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "filter registry not found at ${registryPath}: asking locally"
     Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): no filter registry at $registryPath" -Rule registry-error
   }
 
   try { $entries = Get-HarnessFilterRegistryEntry -RegistryPath $registryPath }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not parse the filter registry at ${registryPath}: asking locally"
+    Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "could not parse the filter registry at ${registryPath}: asking locally"
     Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable" -Rule registry-error
   }
 
@@ -544,7 +544,7 @@ try {
 catch {
   # Fail open to the harness's own prompt: a broken runner must not authorise a
   # call, and must not block one either.
-  Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message $_.Exception.Message
+  Write-HarnessBridgeWarning -CommandName 'decide-call' -Message $_.Exception.Message
   # WHY its own call: a crash is exactly the outcome a review looks for, so the
   # fail-open document is audited rather than only printed.
   Write-HarnessFilterAudit -Harness $Harness -Decision 'ask' -Rule 'runner-error'

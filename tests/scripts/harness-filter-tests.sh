@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Suite for the harness decision runner (src/scripts/notify/harness-filter.sh),
+# Suite for the harness decision runner (src/scripts/notify/harness/decide-call.sh),
 # the safe-delete filter, and the filter registry.
 #
 # Five sections, because the interface has these layers:
@@ -40,8 +40,8 @@ ensure_safe_rm_env
 mkdir -p "$HOME/.local/state/nucleus"
 printf '%s\n' '{"harness-approval":{"sources":[]}}' >"$HOME/.local/state/nucleus/config.json"
 
-RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
-APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
+RUNNER="$REPO_ROOT/src/scripts/notify/harness/decide-call.sh"
+APPROVAL="$REPO_ROOT/src/scripts/notify/harness/request-approval.sh"
 FILTER_DIR="$REPO_ROOT/src/scripts/notify/filters"
 LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
 LIB_DIR_DIR="$REPO_ROOT/src/scripts/lib"
@@ -78,9 +78,9 @@ export NUCLEUS_LOG_DIR
 # touching the checkout.
 make_tree() { # <name>
   local _root="$WORK/$1"
-  mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
-  cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
-  cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
+  mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/harness" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
+  cp "$RUNNER" "$_root/src/scripts/notify/harness/decide-call.sh"
+  cp "$APPROVAL" "$_root/src/scripts/notify/harness/request-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
   cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/bash-guard.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$LIB_DIR_DIR/apply-history.sh" "$LIB_DIR_DIR/bundle-freshness.sh" "$_root/src/scripts/lib/"
   # The bridge entry points source the log library beside them, so the fixture
@@ -107,7 +107,7 @@ run_runner() { # <tree> <harness> <payload>
   local _root="$1"
   local _harness="$2"
   local _payload="$3"
-  NUCLEUS_REPO_ROOT="$_root" "$_root/src/scripts/notify/harness-filter.sh" "$_harness" <<<"$_payload"
+  NUCLEUS_REPO_ROOT="$_root" "$_root/src/scripts/notify/harness/decide-call.sh" "$_harness" <<<"$_payload"
 }
 
 run_filter() { # <settings> <command>

@@ -3,7 +3,7 @@
   Shared helpers for the Windows harness-bridge entry points.
 
 .DESCRIPTION
-  harness-notify.ps1, harness-approval.ps1, and harness-drive.ps1 each dot-source
+  send-notification.ps1, request-approval.ps1, and continue-turn.ps1 each dot-source
   this file, so the warning line, the nucleus root, and the runtime config path
   have one definition.
 
@@ -11,7 +11,7 @@
   (scripts/utils.{sh,ps1}) from the live checkout, so helpers here avoid importing
   repository modules by fixed repository-relative paths when they may run from a
   copied context. Data that only the live checkout owns is reached through
-  $env:NUCLEUS_REPO_ROOT where needed, as harness-filter.ps1 reads its registry.
+  $env:NUCLEUS_REPO_ROOT where needed, as decide-call.ps1 reads its registry.
 
   Warning output keeps the F1 shape (`<cmd>: warning: <msg>`) on stderr minus
   console color, which a hook never sees anyway.

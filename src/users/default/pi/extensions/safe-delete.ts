@@ -2,7 +2,7 @@
  * Routes deletion-shaped bash tool calls through the shared harness filter so the
  * deletion policy lives in `src/scripts/notify/filters/safe-delete.ts`, not here.
  * This extension only pre-filters on deletion words, forwards the hook payload to
- * `harness-filter pi`, and turns the verdict into a block, a confirmation prompt,
+ * `nucleus-utils harness decide-call pi`, and turns the verdict into a block, a confirmation prompt,
  * or an allow. It must not classify commands locally.
  */
 
@@ -131,7 +131,7 @@ export async function runHarnessFilter(
 	options: RunnerOptions = {},
 ): Promise<Verdict> {
 	const runnerCommand = options.runnerCommand ?? DEFAULT_RUNNER_COMMAND;
-	const runnerArgs = options.runnerArgs ?? ["harness-filter", "pi"];
+	const runnerArgs = options.runnerArgs ?? ["harness", "decide-call", "pi"];
 	const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 	const spawnFn = options.spawnFn ?? spawnHarnessFilter;
 	const result = await spawnFn(runnerCommand, runnerArgs, buildPayload(command), timeoutMs);

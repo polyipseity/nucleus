@@ -45,7 +45,7 @@ section 1 "store layout"
 
 LAYOUT="$WORK/layout"
 make_store_layout "$LAYOUT"
-RUNNER="$LAYOUT/app/src/scripts/notify/harness-filter.sh"
+RUNNER="$LAYOUT/app/src/scripts/notify/harness/decide-call.sh"
 AUDIT="$LAYOUT/logs/harness.log"
 
 _rc=0
@@ -100,10 +100,16 @@ fi
 
 # Implementation scripts remain in src/scripts/notify; filter files and shared
 # policy stay under filters/. No standalone deployed wrapper files belong here.
-if [ -f "$REPO_ROOT/src/scripts/notify/harness-filter.sh" ] && [ -f "$REPO_ROOT/src/scripts/notify/harness-filter.ps1" ] && [ -d "$REPO_ROOT/src/scripts/notify/filters" ]; then
-  assert_pass "notify implementations and filter directory remain in src/scripts/notify"
+for _f in "$REPO_ROOT/src/scripts/notify/harness/send-notification.sh" "$REPO_ROOT/src/scripts/notify/harness/send-notification.ps1" "$REPO_ROOT/src/scripts/notify/harness/request-approval.sh" "$REPO_ROOT/src/scripts/notify/harness/request-approval.ps1" "$REPO_ROOT/src/scripts/notify/harness/decide-call.sh" "$REPO_ROOT/src/scripts/notify/harness/decide-call.ps1" "$REPO_ROOT/src/scripts/notify/harness/continue-turn.sh" "$REPO_ROOT/src/scripts/notify/harness/continue-turn.ps1"; do
+  if [ ! -f "$_f" ]; then
+    assert_fail "notify harness implementations exist at new bundle paths" "missing $_f"
+    finish_tests
+  fi
+done
+if [ -d "$REPO_ROOT/src/scripts/notify/filters" ]; then
+  assert_pass "notify harness implementations exist at new bundle paths"
 else
-  assert_fail "notify implementations and filter directory remain in src/scripts/notify" "expected harness-filter scripts and filters/ directory"
+  assert_fail "notify implementations and filter directory remain in src/scripts/notify" "expected moved harness scripts and filters/ directory"
 fi
 
 finish_tests

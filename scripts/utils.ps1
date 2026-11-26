@@ -310,7 +310,7 @@ function Invoke-NucleusSandboxContext {
     exit 1
   }
   if ($argv[0] -eq '-h' -or $argv[0] -eq '--help') {
-    Write-NucleusInfo 'usage: nucleus-utils sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]'
+    Write-NucleusInfo 'usage: nucleus-utils harness report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]'
     exit 0
   }
   $harness = [string]$argv[0]
@@ -346,7 +346,7 @@ function Invoke-NucleusSandboxContext {
     exit 1
   }
   if ($help) {
-    Write-NucleusInfo 'usage: nucleus-utils sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]'
+    Write-NucleusInfo 'usage: nucleus-utils harness report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]'
     exit 0
   }
   if ($format -notin @('text', 'claude', 'cursor', 'check')) {
@@ -550,17 +550,17 @@ function Invoke-NucleusHarness {
 
   switch ($verb) {
     'send-notification' {
-      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-notify.ps1'
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness\send-notification.ps1'
       & $scriptPath @rest
       exit $LASTEXITCODE
     }
     'decide-call' {
-      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-filter.ps1'
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness\decide-call.ps1'
       & $scriptPath @rest
       exit $LASTEXITCODE
     }
     'request-approval' {
-      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-approval.ps1'
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness\request-approval.ps1'
       $plain = $false
       $positionals = @()
       foreach ($arg in $rest) {
@@ -580,7 +580,7 @@ function Invoke-NucleusHarness {
       exit $LASTEXITCODE
     }
     'continue-turn' {
-      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-drive.ps1'
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness\continue-turn.ps1'
       & $scriptPath @rest
       exit $LASTEXITCODE
     }

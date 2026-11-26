@@ -3,7 +3,7 @@
   Normalizes a coding-harness lifecycle event into a Hermes notification (Windows).
 
 .DESCRIPTION
-  Windows twin of harness-notify.sh: every provisioned harness (pi, opencode,
+  Windows twin of send-notification.sh: every provisioned harness (pi, opencode,
   Cursor, VS Code Copilot Chat) funnels its hook payload through one entry point
   so message formatting, channel selection, and failure handling have one
   definition.
@@ -13,7 +13,7 @@
   bot tokens of its own for notifications and no gateway process needs to be
   running for bot-token platforms.
 
-  Invoked as `nucleus-utils harness-notify ...` via scripts/utils.{sh,ps1}.
+  Invoked as `nucleus-utils harness send-notification ...` via scripts/utils.{sh,ps1}.
   Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
   shim deployed by Sync-NucleusAppShim.ps1). The sibling harness-bridge-common.ps1
   is dot-sourced for shared helpers so this script does not import repository
@@ -29,7 +29,7 @@
   from which .message/.prompt/.text/.tool_name is extracted.
 
 .EXAMPLE
-  pwsh -NoProfile -File harness-notify.ps1 pi done 'finished the refactor'
+  pwsh -NoProfile -File send-notification.ps1 pi done 'finished the refactor'
 
 .NOTES
   Exit codes: always 0. A notification is best-effort; it must never block or
@@ -60,7 +60,7 @@ param(
   [string]$Text
 )
 
-. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+. (Join-Path $PSScriptRoot '..\..\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
@@ -68,7 +68,7 @@ $ErrorActionPreference = 'Stop'
 
 # WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
-. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
+. (Join-Path -Path $PSScriptRoot -ChildPath '../harness-bridge-common.ps1')
 
 # WHY script scope: the audit line is written from the delivery helper, which
 # runs before the process ends, so the start time and the input fingerprint are
@@ -103,7 +103,7 @@ function Write-HarnessNotifyAudit {
       -Digest $script:auditDigest -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "could not write the harness audit log: $($_.Exception.Message)"
+    Write-HarnessBridgeWarning -CommandName 'send-notification' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
 }
 
@@ -170,7 +170,7 @@ function Send-HarnessNotification {
     $config = Get-HarnessBridgeNotifyConfig -ConfigPath $ConfigPath
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'could not parse nucleus config: not notifying'
+    Write-HarnessBridgeWarning -CommandName 'send-notification' -Message 'could not parse nucleus config: not notifying'
     return
   }
 
@@ -191,7 +191,7 @@ function Send-HarnessNotification {
   # more than one hermes on PATH otherwise yields a list, which cannot be invoked.
   $hermes = Get-Command -Name 'hermes' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence is the expected case and is reported right below
   if ($null -eq $hermes) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH: notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'send-notification' -Message 'hermes is not on PATH: notification dropped'
     Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: notification dropped (hermes is not on PATH)"
     return
   }
@@ -202,7 +202,7 @@ function Send-HarnessNotification {
     $targetText = [string]$target
     $Text | & $hermes.Source send --to $targetText --subject $subject --file - --quiet
     if ($LASTEXITCODE -ne 0) {
-      Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "delivery to '$targetText' failed"
+      Write-HarnessBridgeWarning -CommandName 'send-notification' -Message "delivery to '$targetText' failed"
     }
   }
   Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: ${Text}"
@@ -214,12 +214,12 @@ $global:LASTEXITCODE = 0
 
 try {
   if ([string]::IsNullOrWhiteSpace($Harness) -or [string]::IsNullOrWhiteSpace($EventName)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'usage: harness-notify <harness> <event> [text]'
+    Write-HarnessBridgeWarning -CommandName 'send-notification' -Message 'usage: nucleus-utils harness send-notification <harness> <event> [text]'
     exit 0
   }
 
   if ($EventName -notin @('done', 'needs-input', 'approval', 'error')) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "unknown event '$EventName': not notifying"
+    Write-HarnessBridgeWarning -CommandName 'send-notification' -Message "unknown event '$EventName': not notifying"
     exit 0
   }
 
@@ -249,7 +249,7 @@ try {
   Send-HarnessNotification -Harness $Harness -EventName $EventName -Text $Text -ConfigPath (Get-HarnessBridgeConfigPath)
 }
 catch {
-  Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message $_.Exception.Message
+  Write-HarnessBridgeWarning -CommandName 'send-notification' -Message $_.Exception.Message
 }
 
 exit 0

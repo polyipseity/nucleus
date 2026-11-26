@@ -1,6 +1,6 @@
 /**
  * OpenCode v2 server plugin that routes session lifecycle events to the shared
- * harness notification entry point (`harness-notify`, deployed to ~/.local/bin),
+ * harness notification entry point (`nucleus-utils harness send-notification`),
  * answers tool-permission requests from a messaging channel, and delivers prompts
  * queued with `/harness send opencode <text>`.
  *
@@ -20,10 +20,10 @@
  * bridge reply, queued prompt injection) is reachable from the server plugin.
  * `attention.notify` is TUI-only in v2 typings, but in-app attention is not part
  * of the surviving contract; external notification remains the detached
- * `harness-notify` child. This plugin is therefore server-only.
+ * `nucleus-utils harness send-notification` child. This plugin is therefore server-only.
  *
  * Only *when* to speak is decided here; channel selection and message formatting
- * belong to `harness-notify`. Every failure is discarded: a notification or a
+ * belong to `nucleus-utils harness send-notification`. Every failure is discarded: a notification or a
  * bridge outage must never surface as an OpenCode error, and a request nobody
  * answered keeps OpenCode's own local prompt (the broker answers `ask` when the
  * bridge is disabled, unreachable, or unanswered).
@@ -115,11 +115,11 @@ function takeQueuedPrompt() {
  * Report one lifecycle event. Failures are intentionally discarded: a
  * notification is best-effort and must not surface as an OpenCode error.
  *
- * @param {string} event Notification event name understood by harness-notify.
+ * @param {string} event Notification event name understood by harness send-notification.
  * @param {string} text  Notification body.
  */
 function notify(event, text) {
-  const child = spawn(NOTIFY_COMMAND, ["harness-notify", "opencode", event, text], {
+  const child = spawn(NOTIFY_COMMAND, ["harness", "send-notification", "opencode", event, text], {
     detached: true,
     stdio: "ignore",
   });
@@ -141,7 +141,7 @@ function asId(value) {
  */
 async function decideRemotely(tool, summary) {
   try {
-    const { stdout } = await runFile(APPROVAL_COMMAND, ["harness-approval", "opencode", tool, summary], {
+    const { stdout } = await runFile(APPROVAL_COMMAND, ["harness", "request-approval", "opencode", tool, summary], {
       timeout: APPROVAL_TIMEOUT_MS,
     });
     const lines = stdout.trim().split("\n");
@@ -189,7 +189,7 @@ function projectLabel(directory) {
  */
 function recordSandboxContext(sessionID) {
   try {
-    const args = ["sandbox-context", "opencode", "--format", "check"];
+    const args = ["harness", "report-sandbox", "opencode", "--format", "check"];
     if (typeof sessionID === "string" && sessionID !== "") {
       args.push("--session-id", sessionID);
     }

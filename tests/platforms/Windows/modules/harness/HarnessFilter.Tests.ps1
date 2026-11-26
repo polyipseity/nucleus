@@ -3,7 +3,7 @@
   Pester coverage for the Windows harness decision runner and its filter.
 
 .DESCRIPTION
-  Covers the twin of harness-filter.sh: the render table (Cursor and Copilot
+  Covers the twin of decide-call.sh: the render table (Cursor and Copilot
   documents, plain word for the rest), the safe-delete filter's rule families and
   its settings.unproven question, and the aggregation and failure rules.
 
@@ -184,7 +184,7 @@ BeforeAll {
     $env:NUCLEUS_REPO_ROOT = $Root
     $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
     try {
-      $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
+      $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness\decide-call.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
       return @{ ExitCode = $LASTEXITCODE; Stdout = $stdout }
     }

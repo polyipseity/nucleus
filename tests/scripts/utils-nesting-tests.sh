@@ -127,11 +127,11 @@ test_send_notification_reaches_implementation() {
   err="$(mktemp)"
   rc=0
   /run/current-system/sw/bin/bash "$UTILS_SH" harness send-notification >"$out" 2>"$err" || rc=$?
-  # harness-notify.sh exits 0 but warns on missing args
-  if grep -qi 'harness-notify\|usage' "$out" "$err"; then
-    assert_pass "send-notification reaches harness-notify implementation"
+  # send-notification.sh exits 0 but warns on missing args
+  if grep -qi 'send-notification\|usage' "$out" "$err"; then
+    assert_pass "send-notification reaches send-notification implementation"
   else
-    assert_fail "send-notification reaches harness-notify implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+    assert_fail "send-notification reaches send-notification implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
   fi
   rm -f "$out" "$err"
 }
@@ -143,9 +143,9 @@ test_decide_call_reaches_implementation() {
   rc=0
   printf '{}' | /run/current-system/sw/bin/bash "$UTILS_SH" harness decide-call cursor >"$out" 2>"$err" || rc=$?
   if [ "$rc" -eq 0 ] && grep -q '"permission"' "$out"; then
-    assert_pass "decide-call reaches harness-filter implementation"
+    assert_pass "decide-call reaches decide-call implementation"
   else
-    assert_fail "decide-call reaches harness-filter implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+    assert_fail "decide-call reaches decide-call implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
   fi
   rm -f "$out" "$err"
 }
@@ -160,9 +160,9 @@ test_request_approval_reaches_implementation() {
   rc=0
   HOME="$home" /run/current-system/sw/bin/bash "$UTILS_SH" harness request-approval cursor bash ls 0 >"$out" 2>"$err" || rc=$?
   if [ "$rc" -eq 0 ] && grep -Eq '"permission"|"hookSpecificOutput"|allow|deny|ask' "$out"; then
-    assert_pass "request-approval reaches harness-approval implementation"
+    assert_pass "request-approval reaches request-approval implementation"
   else
-    assert_fail "request-approval reaches harness-approval implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+    assert_fail "request-approval reaches request-approval implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
   fi
   rm -rf "$home" "$out" "$err"
 }
@@ -178,9 +178,9 @@ test_continue_turn_reaches_implementation() {
   HOME="$home" /run/current-system/sw/bin/bash "$UTILS_SH" harness continue-turn cursor >"$out" 2>"$err" || rc=$?
   # cursor with no queued prompt returns {}
   if [ "$rc" -eq 0 ] && grep -Eq '^\{\}|^\{\s*\}$' "$out"; then
-    assert_pass "continue-turn reaches harness-drive implementation"
+    assert_pass "continue-turn reaches continue-turn implementation"
   else
-    assert_fail "continue-turn reaches harness-drive implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
+    assert_fail "continue-turn reaches continue-turn implementation" "rc=$rc out=$(cat "$out") err=$(cat "$err")"
   fi
   rm -rf "$home" "$out" "$err"
 }

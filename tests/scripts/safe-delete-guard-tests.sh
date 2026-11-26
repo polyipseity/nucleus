@@ -2,8 +2,8 @@
 # Corpus suite for the deployed deletion guard, which is the shared policy
 # `src/scripts/notify/filters/safe-delete.ts` running in its --hook mode.
 #
-# The guard is exposed as `nucleus-utils safe-delete-guard` (command surface)
-# and the same shared policy runs inside `nucleus-utils harness-filter`, so its
+# The guard is exposed as `nucleus-utils harness check-deletion` (command surface)
+# and the same shared policy runs inside `nucleus-utils harness decide-call`, so its
 # verdicts are a security control. It exists for the spellings the interactive
 # alias and the PATH shims cannot see: a deletion reached through a path and
 # cmd.exe. This suite pins the union of matched strings the guard carried before

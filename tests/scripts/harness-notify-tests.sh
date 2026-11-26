@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test: harness-notify.sh event normalization, channel fan-out, config gating,
+# Test: send-notification.sh event normalization, channel fan-out, config gating,
 # stdin payload extraction, body cap, and best-effort exit status.
 #
 # The Hermes CLI is replaced by a recording stub on PATH so the suite asserts the
@@ -11,8 +11,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-NOTIFY="$SCRIPT_DIR/../../src/scripts/notify/harness-notify.sh"
-NOTIFY_PS1="$SCRIPT_DIR/../../src/scripts/notify/harness-notify.ps1"
+NOTIFY="$SCRIPT_DIR/../../src/scripts/notify/harness/send-notification.sh"
+NOTIFY_PS1="$SCRIPT_DIR/../../src/scripts/notify/harness/send-notification.ps1"
 
 require_command mktemp "temporary directories for the recording stub"
 require_command pwsh "the PowerShell twin's default channels are asserted by running it"

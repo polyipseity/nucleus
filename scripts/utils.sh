@@ -73,19 +73,19 @@ Harness bridge and guard verbs.
 Verbs:
   send-notification <harness> <event> [text]
               Normalize a harness lifecycle event into a Hermes notification.
-              Dispatches to src/scripts/notify/harness-notify.sh.
+              Dispatches to src/scripts/notify/harness/send-notification.sh.
 
   decide-call <harness>
               Read a harness hook payload on stdin and print a decision document.
-              Dispatches to src/scripts/notify/harness-filter.sh.
+              Dispatches to src/scripts/notify/harness/decide-call.sh.
 
   request-approval <harness> <tool> <summary> [timeout-seconds]
               Request an approval decision for a harness tool call.
-              Dispatches to src/scripts/notify/harness-approval.sh.
+              Dispatches to src/scripts/notify/harness/request-approval.sh.
 
   continue-turn <harness>
               End a harness turn: notify and inject one queued remote prompt.
-              Dispatches to src/scripts/notify/harness-drive.sh.
+              Dispatches to src/scripts/notify/harness/continue-turn.sh.
 
   report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]
               Detect the current sandbox state, compare it with the recorded
@@ -546,7 +546,7 @@ do_sandbox_context() {
     return 0
   fi
   if [ $# -eq 0 ]; then
-    error "sandbox-context requires a harness name"
+    error "report-sandbox requires a harness name"
     return 1
   fi
   harness="$1"
@@ -574,7 +574,7 @@ do_sandbox_context() {
       return 0
       ;;
     *)
-      error "unknown sandbox-context option: $1"
+      error "unknown report-sandbox option: $1"
       return 1
       ;;
     esac
@@ -583,7 +583,7 @@ do_sandbox_context() {
   case "$format" in
   text | claude | cursor | check) ;;
   *)
-    error "unknown sandbox-context format: $format"
+    error "unknown report-sandbox format: $format"
     return 1
     ;;
   esac
@@ -695,16 +695,16 @@ do_harness() {
 
   case "$verb" in
   send-notification)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-notify.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/send-notification.sh" "$@"
     ;;
   decide-call)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-filter.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/decide-call.sh" "$@"
     ;;
   request-approval)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-approval.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/request-approval.sh" "$@"
     ;;
   continue-turn)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-drive.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/continue-turn.sh" "$@"
     ;;
   report-sandbox)
     do_sandbox_context "$@"
@@ -749,16 +749,16 @@ main() {
   # top-level names dispatching to the same implementations so existing hooks,
   # tests, and callers remain functional during the slice.
   harness-notify)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-notify.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/send-notification.sh" "$@"
     ;;
   harness-approval)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-approval.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/request-approval.sh" "$@"
     ;;
   harness-filter)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-filter.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/decide-call.sh" "$@"
     ;;
   harness-drive)
-    exec "$SCRIPT_DIR/../src/scripts/notify/harness-drive.sh" "$@"
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness/continue-turn.sh" "$@"
     ;;
   sandbox-context)
     do_sandbox_context "$@"

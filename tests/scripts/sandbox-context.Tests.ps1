@@ -159,7 +159,7 @@ BeforeAll {
   }
 }
 
-Describe 'nucleus-utils sandbox-context (PowerShell)' {
+Describe 'nucleus-utils harness report-sandbox (PowerShell)' {
   It 'emits full sandboxed block and records state on first observation' {
     $testHome = New-SandboxContextHome
     try {

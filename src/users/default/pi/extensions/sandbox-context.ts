@@ -1,5 +1,5 @@
 /**
- * Calls `nucleus-utils sandbox-context` on every context event whose last
+ * Calls `nucleus-utils harness report-sandbox` on every context event whose last
  * message is a user message and inserts the returned text. The command owns the
  * record, the decision, and the emitted context, so this extension does not
  * select the block itself.
@@ -74,7 +74,7 @@ export function createSandboxContextExtension(
 				const exec = deps.exec ?? ((command, args, options) => pi.exec(command, [...args], options));
 				result = await exec(
 					SANDBOX_CONTEXT_COMMAND,
-					["sandbox-context", harness, "--format", "text", "--session-id", sessionId],
+					["harness", "report-sandbox", harness, "--format", "text", "--session-id", sessionId],
 					{ timeout: SANDBOX_CONTEXT_TIMEOUT_MS },
 				);
 			} catch {

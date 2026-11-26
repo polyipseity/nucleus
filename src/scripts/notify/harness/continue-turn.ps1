@@ -3,10 +3,10 @@
   Ends a harness turn on Windows: notify, then inject one queued remote prompt.
 
 .DESCRIPTION
-  Windows twin of harness-drive.sh. Every "the agent stopped" hook calls this
+  Windows twin of continue-turn.sh. Every "the agent stopped" hook calls this
   instead of harness-notify, because that is the moment a prompt queued with
   `/harness send <harness> <text>` can be delivered. The stop-hook payload on
-  stdin is forwarded to harness-notify.ps1 <harness> done, so the notification
+  stdin is forwarded to send-notification.ps1 <harness> done, so the notification
   half keeps one definition.
 
   Continuation document (stdout), at most one queued prompt consumed:
@@ -24,7 +24,7 @@
   works on macOS and NixOS only. Nothing here compensates for that: a workaround
   would have to fake user input into the harness.
 
-  Invoked as `nucleus-utils harness-drive ...` via scripts/utils.{sh,ps1}.
+  Invoked as `nucleus-utils harness continue-turn ...` via scripts/utils.{sh,ps1}.
   Hooks resolve nucleus-utils through PATH (POSIX nucleus app, Windows nucleus-*
   shim deployed by Sync-NucleusAppShim.ps1). The sibling harness-bridge-common.ps1
   is dot-sourced for shared helpers. Warning output keeps the F1 shape
@@ -34,10 +34,10 @@
   Harness name: pi, opencode, cursor, or copilot.
 
 .EXAMPLE
-  '{"hook_event_name":"Stop"}' | pwsh -NoProfile -File harness-drive.ps1 copilot
+  '{"hook_event_name":"Stop"}' | pwsh -NoProfile -File continue-turn.ps1 copilot
 
 .EXAMPLE
-  pwsh -NoProfile -File harness-drive.ps1 cursor
+  pwsh -NoProfile -File continue-turn.ps1 cursor
 
 .NOTES
   Exit codes: always 0.  A stop hook that fails is surfaced as a failed turn, so
@@ -57,7 +57,7 @@ param(
   [string]$Harness
 )
 
-. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+. (Join-Path $PSScriptRoot '..\..\lib\pwsh-guard.ps1')
 Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
@@ -65,7 +65,7 @@ $ErrorActionPreference = 'Stop'
 
 # WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
-. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
+. (Join-Path -Path $PSScriptRoot -ChildPath '../harness-bridge-common.ps1')
 
 # WHY script scope: the drop record is written from the queue helper, so the
 # start time and the payload fingerprint are collected here as the run takes them.
@@ -209,7 +209,7 @@ function Get-QueuedHarnessPrompt {
     }
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not read the queued prompt '$($newest.FullName)': treating it as empty"
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message "could not read the queued prompt '$($newest.FullName)': treating it as empty"
     $text = ''
   }
 
@@ -246,13 +246,13 @@ function Clear-QueuedHarnessPrompt {
       $dropped++
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not discard the queued prompt '$($file.Name)'"
+      Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message "could not discard the queued prompt '$($file.Name)'"
     }
   }
   if ($dropped -eq 0) { return }
 
   Write-HarnessDriveAuditEntry -Harness $Harness -Detail "dropped $dropped queued prompt(s)"
-  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled: dropped $dropped queued prompt(s)"
+  Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message "harness-drive is disabled: dropped $dropped queued prompt(s)"
 }
 
 function Write-HarnessDriveAuditEntry {
@@ -278,7 +278,7 @@ function Write-HarnessDriveAuditEntry {
       -Digest $script:auditDigest -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not write the harness audit log: $($_.Exception.Message)"
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
 }
 
@@ -303,11 +303,11 @@ function Send-HarnessDriveNotification {
     [string]$Payload
   )
 
-  $notifyPath = Join-Path -Path $PSScriptRoot -ChildPath 'harness-notify.ps1'
+  $notifyPath = Join-Path -Path $PSScriptRoot -ChildPath 'send-notification.ps1'
   # check-suppress:suppression_doc: several pwsh wrappers can sit on PATH and absence is handled right below
   $pwshCli = Get-Command -Name 'pwsh' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -eq $pwshCli) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'pwsh is not on PATH: notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'pwsh is not on PATH: notification dropped'
     return
   }
 
@@ -315,11 +315,11 @@ function Send-HarnessDriveNotification {
     $Payload | & $pwshCli.Source -NoProfile -ExecutionPolicy Bypass -File $notifyPath $Harness 'done'
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'notification failed: continuing to the queued prompt'
     return
   }
   if ($LASTEXITCODE -ne 0) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'notification failed: continuing to the queued prompt'
   }
 }
 
@@ -329,7 +329,7 @@ $global:LASTEXITCODE = 0
 
 try {
   if ([string]::IsNullOrWhiteSpace($Harness)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'usage: harness-drive <harness>'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'usage: nucleus-utils harness continue-turn <harness>'
     exit 0
   }
 
@@ -337,7 +337,7 @@ try {
     $config = Get-HarnessBridgeDriveConfig -ConfigPath (Get-HarnessBridgeConfigPath)
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not parse nucleus config: not driving'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'could not parse nucleus config: not driving'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
@@ -356,12 +356,12 @@ try {
   # Record sandbox state for this harness so a transition seen by one agent is
   # reported to the next. Best-effort: recording must never affect driving.
   try {
-    $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../scripts/utils.ps1'
+    $utilsPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../scripts/utils.ps1'
     if (Test-Path -LiteralPath $utilsPath -PathType Leaf) {
       $pwshPath = [Environment]::ProcessPath
-      $null = $payload | & $pwshPath -NoProfile -File $utilsPath sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+      $null = $payload | & $pwshPath -NoProfile -File $utilsPath report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
     } elseif (Get-Command -Name 'nucleus-utils' -ErrorAction SilentlyContinue) {
-      $null = $payload | & nucleus-utils sandbox-context $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
+      $null = $payload | & nucleus-utils harness report-sandbox $Harness --format check  # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
     }
   } catch {
     # check-suppress:suppression_doc: sandbox-context recording is best-effort and must not change driving
@@ -391,12 +391,12 @@ try {
   }
 
   if ([string]::IsNullOrWhiteSpace($queued.Text)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'queued prompt is empty: nothing to inject'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'queued prompt is empty: nothing to inject'
     try {
       Remove-Item -LiteralPath $queued.Path -Force
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not discard the empty queued prompt'
+      Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'could not discard the empty queued prompt'
     }
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
@@ -409,7 +409,7 @@ try {
     Remove-Item -LiteralPath $queued.Path -Force
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not consume the queued prompt: dropping it to avoid double delivery'
+    Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message 'could not consume the queued prompt: dropping it to avoid double delivery'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
@@ -419,7 +419,7 @@ try {
   if (-not [string]::IsNullOrWhiteSpace($document)) { Write-Output $document }
 }
 catch {
-  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message $_.Exception.Message
+  Write-HarnessBridgeWarning -CommandName 'continue-turn' -Message $_.Exception.Message
 }
 
 exit 0

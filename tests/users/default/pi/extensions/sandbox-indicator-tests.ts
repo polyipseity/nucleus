@@ -508,7 +508,7 @@ describe("readSafeDeleteUnproven real registry", () => {
 });
 
 describe("defaultProbeRedirect spawn path", () => {
-	test("runs a fake nucleus-utils safe-delete-guard CLI without settings.json", () => {
+	test("runs a fake nucleus-utils harness check-deletion CLI without settings.json", () => {
 		const binDir = mkdtempSync(join(tmpdir(), "sandbox-indicator-cli-"));
 		const scriptPath = join(binDir, "nucleus-utils");
 		writeFileSync(

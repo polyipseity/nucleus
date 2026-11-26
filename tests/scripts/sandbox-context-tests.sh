@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for `nucleus-utils sandbox-context` (.sh twin): record format, state
+# Tests for `nucleus-utils harness report-sandbox` (.sh twin): record format, state
 # decisions, output formats, pruning, corrupt-record handling, and the config
 # gate.
 set -euo pipefail

@@ -1,6 +1,6 @@
 /**
  * Pi extension that routes risky tool calls through the shared remote-approval
- * broker (`harness-approval`, deployed to ~/.local/bin).
+ * broker (`request-approval`, deployed to ~/.local/bin).
  *
  * Only a conservative pattern list is gated. Prompting for every tool call would
  * make the agent unusable, and pi already has its own permission model for the
@@ -110,7 +110,7 @@ export default function (pi: ExtensionAPI) {
     try {
       const result = await pi.exec(
         APPROVAL_COMMAND,
-        ["harness-approval", "pi", event.toolName, summary],
+        ["harness", "request-approval", "pi", event.toolName, summary],
         { timeout: EXEC_TIMEOUT_MS },
       );
       if (result.code === 0) {

@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "nucleus-utils harness-filter claude",
+            "command": "nucleus-utils harness decide-call claude",
             "timeout": 3600
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "nucleus-utils sandbox-context claude --format claude",
+            "command": "nucleus-utils harness report-sandbox claude --format claude",
             "timeout": 10
           }
         ]

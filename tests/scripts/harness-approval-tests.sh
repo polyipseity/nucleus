@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test: harness-approval.sh request/response contract, a blocking harness hook
+# Test: request-approval.sh request/response contract, a blocking harness hook
 # must get exactly one of allow|deny|ask on stdout, in every path, and must exit
 # 0 even when the broker is unreachable.
 #
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness-approval.sh"
+APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness/request-approval.sh"
 
 require_command mktemp "temporary directories for the recording stub"
 require_command find "locating the harness-bridge state directory"

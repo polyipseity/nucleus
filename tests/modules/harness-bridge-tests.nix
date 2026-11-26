@@ -56,8 +56,8 @@ let
   hookCeiling = 3600;
   flatConfigSh = flatten (read "/scripts/config.sh");
   flatConfigPs1 = flatten (read "/scripts/config.ps1");
-  flatApprovalScript = flatten (read "/src/scripts/notify/harness-approval.sh");
-  flatApprovalScriptPs1 = flatten (read "/src/scripts/notify/harness-approval.ps1");
+  flatApprovalScript = flatten (read "/src/scripts/notify/harness/request-approval.sh");
+  flatApprovalScriptPs1 = flatten (read "/src/scripts/notify/harness/request-approval.ps1");
 
   # First token of a hook command (PATH-resolved executable).
   entryPointOf =
@@ -65,13 +65,15 @@ let
     builtins.head (builtins.filter (x: builtins.isString x && x != "") (builtins.split " " command));
   entriesWithCommand = entries: command: builtins.filter (entry: entry.command == command) entries;
 
-  # Filter/drive hooks are now invoked as: nucleus-utils harness-filter <harness>
-  # and nucleus-utils harness-drive <harness>.
+  # Filter/drive hooks are now invoked as: nucleus-utils harness decide-call <harness>
+  # and nucleus-utils harness continue-turn <harness>.
   isUtilsSubcommand =
     subcommand: command: builtins.match "nucleus-utils ${subcommand}( [a-z0-9_-]+)?" command != null;
-  filterEntries = builtins.filter (entry: isUtilsSubcommand "harness-filter" entry.command) (
-    allEntries ++ claudeEntries
-  );
+  filterEntries = builtins.filter (
+    entry:
+    isUtilsSubcommand "harness" entry.command
+    && builtins.match ".* decide-call .*" (" " + entry.command + " ") != null
+  ) (allEntries ++ claudeEntries);
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -141,7 +143,7 @@ in
     (assert'
       (
         builtins.length (
-          entriesWithCommand claudeBashPreToolUseEntries "nucleus-utils harness-filter claude"
+          entriesWithCommand claudeBashPreToolUseEntries "nucleus-utils harness decide-call claude"
         ) == 1
       )
       "Claude's Bash PreToolUse must run exactly the filter runner via nucleus-utils: one entry point makes the decision, so no second hook can answer a deletion differently"
@@ -154,8 +156,9 @@ in
     (assert' (
       builtins.length copilotHooks.PreToolUse == 1
       &&
-        builtins.length (entriesWithCommand copilotHooks.PreToolUse "nucleus-utils harness-filter copilot")
-        == 1
+        builtins.length (
+          entriesWithCommand copilotHooks.PreToolUse "nucleus-utils harness decide-call copilot"
+        ) == 1
     ) "VS Code Copilot PreToolUse must run exactly the filter runner via nucleus-utils")
     (assert' (all (
       entry: entry.type == "command"
@@ -163,7 +166,8 @@ in
     (assert' (
       builtins.length copilotHooks.Stop == 1
     ) "VS Code Copilot must drive turn ends with exactly one Stop hook")
-    (assert' ((builtins.head copilotHooks.Stop).command == "nucleus-utils harness-drive copilot")
+    (assert'
+      ((builtins.head copilotHooks.Stop).command == "nucleus-utils harness continue-turn copilot")
       "VS Code Copilot Stop must run harness-drive via nucleus-utils, which notifies and injects a queued prompt"
     )
 
@@ -173,15 +177,16 @@ in
       builtins.length cursorHooks.beforeShellExecution == 1
       &&
         builtins.length (
-          entriesWithCommand cursorHooks.beforeShellExecution "nucleus-utils harness-filter cursor"
+          entriesWithCommand cursorHooks.beforeShellExecution "nucleus-utils harness decide-call cursor"
         ) == 1
     ) "Cursor shell executions must run exactly the filter runner via nucleus-utils")
     (assert' (
       builtins.length cursorHooks.beforeMCPExecution == 1
-      && (builtins.head cursorHooks.beforeMCPExecution).command == "nucleus-utils harness-filter cursor"
+      &&
+        (builtins.head cursorHooks.beforeMCPExecution).command == "nucleus-utils harness decide-call cursor"
     ) "Cursor MCP calls must run the filter runner via nucleus-utils too")
     (assert' (
-      (builtins.head cursorHooks.stop).command == "nucleus-utils harness-drive cursor"
+      (builtins.head cursorHooks.stop).command == "nucleus-utils harness continue-turn cursor"
     ) "Cursor stop must run harness-drive via nucleus-utils")
 
     # --- Per-action gates: master on, prompt approval, drive on ---
@@ -205,7 +210,7 @@ in
         builtins.match ".*'harness-approval' = @[{][ ]*sources[ ]*= @[(]'prompt'[)][ ]*'timeout-seconds' = @[{][ ]*hermes = 0; prompt = 0.*" flatApprovalScriptPs1
         != null
       )
-      "harness-approval.ps1 carries its own copy of the defaults, and a hook that runs without a config file falls back to it, so it must ship the same source list and per-source timeouts"
+      "request-approval.ps1 carries its own copy of the defaults, and a hook that runs without a config file falls back to it, so it must ship the same source list and per-source timeouts"
     )
     (assert' (
       builtins.match ".*'harness-drive' += @[{][^}]*enable = \\$true.*" flatConfigPs1 != null
