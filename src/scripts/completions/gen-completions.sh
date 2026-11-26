@@ -272,9 +272,9 @@ app_needs_stateful() {
   local _sc_count _has_sc_flags _has_sc_payload
   _sc_count="$(jq -r '.subcommands | length' <<<"$_app")"
   [ "$_sc_count" -eq 0 ] && return 1
-  _has_sc_flags="$(jq -r '[.subcommands[] | ([.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))] | length) + (.positionals | length)] | add // 0' <<<"$_app")"
-  _has_sc_payload="$(jq -r '[.subcommands[] | select((.values != null) or ((.flags // [])[]? | select(.platforms == null or (.platforms | index("posix") != null)) | .valueSource != null) or ((.positionals // [])[]? | .valueSource != null))] | length' <<<"$_app")"
-  # Any per-subcommand flags, positionals, or dynamic providers => stateful.
+  _has_sc_flags="$(jq -r '[.subcommands[] | ([.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))] | length) + (.positionals | length) + ((.subcommands // []) | length)] | add // 0' <<<"$_app")"
+  _has_sc_payload="$(jq -r '[.subcommands[] | select((.values != null) or ((.subcommands // []) | length > 0) or ((.flags // [])[]? | select(.platforms == null or (.platforms | index("posix") != null)) | .valueSource != null) or ((.positionals // [])[]? | .valueSource != null))] | length' <<<"$_app")"
+  # Any per-subcommand flags, positionals, nested subcommands, or dynamic providers => stateful.
   if [ "$_has_sc_flags" -gt 0 ] || [ "$_has_sc_payload" -gt 0 ]; then
     return 0
   fi
@@ -404,39 +404,109 @@ generate_command_file() {
         [ -n "$_sc" ] || continue
         _s="$(jq -r '.name' <<<"$_sc")"
         printf '      %s)\n' "$_s"
-        printf '        _arguments \\\n'
-        # subcommand flags
-        local _sc_specs="" _sf
-        while IFS= read -r _sf; do
-          [ -n "$_sf" ] || continue
-          emit_flag_spec "$_cmd" "$_s" "$_sf" _sc_specs _dyn_states _dyn_actions
-        done < <(jq -c '.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))' <<<"$_sc")
-        # positionals
-        local _pi=1 _p
-        while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          local _pa _psrc
-          _pa="$(pos_action "$_cmd" "$_s" "$_p" "$_pi")"
-          append_line _sc_specs "'${_pa}'"
-          _psrc="$(jq -r '.valueSource // empty' <<<"$_p")"
-          if [ -n "$_psrc" ]; then
-            record_dynamic_provider "$_cmd" "$_s" "$_psrc" "$_pi" _dyn_states _dyn_actions
-          fi
-          if jq -e '.variadic == true' <<<"$_p" >/dev/null 2>&1; then :; else _pi=$((_pi + 1)); fi
-        done < <(jq -c '.positionals[]?' <<<"$_sc")
-        if [ -z "$_sc_specs" ]; then
-          printf "          '*: :'\n"
-        else
-          local _n=0 _i=0 _line
-          _n="$(printf '%s\n' "$_sc_specs" | wc -l | tr -d ' ')"
-          while IFS= read -r _line; do
-            _i=$((_i + 1))
-            if [ "$_i" -lt "$_n" ]; then
-              printf '          %s \\\n' "$_line"
+        local _has_nested
+        _has_nested="$(jq -r '(.subcommands // []) | length' <<<"$_sc")"
+        if [ "$_has_nested" -gt 0 ]; then
+          printf '        _arguments -C \\\n'
+          printf "          '1:subcommand:->%s_subcmd' \\\\
+" "$_s"
+          printf "          '*::arg:->%s_args'\\n" "$_s"
+          # shellcheck disable=SC2016 # reason: $state/$words are zsh variables in generated output, not shell expansions.
+          printf '        case $state in\n'
+          printf '          %s_subcmd)\n' "$_s"
+          printf '            local -a _subcmds\n'
+          printf '            _subcmds=(\n'
+          while IFS= read -r _nsc; do
+            [ -n "$_nsc" ] || continue
+            local _ns _ndesc
+            _ns="$(jq -r '.name' <<<"$_nsc")"
+            _ndesc="$(jq -r '.description // empty' <<<"$_nsc")"
+            _ndesc="$(escape_zsh_spec_text "$_ndesc")"
+            printf "              '%s:%s'\n" "$_ns" "$_ndesc"
+          done < <(jq -c '.subcommands[]?' <<<"$_sc")
+          printf '            )\n'
+          printf "            _describe -t commands 'subcommand' _subcmds\n"
+          printf '            ;;\n'
+          printf '          %s_args)\n' "$_s"
+          # shellcheck disable=SC2016 # reason: $words is a zsh variable in generated output, not shell expansion.
+          printf '            case $words[1] in\n'
+          while IFS= read -r _nsc; do
+            [ -n "$_nsc" ] || continue
+            local _ns
+            _ns="$(jq -r '.name' <<<"$_nsc")"
+            printf '              %s)\n' "$_ns"
+            printf '                _arguments \\\n'
+            local _nsc_specs="" _nsf
+            while IFS= read -r _nsf; do
+              [ -n "$_nsf" ] || continue
+              emit_flag_spec "$_cmd" "$_s" "$_nsf" _nsc_specs _dyn_states _dyn_actions
+            done < <(jq -c '.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))' <<<"$_nsc")
+            local _npi=1 _np
+            while IFS= read -r _np; do
+              [ -n "$_np" ] || continue
+              local _npa _npsrc
+              _npa="$(pos_action "$_cmd" "$_s" "$_np" "$_npi")"
+              append_line _nsc_specs "'${_npa}'"
+              _npsrc="$(jq -r '.valueSource // empty' <<<"$_np")"
+              if [ -n "$_npsrc" ]; then
+                record_dynamic_provider "$_cmd" "$_s" "$_npsrc" "$_npi" _dyn_states _dyn_actions
+              fi
+              if jq -e '.variadic == true' <<<"$_np" >/dev/null 2>&1; then :; else _npi=$((_npi + 1)); fi
+            done < <(jq -c '.positionals[]?' <<<"$_nsc")
+            if [ -z "$_nsc_specs" ]; then
+              printf "                  '*: :'\n"
             else
-              printf '          %s\n' "$_line"
+              local _nn=0 _ni=0 _nline
+              _nn="$(printf '%s\n' "$_nsc_specs" | wc -l | tr -d ' ')"
+              while IFS= read -r _nline; do
+                _ni=$((_ni + 1))
+                if [ "$_ni" -lt "$_nn" ]; then
+                  printf '                  %s \\\n' "$_nline"
+                else
+                  printf '                  %s\n' "$_nline"
+                fi
+              done <<<"$_nsc_specs"
             fi
-          done <<<"$_sc_specs"
+            printf '                ;;\n'
+          done < <(jq -c '.subcommands[]?' <<<"$_sc")
+          printf '            esac\n'
+          printf '            ;;\n'
+          printf '        esac\n'
+        else
+          printf '        _arguments \\\n'
+          # subcommand flags
+          local _sc_specs="" _sf
+          while IFS= read -r _sf; do
+            [ -n "$_sf" ] || continue
+            emit_flag_spec "$_cmd" "$_s" "$_sf" _sc_specs _dyn_states _dyn_actions
+          done < <(jq -c '.flags[]? | select(.platforms == null or (.platforms | index("posix") != null))' <<<"$_sc")
+          # positionals
+          local _pi=1 _p
+          while IFS= read -r _p; do
+            [ -n "$_p" ] || continue
+            local _pa _psrc
+            _pa="$(pos_action "$_cmd" "$_s" "$_p" "$_pi")"
+            append_line _sc_specs "'${_pa}'"
+            _psrc="$(jq -r '.valueSource // empty' <<<"$_p")"
+            if [ -n "$_psrc" ]; then
+              record_dynamic_provider "$_cmd" "$_s" "$_psrc" "$_pi" _dyn_states _dyn_actions
+            fi
+            if jq -e '.variadic == true' <<<"$_p" >/dev/null 2>&1; then :; else _pi=$((_pi + 1)); fi
+          done < <(jq -c '.positionals[]?' <<<"$_sc")
+          if [ -z "$_sc_specs" ]; then
+            printf "          '*: :'\n"
+          else
+            local _n=0 _i=0 _line
+            _n="$(printf '%s\n' "$_sc_specs" | wc -l | tr -d ' ')"
+            while IFS= read -r _line; do
+              _i=$((_i + 1))
+              if [ "$_i" -lt "$_n" ]; then
+                printf '          %s \\\n' "$_line"
+              else
+                printf '          %s\n' "$_line"
+              fi
+            done <<<"$_sc_specs"
+          fi
         fi
         printf '        ;;\n'
       done < <(jq -c '.subcommands[]?' <<<"$_app")

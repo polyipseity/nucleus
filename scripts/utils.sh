@@ -24,8 +24,8 @@ bash_guard_require 5 1 utils
 # subcommand, flag, and preset the parsers accept.
 usage() {
   usage_std "$(basename "$0")" \
-    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness-notify <harness> <event> [text] | harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [--settings <json>] [--command <text>] [--hook]" \
-    "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations; sandbox-context records and reports sandbox state changes."
+    "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>... | harness <verb> [args...]" \
+    "Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness groups notification, approval, filter, drive, sandbox reporting, deletion checking, and model merge verbs."
   cat <<'EOF'
 
   -h|--help  Show usage.
@@ -41,36 +41,8 @@ Subcommands:
               Legacy OLE2 files (.doc/.xls/.ppt) and PDF files are skipped
               with a warning.
 
-  harness-notify <harness> <event> [text]
-              Normalize a harness lifecycle event into a Hermes notification.
-              Dispatches to src/scripts/notify/harness-notify.sh.
-
-  harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds]
-              Request an approval decision for a harness tool call.
-              Dispatches to src/scripts/notify/harness-approval.sh.
-
-  harness-filter <harness>
-              Read a harness hook payload on stdin and print a decision document.
-              Dispatches to src/scripts/notify/harness-filter.sh.
-
-  harness-drive <harness>
-              End a harness turn: notify and inject one queued remote prompt.
-              Dispatches to src/scripts/notify/harness-drive.sh.
-
-  sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>]
-              Detect the current sandbox state, compare it with the recorded
-              state for the harness session, emit context on a change or first
-              observation, and update the record. Reads a hook payload from
-              stdin when available to extract the session id.
-    --format <text|claude|cursor|check>  Output format.
-    --session-id <id>  Harness session identifier.
-
-  safe-delete-guard [--settings <json>] [--command <text>] [--hook]
-              Evaluate deletion commands against the safe-delete policy.
-              Dispatches to src/scripts/notify/filters/safe-delete.ts.
-    --settings <json>  Filter settings JSON.
-    --command <text>   Command text to evaluate.
-    --hook             Read hook payload on stdin and emit hook protocol output.
+  harness <verb> [args...]
+              Harness bridge and guard entry points. Run `nucleus-utils harness --help` for verbs.
 
   optimize-pdf presets (default: default):
     default   - high quality
@@ -89,6 +61,50 @@ Subcommands:
   Inputs that cannot be processed are listed at the end; with --dialog the list
   is shown in a modal popup. If a .bak file already exists for an input, that
   input is refused. On failure, the original file is restored from backup.
+EOF
+}
+
+usage_harness() {
+  cat <<'EOF'
+usage: nucleus-utils harness <verb> [args...]
+
+Harness bridge and guard verbs.
+
+Verbs:
+  send-notification <harness> <event> [text]
+              Normalize a harness lifecycle event into a Hermes notification.
+              Dispatches to src/scripts/notify/harness-notify.sh.
+
+  decide-call <harness>
+              Read a harness hook payload on stdin and print a decision document.
+              Dispatches to src/scripts/notify/harness-filter.sh.
+
+  request-approval <harness> <tool> <summary> [timeout-seconds]
+              Request an approval decision for a harness tool call.
+              Dispatches to src/scripts/notify/harness-approval.sh.
+
+  continue-turn <harness>
+              End a harness turn: notify and inject one queued remote prompt.
+              Dispatches to src/scripts/notify/harness-drive.sh.
+
+  report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]
+              Detect the current sandbox state, compare it with the recorded
+              state for the harness session, emit context on a change or first
+              observation, and update the record.
+    --format <text|claude|cursor|check>  Output format.
+    --session-id <id>  Harness session identifier.
+
+  check-deletion [--settings <json>] [--command <text>] [--hook]
+              Evaluate deletion commands against the safe-delete policy.
+              Dispatches to src/scripts/notify/filters/safe-delete.ts.
+    --settings <json>  Filter settings JSON.
+    --command <text>   Command text to evaluate.
+    --hook             Read hook payload on stdin and emit hook protocol output.
+
+  merge-models [--check]
+              Merge LiteLLM gateway model aliases into harness config files.
+              Not implemented in this slice.
+    --check            Verify merged state without writing.
 EOF
 }
 
@@ -668,6 +684,46 @@ do_sandbox_context() {
   return 0
 }
 
+do_harness() {
+  if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+    usage_harness
+    return 0
+  fi
+
+  local verb="$1"
+  shift
+
+  case "$verb" in
+  send-notification)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-notify.sh" "$@"
+    ;;
+  decide-call)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-filter.sh" "$@"
+    ;;
+  request-approval)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-approval.sh" "$@"
+    ;;
+  continue-turn)
+    exec "$SCRIPT_DIR/../src/scripts/notify/harness-drive.sh" "$@"
+    ;;
+  report-sandbox)
+    do_sandbox_context "$@"
+    ;;
+  check-deletion)
+    exec "$SCRIPT_DIR/../src/scripts/notify/filters/safe-delete.ts" "$@"
+    ;;
+  merge-models)
+    error "harness merge-models is not implemented in this slice"
+    return 1
+    ;;
+  *)
+    error "unknown harness verb: $verb" || true # check-suppress:suppression_doc: print usage after error; return below carries the non-zero contract
+    usage_harness >&2
+    return 1
+    ;;
+  esac
+}
+
 # WHY: a bare invocation or -h/--help shows help with exit 0, so the first run
 # is discoverable and harmless.
 main() {
@@ -686,6 +742,12 @@ main() {
   strip-metadata)
     do_strip_metadata "$@"
     ;;
+  harness)
+    do_harness "$@"
+    ;;
+  # WHY: A1 nests harness verbs; A2 sweeps external references. Keep the old
+  # top-level names dispatching to the same implementations so existing hooks,
+  # tests, and callers remain functional during the slice.
   harness-notify)
     exec "$SCRIPT_DIR/../src/scripts/notify/harness-notify.sh" "$@"
     ;;

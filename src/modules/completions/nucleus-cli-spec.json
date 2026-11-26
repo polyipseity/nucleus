@@ -1822,148 +1822,168 @@
           "description": "Strip personal metadata from files."
         },
         {
-          "name": "harness-notify",
+          "name": "harness",
           "flags": [],
-          "positionals": [
-            {
-              "name": "harness",
-              "required": true,
-              "variadic": false,
-              "description": "Harness name"
-            },
-            {
-              "name": "event",
-              "required": true,
-              "variadic": false,
-              "description": "Lifecycle event"
-            },
-            {
-              "name": "text",
-              "required": false,
-              "variadic": false,
-              "description": "Optional message body"
-            }
-          ],
-          "description": "Normalize a harness lifecycle event into a Hermes notification."
-        },
-        {
-          "name": "harness-approval",
-          "flags": [
-            {
-              "long": "--plain",
-              "takesValue": false,
-              "description": "Print the decision word alone"
-            }
-          ],
-          "positionals": [
-            {
-              "name": "harness",
-              "required": true,
-              "variadic": false,
-              "description": "Harness name"
-            },
-            {
-              "name": "tool",
-              "required": true,
-              "variadic": false,
-              "description": "Tool name"
-            },
-            {
-              "name": "summary",
-              "required": true,
-              "variadic": false,
-              "description": "Call summary"
-            },
-            {
-              "name": "timeout-seconds",
-              "required": false,
-              "variadic": false,
-              "description": "Wait override in seconds"
-            }
-          ],
-          "description": "Request an approval decision for a harness tool call."
-        },
-        {
-          "name": "harness-filter",
-          "flags": [],
-          "positionals": [
-            {
-              "name": "harness",
-              "required": true,
-              "variadic": false,
-              "description": "Harness name"
-            }
-          ],
-          "description": "Read a harness hook payload on stdin and print a decision document."
-        },
-        {
-          "name": "harness-drive",
-          "flags": [],
-          "positionals": [
-            {
-              "name": "harness",
-              "required": true,
-              "variadic": false,
-              "description": "Harness name"
-            }
-          ],
-          "description": "End a harness turn: notify and inject one queued remote prompt."
-        },
-        {
-          "name": "sandbox-context",
-          "flags": [
-            {
-              "long": "--format",
-              "takesValue": true,
-              "valueType": "enum",
-              "choices": [
-                "text",
-                "claude",
-                "cursor",
-                "check"
-              ],
-              "description": "Output format"
-            },
-            {
-              "long": "--session-id",
-              "takesValue": true,
-              "valueType": "string",
-              "description": "Harness session identifier"
-            }
-          ],
-          "positionals": [
-            {
-              "name": "harness",
-              "required": true,
-              "variadic": false,
-              "description": "Harness name"
-            }
-          ],
-          "description": "Detect, record, and report sandbox state changes for a harness session."
-        },
-        {
-          "name": "safe-delete-guard",
-          "flags": [
-            {
-              "long": "--settings",
-              "takesValue": true,
-              "valueType": "string",
-              "description": "Filter settings JSON"
-            },
-            {
-              "long": "--command",
-              "takesValue": true,
-              "valueType": "string",
-              "description": "Command text to evaluate"
-            },
-            {
-              "long": "--hook",
-              "takesValue": false,
-              "description": "Read hook payload on stdin and emit hook protocol output"
-            }
-          ],
           "positionals": [],
-          "description": "Evaluate deletion commands against the safe-delete policy."
+          "description": "Harness bridge and guard verbs.",
+          "subcommands": [
+            {
+              "name": "send-notification",
+              "flags": [],
+              "positionals": [
+                {
+                  "name": "harness",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Harness name"
+                },
+                {
+                  "name": "event",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Lifecycle event"
+                },
+                {
+                  "name": "text",
+                  "required": false,
+                  "variadic": false,
+                  "description": "Optional message body"
+                }
+              ],
+              "description": "Normalize a harness lifecycle event into a Hermes notification."
+            },
+            {
+              "name": "decide-call",
+              "flags": [],
+              "positionals": [
+                {
+                  "name": "harness",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Harness name"
+                }
+              ],
+              "description": "Read a harness hook payload on stdin and print a decision document."
+            },
+            {
+              "name": "request-approval",
+              "flags": [
+                {
+                  "long": "--plain",
+                  "takesValue": false,
+                  "description": "Print the decision word alone"
+                }
+              ],
+              "positionals": [
+                {
+                  "name": "harness",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Harness name"
+                },
+                {
+                  "name": "tool",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Tool name"
+                },
+                {
+                  "name": "summary",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Call summary"
+                },
+                {
+                  "name": "timeout-seconds",
+                  "required": false,
+                  "variadic": false,
+                  "description": "Wait override in seconds"
+                }
+              ],
+              "description": "Request an approval decision for a harness tool call."
+            },
+            {
+              "name": "continue-turn",
+              "flags": [],
+              "positionals": [
+                {
+                  "name": "harness",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Harness name"
+                }
+              ],
+              "description": "End a harness turn: notify and inject one queued remote prompt."
+            },
+            {
+              "name": "report-sandbox",
+              "flags": [
+                {
+                  "long": "--format",
+                  "takesValue": true,
+                  "valueType": "enum",
+                  "choices": [
+                    "text",
+                    "claude",
+                    "cursor",
+                    "check"
+                  ],
+                  "description": "Output format"
+                },
+                {
+                  "long": "--session-id",
+                  "takesValue": true,
+                  "valueType": "string",
+                  "description": "Harness session identifier"
+                }
+              ],
+              "positionals": [
+                {
+                  "name": "harness",
+                  "required": true,
+                  "variadic": false,
+                  "description": "Harness name"
+                }
+              ],
+              "description": "Detect, record, and report sandbox state changes for a harness session."
+            },
+            {
+              "name": "check-deletion",
+              "flags": [
+                {
+                  "long": "--settings",
+                  "takesValue": true,
+                  "valueType": "string",
+                  "description": "Filter settings JSON"
+                },
+                {
+                  "long": "--command",
+                  "takesValue": true,
+                  "valueType": "string",
+                  "description": "Command text to evaluate"
+                },
+                {
+                  "long": "--hook",
+                  "takesValue": false,
+                  "description": "Read hook payload on stdin and emit hook protocol output"
+                }
+              ],
+              "positionals": [],
+              "description": "Evaluate deletion commands against the safe-delete policy."
+            },
+            {
+              "name": "merge-models",
+              "flags": [
+                {
+                  "long": "--check",
+                  "takesValue": false,
+                  "description": "Verify merged state without writing"
+                }
+              ],
+              "positionals": [],
+              "description": "Merge LiteLLM gateway model aliases into harness config files."
+            }
+          ]
         }
       ]
     },

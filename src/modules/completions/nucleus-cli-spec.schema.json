@@ -185,6 +185,12 @@
           "items": {
             "$ref": "#/definitions/positional"
           }
+        },
+        "subcommands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/subcommand"
+          }
         }
       }
     },

@@ -13,12 +13,7 @@ case $state in
     _subcmds=(
       'optimize-pdf:Optimize PDF files using Ghostscript.'
       'strip-metadata:Strip personal metadata from files.'
-      'harness-notify:Normalize a harness lifecycle event into a Hermes notification.'
-      'harness-approval:Request an approval decision for a harness tool call.'
-      'harness-filter:Read a harness hook payload on stdin and print a decision document.'
-      'harness-drive:End a harness turn: notify and inject one queued remote prompt.'
-      'sandbox-context:Detect, record, and report sandbox state changes for a harness session.'
-      'safe-delete-guard:Evaluate deletion commands against the safe-delete policy.'
+      'harness:Harness bridge and guard verbs.'
     )
     _describe -t commands 'subcommand' _subcmds
     ;;
@@ -36,39 +31,67 @@ case $state in
           '--dialog[Show one popup listing the inputs that were not processed]' \
           '*:file:'
         ;;
-      harness-notify)
-        _arguments \
-          '1:harness:' \
-          '2:event:' \
-          '3:text:'
-        ;;
-      harness-approval)
-        _arguments \
-          '--plain[Print the decision word alone]' \
-          '1:harness:' \
-          '2:tool:' \
-          '3:summary:' \
-          '4:timeout-seconds:'
-        ;;
-      harness-filter)
-        _arguments \
-          '1:harness:'
-        ;;
-      harness-drive)
-        _arguments \
-          '1:harness:'
-        ;;
-      sandbox-context)
-        _arguments \
-          '--format[Output format]:format:(text claude cursor check)' \
-          '--session-id[Harness session identifier]:session id:' \
-          '1:harness:'
-        ;;
-      safe-delete-guard)
-        _arguments \
-          '--settings[Filter settings JSON]:settings:' \
-          '--command[Command text to evaluate]:command:' \
-          '--hook[Read hook payload on stdin and emit hook protocol output]'
+      harness)
+        _arguments -C \
+          '1:subcommand:->harness_subcmd' \
+          '*::arg:->harness_args'
+        case $state in
+          harness_subcmd)
+            local -a _subcmds
+            _subcmds=(
+              'send-notification:Normalize a harness lifecycle event into a Hermes notification.'
+              'decide-call:Read a harness hook payload on stdin and print a decision document.'
+              'request-approval:Request an approval decision for a harness tool call.'
+              'continue-turn:End a harness turn: notify and inject one queued remote prompt.'
+              'report-sandbox:Detect, record, and report sandbox state changes for a harness session.'
+              'check-deletion:Evaluate deletion commands against the safe-delete policy.'
+              'merge-models:Merge LiteLLM gateway model aliases into harness config files.'
+            )
+            _describe -t commands 'subcommand' _subcmds
+            ;;
+          harness_args)
+            case $words[1] in
+              send-notification)
+                _arguments \
+                  '1:harness:' \
+                  '2:event:' \
+                  '3:text:'
+                ;;
+              decide-call)
+                _arguments \
+                  '1:harness:'
+                ;;
+              request-approval)
+                _arguments \
+                  '--plain[Print the decision word alone]' \
+                  '1:harness:' \
+                  '2:tool:' \
+                  '3:summary:' \
+                  '4:timeout-seconds:'
+                ;;
+              continue-turn)
+                _arguments \
+                  '1:harness:'
+                ;;
+              report-sandbox)
+                _arguments \
+                  '--format[Output format]:format:(text claude cursor check)' \
+                  '--session-id[Harness session identifier]:session id:' \
+                  '1:harness:'
+                ;;
+              check-deletion)
+                _arguments \
+                  '--settings[Filter settings JSON]:settings:' \
+                  '--command[Command text to evaluate]:command:' \
+                  '--hook[Read hook payload on stdin and emit hook protocol output]'
+                ;;
+              merge-models)
+                _arguments \
+                  '--check[Verify merged state without writing]'
+                ;;
+            esac
+            ;;
+        esac
         ;;
     esac
     ;;

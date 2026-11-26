@@ -7,17 +7,10 @@
   - strip-metadata: strip file metadata with mat2/exiftool. PDF and legacy OLE2
     files are skipped with a warning; inputs that could not be processed are
     listed at the end of the run.
-  - harness-notify: normalize a harness lifecycle event into a Hermes notification.
-  - harness-approval: request an approval decision for a harness tool call.
-  - harness-filter: read a harness hook payload on stdin and print a decision document.
-  - harness-drive: end a harness turn: notify and inject one queued remote prompt.
-  - sandbox-context: detect the current sandbox state, compare it with the recorded
-    state for the harness session, emit context on a change or first observation,
-    and update the record.
-  - safe-delete-guard: evaluate deletion commands against the safe-delete policy.
+  - harness: harness bridge and guard verbs (send-notification, decide-call,
+    request-approval, continue-turn, report-sandbox, check-deletion, merge-models).
 .PARAMETER Action
-  The subcommand to run: optimize-pdf, strip-metadata, harness-notify,
-  harness-approval, harness-filter, harness-drive, sandbox-context, safe-delete-guard.
+  The subcommand to run: optimize-pdf, strip-metadata, harness.
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
 .PARAMETER Dialog
@@ -25,20 +18,23 @@
   not processed. Needed by GUI callers: the context-menu verb runs with
   -WindowStyle Hidden, which discards stdout and stderr.
 .PARAMETER Plain
-  Switch (harness-approval only). Print the decision word alone instead of the
+  Switch (harness request-approval only). Print the decision word alone instead of the
   harness's document.
 .PARAMETER File
   One or more file paths to process, or positional arguments forwarded to
-  harness, sandbox-context, and safe-delete-guard subcommands.
+  harness verbs.
 .NOTES
   Maps to the optimize-pdf --preset and --rm-bak and strip-metadata --rm-bak options.
-  Harness and safe-delete-guard subcommands dispatch to implementations in
-  src/scripts/notify/.
+  Harness verbs dispatch to implementations in src/scripts/notify/ and to the
+  sandbox-context implementation in this script.
 #>
 
 [CmdletBinding(PositionalBinding = $false)]
 param(
-  [ValidateSet('optimize-pdf', 'strip-metadata', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')]
+  # WHY: A1 nests harness verbs; A2 sweeps external references. Keep old
+  # top-level names accepted during the slice so existing callers remain
+  # functional; they dispatch to the same current implementations as bash.
+  [ValidateSet('optimize-pdf', 'strip-metadata', 'harness', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')]
   [string]$Action,
 
   [Parameter()]
@@ -478,22 +474,36 @@ if ($Help) {
 # The subcommand is the first token that is a known action word.
 $File = @($File | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
 if ([string]::IsNullOrWhiteSpace($Action) -and $File.Count -gt 0) { $Action = [string]$File[0]; $File = @($File | Select-Object -Skip 1) }
-if (-not $Action) {
+function Show-Usage {
   $scriptName = Split-Path -Leaf $PSCommandPath
-  Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>... | harness-notify <harness> <event> [text] | harness-approval [-Plain] <harness> <tool> <summary> [timeout-seconds] | harness-filter <harness> | harness-drive <harness> | sandbox-context <harness> [--format <text|claude|cursor|check>] [--session-id <id>] | safe-delete-guard [args]..."
-  Write-NucleusInfo "  Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness-notify/approval/filter/drive and safe-delete-guard dispatch to harness bridge and deletion-guard implementations; sandbox-context records and reports sandbox state changes."
+  Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>... | harness <verb> [args...]"
+  Write-NucleusInfo "  Grouped nucleus user utilities. optimize-pdf/strip-metadata process files; harness groups notification, approval, filter, drive, sandbox reporting, deletion checking, and model merge verbs."
   Write-NucleusInfo ""
   Write-NucleusInfo "Subcommands:"
-  Write-NucleusInfo "  optimize-pdf       Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
-  Write-NucleusInfo "  strip-metadata     Strip personal metadata from files (mat2 for OOXML, exiftool otherwise); PDF and legacy OLE2 inputs are skipped."
-  Write-NucleusInfo "  harness-notify     Normalize a harness lifecycle event into a Hermes notification."
-  Write-NucleusInfo "  harness-approval   Request an approval decision for a harness tool call."
-  Write-NucleusInfo "  harness-filter     Read a harness hook payload on stdin and print a decision document."
-  Write-NucleusInfo "  harness-drive      End a harness turn: notify and inject one queued remote prompt."
-  Write-NucleusInfo "  sandbox-context    Detect, record, and report sandbox state changes for a harness session."
-  Write-NucleusInfo "  safe-delete-guard  Evaluate deletion commands against the safe-delete policy."
+  Write-NucleusInfo "  optimize-pdf    Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
+  Write-NucleusInfo "  strip-metadata  Strip personal metadata from files (mat2 for OOXML, exiftool otherwise); PDF and legacy OLE2 inputs are skipped."
+  Write-NucleusInfo "  harness         Harness bridge and guard verbs. Run '$scriptName harness --help' for verbs."
   Write-NucleusInfo ""
   Write-NucleusInfo "Run $scriptName -Help for the full help text."
+}
+
+function Show-HarnessUsage {
+  Write-NucleusInfo "usage: nucleus-utils harness <verb> [args...]"
+  Write-NucleusInfo ""
+  Write-NucleusInfo "Harness bridge and guard verbs."
+  Write-NucleusInfo ""
+  Write-NucleusInfo "Verbs:"
+  Write-NucleusInfo "  send-notification <harness> <event> [text]"
+  Write-NucleusInfo "  decide-call <harness>"
+  Write-NucleusInfo "  request-approval <harness> <tool> <summary> [timeout-seconds]"
+  Write-NucleusInfo "  continue-turn <harness>"
+  Write-NucleusInfo "  report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]"
+  Write-NucleusInfo "  check-deletion [--settings <json>] [--command <text>] [--hook]"
+  Write-NucleusInfo "  merge-models [--check]"
+}
+
+if (-not $Action) {
+  Show-Usage
   exit 0
 }
 
@@ -517,6 +527,89 @@ if (-not (Get-Command Invoke-NucleusExifTool -ErrorAction SilentlyContinue)) {
     # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
     if (Get-Command exiftool -ErrorAction SilentlyContinue) { & exiftool @Args; return }
     throw "ExifTool CLI not found. Expected: exiftool"
+  }
+}
+
+function Invoke-NucleusHarness {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyCollection()]
+    [string[]]$Arguments = @()
+  )
+
+  $argv = @($Arguments)
+  if ($argv.Count -eq 0 -or $argv[0] -eq '-h' -or $argv[0] -eq '--help') {
+    Show-HarnessUsage
+    exit 0
+  }
+
+  $verb = [string]$argv[0]
+  $rest = @()
+  if ($argv.Count -gt 1) { $rest = @($argv | Select-Object -Skip 1) }
+
+  switch ($verb) {
+    'send-notification' {
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-notify.ps1'
+      & $scriptPath @rest
+      exit $LASTEXITCODE
+    }
+    'decide-call' {
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-filter.ps1'
+      & $scriptPath @rest
+      exit $LASTEXITCODE
+    }
+    'request-approval' {
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-approval.ps1'
+      $plain = $false
+      $positionals = @()
+      foreach ($arg in $rest) {
+        if ($arg -eq '--plain' -or $arg -eq '-Plain') { $plain = $true; continue }
+        $positionals += [string]$arg
+      }
+      $haSplat = @{}
+      if ($plain) { $haSplat['Plain'] = $true }
+      if ($positionals.Count -ge 1) { $haSplat['Harness'] = $positionals[0] }
+      if ($positionals.Count -ge 2) { $haSplat['Tool'] = $positionals[1] }
+      if ($positionals.Count -ge 3) { $haSplat['Summary'] = $positionals[2] }
+      if ($positionals.Count -ge 4) {
+        $ts = 0
+        if ([int]::TryParse([string]$positionals[3], [ref]$ts)) { $haSplat['TimeoutSeconds'] = $ts }
+      }
+      & $scriptPath @haSplat
+      exit $LASTEXITCODE
+    }
+    'continue-turn' {
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-drive.ps1'
+      & $scriptPath @rest
+      exit $LASTEXITCODE
+    }
+    'report-sandbox' {
+      $scArgs = @()
+      for ($i = 0; $i -lt $rest.Count; $i++) {
+        $arg = [string]$rest[$i]
+        if ($arg -eq '--format' -and $i + 1 -lt $rest.Count) { $scArgs += @('--format', [string]$rest[$i + 1]); $i++; continue }
+        if ($arg.StartsWith('--format=')) { $scArgs += @('--format', $arg.Substring('--format='.Length)); continue }
+        if ($arg -eq '--session-id' -and $i + 1 -lt $rest.Count) { $scArgs += @('--session-id', [string]$rest[$i + 1]); $i++; continue }
+        if ($arg.StartsWith('--session-id=')) { $scArgs += @('--session-id', $arg.Substring('--session-id='.Length)); continue }
+        $scArgs += $arg
+      }
+      Invoke-NucleusSandboxContext -ArgumentList $scArgs
+    }
+    'check-deletion' {
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\filters\safe-delete.ts'
+      & bun $scriptPath @rest
+      exit $LASTEXITCODE
+    }
+    'merge-models' {
+      Write-NucleusError 'harness merge-models is not implemented in this slice'
+      exit 1
+    }
+    default {
+      Write-NucleusError "unknown harness verb: $verb" -ErrorAction Continue
+      Show-HarnessUsage
+      exit 1
+    }
   }
 }
 
@@ -674,49 +767,39 @@ switch ($Action) {
     if ($failed -gt 0) { exit 1 }
   }
 
+  'harness' {
+    Invoke-NucleusHarness -Arguments $File
+  }
+
+  # Legacy top-level aliases kept for A1/A2 transition (bash keeps same names).
   'harness-notify' {
-    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-notify.ps1'
-    & $scriptPath @File
-    exit $LASTEXITCODE
+    Invoke-NucleusHarness -Arguments (@('send-notification') + $File)
   }
-
-  'harness-approval' {
-    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-approval.ps1'
-    $forwardArgs = @()
-    if ($Plain) { $forwardArgs += '-Plain' }
-    if ($File) { $forwardArgs += $File }
-    & $scriptPath @forwardArgs
-    exit $LASTEXITCODE
-  }
-
   'harness-filter' {
-    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-filter.ps1'
-    & $scriptPath @File
-    exit $LASTEXITCODE
+    Invoke-NucleusHarness -Arguments (@('decide-call') + $File)
   }
-
+  'harness-approval' {
+    $haArgs = @('request-approval')
+    if ($Plain) { $haArgs += '--plain' }
+    if ($File) { $haArgs += @($File) }
+    Invoke-NucleusHarness -Arguments $haArgs
+  }
   'harness-drive' {
-    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness-drive.ps1'
-    & $scriptPath @File
-    exit $LASTEXITCODE
+    Invoke-NucleusHarness -Arguments (@('continue-turn') + $File)
   }
-
   'sandbox-context' {
-    $scArgs = @()
+    $scArgs = @('report-sandbox')
     if ($PSBoundParameters.ContainsKey('Format')) { $scArgs += @('--format', $Format) }
     if ($PSBoundParameters.ContainsKey('SessionId')) { $scArgs += @('--session-id', $SessionId) }
     if ($File) { $scArgs += @($File) }
-    Invoke-NucleusSandboxContext -ArgumentList $scArgs
+    Invoke-NucleusHarness -Arguments $scArgs
   }
-
   'safe-delete-guard' {
-    $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\filters\safe-delete.ts'
-    $sdgArgs = @()
+    $sdgArgs = @('check-deletion')
     if ($PSBoundParameters.ContainsKey('Settings')) { $sdgArgs += @('--settings', $Settings) }
     if ($PSBoundParameters.ContainsKey('TargetCommand')) { $sdgArgs += @('--command', $TargetCommand) }
     if ($Hook) { $sdgArgs += '--hook' }
     if ($File) { $sdgArgs += @($File) }
-    & bun $scriptPath @sdgArgs
-    exit $LASTEXITCODE
+    Invoke-NucleusHarness -Arguments $sdgArgs
   }
 }

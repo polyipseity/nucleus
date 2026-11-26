@@ -1069,7 +1069,8 @@ $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 
 $nucleusConfigCommands = @('get', 'set', 'list')
 $nucleusGcCommands = @('cleanup-nix', 'graveyard', 'logs', 'preferences')
 $nucleusLogsCommands = @('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')
-$nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata', 'harness-notify', 'harness-approval', 'harness-filter', 'harness-drive', 'sandbox-context', 'safe-delete-guard')
+$nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata', 'harness')
+$nucleusHarnessCommands = @('send-notification', 'decide-call', 'request-approval', 'continue-turn', 'report-sandbox', 'check-deletion', 'merge-models')
 $nucleusCloudCommands = @('setup', 'reset', 'sync', 'status', 'restart')
 $nucleusUpdateCommands = @('update', 'lockfile')
 $nucleusCheckCommands = @('packer', 'pwsh', 'sh')
@@ -1322,7 +1323,14 @@ Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-utils -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $tokens = @($commandAst.CommandElements | ForEach-Object { [string]$_.Extent.Text })
+  $first = if ($tokens.Count -ge 2) { [string]$tokens[1] } else { '' }
+  $second = if ($tokens.Count -ge 3) { [string]$tokens[2] } else { '' }
+  if ($first -eq 'harness' -and ($tokens.Count -le 3 -or $wordToComplete -eq $second)) {
+    $nucleusHarnessCommands | Where-Object { $_ -like "$wordToComplete*" }
+    return
+  }
   $nucleusUtilsCommands | Where-Object { $_ -like "$wordToComplete*" }
   $nucleusUtilsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
