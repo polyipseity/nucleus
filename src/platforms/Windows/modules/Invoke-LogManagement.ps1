@@ -10,16 +10,57 @@
 .NOTES
   Environment variables:
     NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR override JSON paths when set.
-    NUCLEUS_REPO_ROOT required for JSON path resolution.
+    NUCLEUS_REPO_ROOT overrides the repo root; when unset the root is derived
+    from this module's location and a missing root is a hard error.
 #>
 
 . (Join-Path $PSScriptRoot 'Get-NucleusHostPlatform.ps1')
 
-function Get-NucleusServicesJsonPath {
+# WHY: functions defined here run in the dot-sourcing caller's scope, where
+# $PSScriptRoot names that caller's directory. Capture this module's own path
+# at load time so root derivation does not depend on the caller or the ambient
+# variable.
+$script:InvokeLogManagementPath = $MyInvocation.MyCommand.Path
+
+function Resolve-NucleusLogRepoRoot {
+  <#
+  .SYNOPSIS
+    Resolves the nucleus repository root for log path helpers.
+  .DESCRIPTION
+    NUCLEUS_REPO_ROOT wins when set. Otherwise the resolver walks up from this
+    module's own file until it finds src/flake.nix, matching the POSIX
+    derive_repo_root contract. A missing root throws instead of defaulting.
+  .OUTPUTS
+    The repository root path.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param()
+
   $repoRoot = $env:NUCLEUS_REPO_ROOT
-  if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-    throw 'NUCLEUS_REPO_ROOT not set'
+  if (-not [string]::IsNullOrWhiteSpace($repoRoot)) {
+    return $repoRoot
   }
+
+  $candidate = if ($script:InvokeLogManagementPath) {
+    Split-Path -Parent $script:InvokeLogManagementPath
+  } else {
+    ''
+  }
+  for ($i = 0; $i -lt 6 -and -not [string]::IsNullOrWhiteSpace($candidate); $i++) {
+    $marker = Join-Path -Path $candidate -ChildPath 'src' -AdditionalChildPath 'flake.nix'
+    if (Test-Path -LiteralPath $marker -PathType Leaf) {
+      return $candidate
+    }
+    $parent = Split-Path -Parent $candidate
+    if ($parent -eq $candidate) { break }
+    $candidate = $parent
+  }
+  throw 'cannot resolve nucleus repository root from NUCLEUS_REPO_ROOT or the log module location'
+}
+
+function Get-NucleusServicesJsonPath {
+  $repoRoot = Resolve-NucleusLogRepoRoot
   return Join-Path -Path $repoRoot -ChildPath 'src\modules\services.json'
 }
 

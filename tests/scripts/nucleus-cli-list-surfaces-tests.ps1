@@ -20,6 +20,48 @@ function Assert-True([bool]$cond, [string]$name, [string]$detail = '') {
   }
 }
 
+function Invoke-LogCommandWithoutRepoRoot {
+  <#
+  .SYNOPSIS
+    Runs a log-list command in a child with root and log-dir overrides removed.
+  .DESCRIPTION
+    The child proves the entry script and its log module resolve the repository
+    from their own paths. A caller's exported variables cannot satisfy the test.
+  .PARAMETER CommandPath
+    Script under the repository root to invoke.
+  .PARAMETER Arguments
+    Arguments passed after the script path.
+  .OUTPUTS
+    ExitCode and combined output of the child process.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$CommandPath,
+    [Parameter(Mandatory)][string[]]$Arguments
+  )
+
+  $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = (Get-Process -Id $PID).Path
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  foreach ($argument in @('-NoProfile', '-NoLogo', '-NonInteractive', '-File', $CommandPath) + $Arguments) {
+    $startInfo.ArgumentList.Add($argument)
+  }
+  $null = $startInfo.Environment.Remove('NUCLEUS_REPO_ROOT')  # check-suppress:suppression_doc: Remove returns a bool; only the environment mutation matters
+  $null = $startInfo.Environment.Remove('NUCLEUS_LOG_DIR')  # check-suppress:suppression_doc: Remove returns a bool; only the environment mutation matters
+  $null = $startInfo.Environment.Remove('NUCLEUS_LOGS_BIN')  # check-suppress:suppression_doc: Remove returns a bool; only the environment mutation matters
+  $startInfo.Environment['NUCLEUS_HOST'] = 'Windows'
+  $startInfo.Environment['NO_COLOR'] = '1'
+
+  $process = [System.Diagnostics.Process]::Start($startInfo)
+  $stdout = $process.StandardOutput.ReadToEndAsync()
+  $stderr = $process.StandardError.ReadToEndAsync()
+  $process.WaitForExit()
+  $combined = ($stdout.Result + "`n" + $stderr.Result).Trim()
+  return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $combined }
+}
+
 Write-Output "`n=== [1] config list --json ==="
 $configJson = & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/config.ps1') list --json 2>$null
 $cfgOk = $false
@@ -249,6 +291,19 @@ $vmOut = & pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/vm.ps1') sync --d
 $vmTxt = (($vmOut | ForEach-Object { "$_" }) -join "`n")
 $vmBindErr = $vmTxt -match "unknown flag '--dry-run'|parameter cannot be found|A parameter cannot be found"
 Assert-True -cond (-not $vmBindErr) -name 'vm.ps1 sync --dry-run is not rejected as unknown normalizer flag' -detail ("rc={0} out={1}" -f $LASTEXITCODE, $vmTxt)
+
+Write-Output "`n=== [6a] log list without ambient NUCLEUS_REPO_ROOT ==="
+$rootlessCases = @(
+  @{ name='gc.ps1 --list-logs resolves its own repo root'; path='scripts/gc.ps1'; args=@('--list-logs') },
+  @{ name='gc.ps1 --dry-run --list-logs resolves its own repo root'; path='scripts/gc.ps1'; args=@('--dry-run', '--list-logs') },
+  @{ name='logs.ps1 --list-logs resolves its own repo root'; path='scripts/logs.ps1'; args=@('--list-logs') }
+)
+foreach ($case in $rootlessCases) {
+  $result = Invoke-LogCommandWithoutRepoRoot -CommandPath (Join-Path $repoRoot $case.path) -Arguments $case.args
+  $detail = "rc=$($result.ExitCode) out=$($result.Output)"
+  $ok = ($result.ExitCode -eq 0 -and $result.Output -notmatch 'cannot resolve nucleus repository root|NUCLEUS_REPO_ROOT not set')
+  Assert-True -cond $ok -name $case.name -detail $detail
+}
 
 if ($null -eq $prevNucleusRepoRoot) { Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue } else { $env:NUCLEUS_REPO_ROOT = $prevNucleusRepoRoot }
 Write-Output "`n$passed passed, $failed failed"
