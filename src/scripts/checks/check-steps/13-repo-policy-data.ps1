@@ -318,13 +318,19 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   $pythonExe = if (-not [string]::IsNullOrWhiteSpace($managedPython) -and
     (Test-Path -LiteralPath $managedPython -PathType Leaf)) { $managedPython } else { $null }
   if (-not $pythonExe) {
-    $fallback = Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional fallback interpreter; absence is a hard error below
-    if ($null -eq $fallback) {
+    # WHY: Get-Command returns every matching application. Assigning the raw
+    #   result turns .Source into an object array when python3 appears more
+    #   than once on PATH, and the invocation then treats all paths as one
+    #   command name. The first match follows Resolve-HarnessPythonExe.
+    $fallbackCommands = @(
+      Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional fallback interpreter; absence is a hard error below
+    )
+    if ($fallbackCommands.Count -eq 0) {
       Write-ErrorMessage 'harness model drift needs a Python interpreter: the managed harness venv is unavailable and python3 is not on PATH'
       $failed = $true
     }
     else {
-      $pythonExe = $fallback.Source
+      $pythonExe = $fallbackCommands[0].Source
     }
   }
   if ($pythonExe) {

@@ -16,6 +16,10 @@
 # the body. Dot-sourcing the step file and invoking $script:StepActions is the
 # same path the runner uses, and tests/scripts/step-runner-unit-tests.ps1
 # already does this.
+#
+# Round 3 adds a source assertion and a two-wrapper PATH case for the fallback
+# interpreter probe. The source assertion keeps the single-match rule visible
+# on hosts where only one python3 executable is installed.
 
 #Requires -Version 7.4
 
@@ -130,6 +134,142 @@ if ($selfShDerivation.Success -and $step12Derivation.Success -and
   Assert-Pass 'step 13: the $selfShLeaf derivation matches step 12'
 } else {
   Assert-Fail 'step 13: the $selfShLeaf derivation matches step 12' 'derivation differs or not found'
+}
+
+# 6. The source rule must stay explicit so a host with one python3 cannot hide
+#    a regression back to a bare Get-Command assignment.
+$collectsMatches = $source -match '(?m)^\s*\$fallbackCommands\s*=\s*@\(\s*Get-Command -Name ''python3'''
+$checksCount = $source -match '\$fallbackCommands\.Count\s*-eq\s*0'
+$selectsFirst = $source -match '\$pythonExe\s*=\s*\$fallbackCommands\[0\]\.Source'
+if ($collectsMatches -and $checksCount -and $selectsFirst) {
+  Assert-Pass 'step 13: the python3 fallback collects matches and selects the first'
+} else {
+  Assert-Fail 'step 13: the python3 fallback collects matches and selects the first' "collects=$collectsMatches count=$checksCount first=$selectsFirst"
+}
+
+# 7. Make the multi-match case deterministic. Two wrapper python3 applications
+#    sit at the front of PATH, each writing its own marker. The body must run
+#    the first one instead of treating every match as one command name.
+$hostIsWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+  [System.Runtime.InteropServices.OSPlatform]::Windows
+)
+$originalPath = $env:PATH
+$originalLocalAppData = $env:LOCALAPPDATA
+$originalMarker = $env:NUCLEUS_STEP13_PYTHON3_MARKER
+$wrapperRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('nucleus-step13-python3-' + [guid]::NewGuid().ToString('N'))
+$firstDir = Join-Path -Path $wrapperRoot -ChildPath 'first'
+$secondDir = Join-Path -Path $wrapperRoot -ChildPath 'second'
+$markerPath = Join-Path -Path $wrapperRoot -ChildPath 'invoked.txt'
+$wrapperLeaf = if ($hostIsWindows) { 'python3.cmd' } else { 'python3' }
+$firstWrapper = Join-Path -Path $firstDir -ChildPath $wrapperLeaf
+$secondWrapper = Join-Path -Path $secondDir -ChildPath $wrapperLeaf
+$fixtureError = ''
+$discoveredCount = 0
+$firstDiscovered = ''
+$multiThrew = $false
+$multiThrowMessage = ''
+$multiOutput = ''
+$markerText = ''
+
+try {
+  $null = New-Item -ItemType Directory -Path $firstDir, $secondDir -Force
+
+  foreach ($pair in @(@($firstWrapper, 'first'), @($secondWrapper, 'second'))) {
+    $wrapperPath = [string]$pair[0]
+    $markerValue = [string]$pair[1]
+    if ($hostIsWindows) {
+      $lines = @('@echo off', "echo $markerValue > ""%NUCLEUS_STEP13_PYTHON3_MARKER%""", 'exit /b 0')
+    }
+    else {
+      $lines = @(
+        '#!/bin/sh',
+        ('printf ''%s\n'' ' + $markerValue + ' > "$NUCLEUS_STEP13_PYTHON3_MARKER"'),
+        'exit 0'
+      )
+    }
+    Set-Content -LiteralPath $wrapperPath -Value $lines
+    if (-not $hostIsWindows) {
+      [System.IO.File]::SetUnixFileMode(
+        $wrapperPath,
+        [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute
+      )
+    }
+  }
+
+  # WHY: the managed resolver probes python.exe and python3.exe before PATH
+  #   fallbacks. Remove those application directories so the test reaches the
+  #   step's python3 fallback on Windows without changing the host.
+  $pathEntries = @(
+    foreach ($entry in ($originalPath -split [regex]::Escape([System.IO.Path]::PathSeparator))) {
+      if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+      if ($hostIsWindows) {
+        $shadowsFallback = @('python3.exe', 'python.exe') | Where-Object {
+          Test-Path -LiteralPath (Join-Path -Path $entry -ChildPath $_) -PathType Leaf
+        }
+        if ($shadowsFallback.Count -gt 0) { continue }
+      }
+      $entry
+    }
+  )
+
+  $env:PATH = (@($firstDir, $secondDir) + $pathEntries) -join [System.IO.Path]::PathSeparator
+  $env:LOCALAPPDATA = $wrapperRoot
+  $env:NUCLEUS_STEP13_PYTHON3_MARKER = $markerPath
+
+  $discovered = @(Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue)
+  $discoveredCount = $discovered.Count
+  if ($discoveredCount -gt 0) { $firstDiscovered = [string]$discovered[0].Source }
+
+  try {
+    $multiOutput = & $script:StepActions[$stepIndex] $context 2>&1 | Out-String
+  } catch {
+    $multiThrew = $true
+    $multiThrowMessage = $_.Exception.Message
+  }
+
+  if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    $markerText = (Get-Content -LiteralPath $markerPath -Raw).Trim()
+  }
+} catch {
+  $fixtureError = $_.Exception.Message
+} finally {
+  $env:PATH = $originalPath
+  if ($null -eq $originalLocalAppData) {
+    Remove-Item -Path Env:LOCALAPPDATA -Force -ErrorAction SilentlyContinue # check-suppress:suppression_doc: restore an originally unset variable; absence is the correct end state
+  }
+  else {
+    $env:LOCALAPPDATA = $originalLocalAppData
+  }
+  if ($null -eq $originalMarker) {
+    Remove-Item -Path Env:NUCLEUS_STEP13_PYTHON3_MARKER -Force -ErrorAction SilentlyContinue # check-suppress:suppression_doc: restore an originally unset variable; absence is the correct end state
+  }
+  else {
+    $env:NUCLEUS_STEP13_PYTHON3_MARKER = $originalMarker
+  }
+  if (Test-Path -LiteralPath $wrapperRoot -PathType Container) {
+    Remove-Item -LiteralPath $wrapperRoot -Recurse -Force -ErrorAction SilentlyContinue # check-suppress:suppression_doc: temporary fixture cleanup; the assertions already captured its result
+  }
+}
+
+if ($fixtureError) {
+  Assert-Fail 'step 13: the two-wrapper python3 fixture is usable' $fixtureError
+  Assert-Fail 'step 13: the body runs the first python3 match' 'fixture setup failed'
+}
+else {
+  if ($discoveredCount -ge 2 -and $firstDiscovered -eq $firstWrapper) {
+    Assert-Pass 'step 13: the two-wrapper python3 fixture is usable'
+  }
+  else {
+    Assert-Fail 'step 13: the two-wrapper python3 fixture is usable' "count=$discoveredCount first=$firstDiscovered expected=$firstWrapper"
+  }
+
+  if (-not $multiThrew -and $markerText -eq 'first' -and
+      $multiOutput -match 'repository policy \(data-driven\) passed') {
+    Assert-Pass 'step 13: the body runs the first python3 match'
+  }
+  else {
+    Assert-Fail 'step 13: the body runs the first python3 match' "threw=$multiThrew marker=$markerText error=$multiThrowMessage output=$multiOutput"
+  }
 }
 
 Write-Output ''
