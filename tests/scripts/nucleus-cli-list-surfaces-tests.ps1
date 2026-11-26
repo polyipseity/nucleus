@@ -75,6 +75,88 @@ if (-not $IsWindows) {
   Write-Output "- SKIP: svc.ps1 POSIX delegation (Windows host)"
 }
 
+Write-Output "`n=== [4a] svc.ps1 registry filter ==="
+# WHY: the Windows branch of svc.ps1 filters services.json before --list-services resolves
+# any service. A top-level metadata object has no hosts map, so the filter must skip it
+# instead of calling a method on the null result of that missing key.
+$svcAstTokens = $null
+$svcAstErrors = $null
+$svcSource = Get-Content (Join-Path $repoRoot 'scripts/svc.ps1') -Raw
+$svcAst = [System.Management.Automation.Language.Parser]::ParseInput($svcSource, [ref]$svcAstTokens, [ref]$svcAstErrors)
+$filterAsts = @($svcAst.FindAll({ $args[0] -is [System.Management.Automation.Language.ForEachStatementAst] -and $args[0].Extent.Text -match 'RegistryRaw\.Keys' }, $true))
+$filterCode = if ($svcAstErrors.Count -eq 0 -and $filterAsts.Count -eq 1) { $filterAsts[0].Extent.Text } else { '' }
+
+function Invoke-SvcRegistryFilter {
+  <#
+  .SYNOPSIS
+    Runs the production services.json filter against a fixture registry.
+  #>
+  param(
+    [Parameter(Mandatory)][hashtable]$Raw,
+    [Parameter(Mandatory)][string]$Code
+  )
+  Set-Variable -Name 'RegistryRaw' -Value $Raw
+  Set-Variable -Name 'NucleusHost' -Value 'Windows'
+  $Registry = @{}
+  . ([scriptblock]::Create($Code))
+  return $Registry
+}
+
+$fixtureWithService = @{
+  '$schema'  = './services.schema.json'
+  '$logging' = @{ capture = 'all'; maxSize = 10000000 }
+  'ollama'   = @{ displayName = 'Ollama'; description = 'Local model server'; hosts = @{ Windows = @{ type = 'windows-native'; service = 'ollama' } } }
+}
+$fixtureMetadataOnly = @{
+  '$schema'  = './services.schema.json'
+  '$logging' = @{ capture = 'all' }
+}
+$filterError = $null
+$filtered = $null
+try { $filtered = Invoke-SvcRegistryFilter -Raw $fixtureWithService -Code $filterCode } catch { $filterError = $_.Exception.Message }
+$filteredKeys = if ($null -ne $filtered) { @($filtered.Keys) -join '|' } else { 'none' }
+Assert-True -cond ($null -eq $filterError -and $null -ne $filtered -and $filtered.Count -eq 1 -and $filtered.ContainsKey('ollama')) -name 'svc.ps1 registry filter skips entries without a hosts map' -detail "error=$filterError keys=$filteredKeys"
+
+$emptyFilterError = $null
+$emptyFiltered = $null
+try { $emptyFiltered = Invoke-SvcRegistryFilter -Raw $fixtureMetadataOnly -Code $filterCode } catch { $emptyFilterError = $_.Exception.Message }
+Assert-True -cond ($null -eq $emptyFilterError -and $null -ne $emptyFiltered -and $emptyFiltered.Count -eq 0) -name 'svc.ps1 registry filter accepts a metadata-only registry' -detail "error=$emptyFilterError"
+
+Write-Output "`n=== [4b] svc.ps1 --list-services with metadata-only registry ==="
+$fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-svc-registry-" + [Guid]::NewGuid().ToString('n'))
+New-Item -ItemType Directory -Path (Join-Path -Path $fixtureRoot -ChildPath 'src' -AdditionalChildPath 'modules') -Force > $null
+@{
+  '$schema'  = './services.schema.json'
+  '$logging' = @{ capture = 'all' }
+} | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path -Path $fixtureRoot -ChildPath 'src' -AdditionalChildPath 'modules', 'services.json') -Encoding utf8
+if ($IsWindows) {
+  $moduleCopies = @(
+    'src/platforms/Windows/modules/Invoke-LogManagement.ps1'
+    'src/platforms/Windows/modules/Get-NucleusHostPlatform.ps1'
+    'src/platforms/Windows/modules/Get-NucleusServiceInstance.ps1'
+    'src/platforms/Windows/modules/ServiceHealth.ps1'
+    'src/scripts/lib/ServiceLiveness.ps1'
+  )
+  foreach ($relative in $moduleCopies) {
+    $destination = Join-Path $fixtureRoot ($relative -replace '/', '\')
+    New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force > $null
+    Copy-Item -Path (Join-Path $repoRoot $relative) -Destination $destination -Force
+  }
+}
+$fixtureRc = -1
+$fixtureText = ''
+try {
+  $env:NUCLEUS_REPO_ROOT = $fixtureRoot
+  $fixtureOutput = @(& pwsh -NoProfile -File (Join-Path $repoRoot 'scripts/svc.ps1') --list-services 2>&1)
+  $fixtureRc = $LASTEXITCODE
+  $fixtureText = (($fixtureOutput | ForEach-Object { "$_" }) -join "`n")
+} finally {
+  $env:NUCLEUS_REPO_ROOT = $repoRoot
+  # check-suppress:suppression_doc: cleanup of test-owned state must not fail the test when already gone
+  Remove-Item -Recurse -Force $fixtureRoot -ErrorAction SilentlyContinue
+}
+Assert-True -cond ($fixtureRc -eq 0 -and $fixtureText -notmatch 'null-valued expression') -name 'svc.ps1 --list-services succeeds with metadata-only registry' -detail "rc=$fixtureRc out=$fixtureText"
+
 Write-Output "`n=== [5] spec --list-* conformance (PowerShell) ==="
 $specFile = Join-Path $repoRoot 'src/modules/completions/nucleus-cli-spec.json'
 $specText = Get-Content $specFile -Raw

@@ -201,7 +201,7 @@ $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
 $Registry = @{}
 foreach ($svc in $RegistryRaw.Keys) {
   $entry = $RegistryRaw[$svc]
-  if ($entry -is [hashtable] -and $entry.hosts.ContainsKey($NucleusHost) -and $entry.hosts[$NucleusHost].type -ne 'omitted') {
+  if ($entry -is [hashtable] -and $entry.ContainsKey('hosts') -and $entry.hosts.ContainsKey($NucleusHost) -and $entry.hosts[$NucleusHost].type -ne 'omitted') {
     $Registry[$svc] = @{
       displayName = $entry.displayName
       description = $entry.description
