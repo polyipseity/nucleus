@@ -43,13 +43,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Cursor is installed for cross-host editor parity with macOS (Homebrew cask cursor) and NixOS (nixpkgs code-cursor)
-      settings:
-        id: Anysphere.Cursor
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure Ruff is installed for cross-host Python lint/format CLI parity with macOS and NixOS
       settings:
         id: astral-sh.ruff
