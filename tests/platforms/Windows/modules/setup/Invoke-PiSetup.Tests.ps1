@@ -5,8 +5,9 @@
     Drives the converger against a temp HOME with a recording "pi" shim on PATH
     and asserts: install specs carry the npm: scheme plus the lockfile version,
     an installed-but-undesired extension is removed, a version-drifted extension
-    is reinstalled at the pinned version, and a missing desired-package registry
-    is a hard error rather than a silent skip.
+    is reinstalled at the pinned version, a multi-directory persisted PATH resolves
+    bun without a resolver mock, and a missing desired-package registry is a hard
+    error rather than a silent skip.
 .NOTES
     Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
@@ -46,6 +47,8 @@ Describe 'Invoke-PiSetup pi extension convergence' {
 
         $script:originalHome = $HOME
         $script:originalPath = $env:PATH
+        $script:originalRepoRoot = $env:NUCLEUS_REPO_ROOT
+        $env:NUCLEUS_REPO_ROOT = $script:realRepoRoot
 
         # bun shim: Invoke-PiSetup requires the interpreter to be resolvable,
         # because pi spawns the bare command "bun" for npm: installs.
@@ -100,6 +103,11 @@ Describe 'Invoke-PiSetup pi extension convergence' {
     AfterAll {
         Set-Variable -Name HOME -Value $script:originalHome -Force
         $env:PATH = $script:originalPath
+        if ($null -eq $script:originalRepoRoot) {
+            Remove-Item Env:NUCLEUS_REPO_ROOT -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
+        } else {
+            $env:NUCLEUS_REPO_ROOT = $script:originalRepoRoot
+        }
         if ($script:tempRoot -and (Test-Path -LiteralPath $script:tempRoot)) {
             # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
             Remove-Item -LiteralPath $script:tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -158,26 +166,53 @@ Describe 'Invoke-PiSetup pi extension convergence' {
         @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty
     }
 
+    It 'resolves the registry from NUCLEUS_REPO_ROOT when the module is staged elsewhere' {
+        Clear-PiState
+        $savedRepoRoot = $env:NUCLEUS_REPO_ROOT
+        try {
+            $stagedRoot = Join-Path $script:tempRoot 'stagedroot'
+            $stagedSetupDir = Join-Path $stagedRoot 'src\platforms\Windows\modules\setup'
+            $null = New-Item -ItemType Directory -Path $stagedSetupDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PiSetup.ps1') -Destination (Join-Path $stagedSetupDir 'Invoke-PiSetup.ps1')
+            . (Join-Path $stagedSetupDir 'Invoke-PiSetup.ps1')
+
+            $env:NUCLEUS_REPO_ROOT = $script:realRepoRoot
+            Invoke-PiSetup
+
+            # A staged module with the live root in the environment reads the
+            # real registry, so every desired extension is still installed.
+            @(Get-PiCallList | Where-Object { $_ -match '^install ' }).Count | Should -Be $script:desiredNames.Count
+        } finally {
+            $env:NUCLEUS_REPO_ROOT = $savedRepoRoot
+        }
+    }
+
     It 'hard-errors when the desired-package registry is missing' {
         Clear-PiState
-        # The module derives its repo root from its own location, so a copied
-        # module inside a synthetic tree exercises the missing-file branch
-        # without touching the real registry.
-        $fakeRoot = Join-Path $script:tempRoot 'fakeroot'
-        $fakeModuleDir = Join-Path $fakeRoot 'src\platforms\Windows\modules'
-        $fakeSetupDir = Join-Path $fakeModuleDir 'setup'
-        $null = New-Item -ItemType Directory -Path $fakeSetupDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        # The synthetic tree holds a lockfile but no desired-package registry, so
-        # the registry check is the one that fires.
-        $null = New-Item -ItemType Directory -Path (Join-Path $fakeRoot 'src\lockfiles') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\lockfiles\lockfile.json') -Destination (Join-Path $fakeRoot 'src\lockfiles\lockfile.json')
-        Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1') -Destination (Join-Path $fakeModuleDir 'Get-NucleusHostPlatform.ps1')
-        Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PiSetup.ps1') -Destination (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
-        . (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
+        $savedRepoRoot = $env:NUCLEUS_REPO_ROOT
+        try {
+            # The module reads the root from NUCLEUS_REPO_ROOT when it is set,
+            # so the synthetic tree points the environment at itself to exercise
+            # the missing-file branch without touching the real registry.
+            $fakeRoot = Join-Path $script:tempRoot 'fakeroot'
+            $fakeModuleDir = Join-Path $fakeRoot 'src\platforms\Windows\modules'
+            $fakeSetupDir = Join-Path $fakeModuleDir 'setup'
+            $null = New-Item -ItemType Directory -Path $fakeSetupDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+            # The synthetic tree holds a lockfile but no desired-package registry, so
+            # the registry check is the one that fires.
+            $null = New-Item -ItemType Directory -Path (Join-Path $fakeRoot 'src\lockfiles') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\lockfiles\lockfile.json') -Destination (Join-Path $fakeRoot 'src\lockfiles\lockfile.json')
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1') -Destination (Join-Path $fakeModuleDir 'Get-NucleusHostPlatform.ps1')
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PiSetup.ps1') -Destination (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
+            . (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
+            $env:NUCLEUS_REPO_ROOT = $fakeRoot
 
-        { Invoke-PiSetup } | Should -Throw -ExpectedMessage '*desired package registry not found*'
-        # A hard error must not fall through to installing anything.
-        @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty
+            { Invoke-PiSetup } | Should -Throw -ExpectedMessage '*desired package registry not found*'
+            # A hard error must not fall through to installing anything.
+            @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty
+        } finally {
+            $env:NUCLEUS_REPO_ROOT = $savedRepoRoot
+        }
     }
 
     It 'puts the managed bun directory on PATH for the pi child' {
@@ -199,12 +234,60 @@ Describe 'Invoke-PiSetup pi extension convergence' {
         @(Get-PiCallList | Where-Object { $_ -match '^install ' }).Count | Should -BeGreaterThan 0
     }
 
+    It 'resolves bun from a multi-directory persisted PATH on Windows' {
+        Clear-PiState
+        $savedPath = $env:PATH
+        $savedIsWindows = $IsWindows
+        try {
+            # WHY: $IsWindows selects the persisted-scope branch on every host,
+            # and -PersistedPath supplies its registry values without changing
+            # machine state. The process PATH holds only the pi shim, so no
+            # process-path entry can satisfy the probe.
+            Set-Variable -Name IsWindows -Value $true -Force
+            $env:PATH = $script:shimDir
+            $missingDir = Join-Path -Path $script:tempRoot -ChildPath 'missing-bun-dir'
+            $anotherMissingDir = Join-Path -Path $script:tempRoot -ChildPath 'another-missing-dir'
+            $persistedPath = "$missingDir;$script:bunDir;$anotherMissingDir"
+
+            $resolvedBun = Get-NucleusBunExecutable -PersistedPath @($persistedPath)
+
+            $resolvedBun | Should -Not -BeNullOrEmpty
+            Split-Path -Path $resolvedBun -Parent | Should -Be $script:bunDir
+            Split-Path -Path $resolvedBun -Leaf | Should -BeIn @('bun.exe', 'bun.cmd', 'bun')
+        } finally {
+            Set-Variable -Name IsWindows -Value $savedIsWindows -Force
+            $env:PATH = $savedPath
+        }
+    }
+
+    It 'resolves bun from a persisted install directory when the process PATH is stale' {
+        Clear-PiState
+        $savedPath = $env:PATH
+        $script:resolvedBun = Get-NucleusBunExecutable -SearchPath @($script:bunDir)
+        $script:resolvedBun | Should -Not -BeNullOrEmpty
+        # Mocking the resolver stands in for a WinGet-installed bun whose directory
+        # is in the persisted PATH but not in this process's PATH snapshot.
+        Mock -CommandName Get-NucleusBunExecutable { return $script:resolvedBun }
+        try {
+            $env:PATH = $script:shimDir
+
+            Invoke-PiSetup
+
+            Get-Command bun -ErrorAction Stop | Should -Not -BeNullOrEmpty
+            @(Get-PiCallList | Where-Object { $_ -match '^install ' }).Count | Should -BeGreaterThan 0
+        } finally {
+            $env:PATH = $savedPath
+        }
+    }
+
     It 'hard-errors when bun is not resolvable' {
         Clear-PiState
         $savedPath = $env:PATH
         try {
-            # A PATH without any bun directory: pi's installs would fail with an
-            # opaque spawn ENOENT, so the module must fail loudly first.
+            # A PATH without any bun directory, and no installed bun reported by
+            # the resolver: pi's installs would fail with an opaque spawn ENOENT,
+            # so the module must fail loudly first.
+            Mock -CommandName Get-NucleusBunExecutable { return $null }
             $env:PATH = $script:shimDir
             { Invoke-PiSetup } | Should -Throw -ExpectedMessage '*bun not found*'
             @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty

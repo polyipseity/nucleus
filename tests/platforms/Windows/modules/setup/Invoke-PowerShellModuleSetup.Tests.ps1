@@ -390,24 +390,33 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:removedDirectories | Should -Contain $removable.ModuleBase
     }
 
-    It 'clears the read-only attribute before the delete and only outside the per-user path' {
-        $imageCopy = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+    It 'clears the read-only attribute on every machine copy before the delete and only outside the per-user path' {
+        $imageCopy65 = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+        $imageCopy70 = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
         $userCopy = Get-ModuleCopy -Version '7.0.0' -Scope 'CurrentUserModules'
-        Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
-        Initialize-ModuleDirectory -ModuleBase $userCopy.ModuleBase
-        $script:copies = @($imageCopy, $userCopy)
+        foreach ($copy in @($imageCopy65, $imageCopy70, $userCopy)) {
+            Initialize-ModuleDirectory -ModuleBase $copy.ModuleBase
+        }
+        $script:copies = @($imageCopy65, $imageCopy70, $userCopy)
 
         & $script:invokeSetup
 
-        # A read-only file inside an image tree is denied exactly the way a
-        # permission problem is, so the attribute has to be cleared before the
-        # delete rather than diagnosed after it failed.
-        $clearIndex = [array]::IndexOf($script:operationLog, "clear-readonly:$($imageCopy.ModuleBase)")
-        $removeIndex = [array]::IndexOf($script:operationLog, "remove:$($imageCopy.ModuleBase)")
-        $clearIndex | Should -BeGreaterThan -1
-        $removeIndex | Should -BeGreaterThan -1
-        $clearIndex | Should -BeLessThan $removeIndex
-        $script:clearedReadOnlyPaths | Should -Contain $imageCopy.ModuleBase
+        # Both machine copies are above the pin. A read-only file inside an
+        # image tree is denied exactly the way a permission problem is, so each
+        # tree gets the grant and the attribute clear before its delete.
+        foreach ($copy in @($imageCopy65, $imageCopy70)) {
+            $grantIndex = [array]::IndexOf($script:operationLog, "grant:$($copy.ModuleBase)")
+            $clearIndex = [array]::IndexOf($script:operationLog, "clear-readonly:$($copy.ModuleBase)")
+            $removeIndex = [array]::IndexOf($script:operationLog, "remove:$($copy.ModuleBase)")
+            $grantIndex | Should -BeGreaterThan -1
+            $clearIndex | Should -BeGreaterThan -1
+            $removeIndex | Should -BeGreaterThan -1
+            $grantIndex | Should -BeLessThan $clearIndex
+            $clearIndex | Should -BeLessThan $removeIndex
+            $script:grantedPaths | Should -Contain $copy.ModuleBase
+            $script:clearedReadOnlyPaths | Should -Contain $copy.ModuleBase
+            $script:removedDirectories | Should -Contain $copy.ModuleBase
+        }
         # The per-user copy is ours, so its attributes are not rewritten even
         # though it is above the pin and therefore a sweep target.
         @($script:clearedReadOnlyPaths) | Should -Not -Contain $userCopy.ModuleBase

@@ -609,9 +609,17 @@ Invoke-ScoopSetup
 # After Invoke-ScoopSetup installs cargo-binstall and prepends the shims
 # directory to PATH.
 Invoke-CargoBinstallSetup
-# After WinGet DSC installs Oven-sh.Bun; Invoke-BunSetup prepends ~/.bun/bin
-# to PATH for this session.
+# After WinGet DSC installs Oven-sh.Bun; WinGet updates the persisted User or
+# Machine PATH, while this elevated process still carries its startup PATH.
+# Resolve the installed executable first so bun setup, and the pi setup that
+# follows it, use the binary DSC actually installed.
 if ($EnableBunParity) {
+  $bunExecutable = Get-NucleusBunExecutable
+  if ([string]::IsNullOrWhiteSpace($bunExecutable)) {
+    throw "bun not found in the process PATH or the persisted User/Machine PATH; ensure the Oven-sh.Bun DSC package installed before this setup step"
+  }
+  Add-NucleusPathEntry -Path (Split-Path -Parent $bunExecutable) -Position Prepend
+  # Invoke-BunSetup prepends ~/.bun/bin to PATH for this session.
   Invoke-BunSetup
 }
 # pi itself is a bun global package, so this runs after Invoke-BunSetup made

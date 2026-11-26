@@ -26,12 +26,89 @@
 .NOTES
   Environment variables: (none)
 #>
+function Get-NucleusBunExecutable {
+  <#
+  .SYNOPSIS
+    Finds the bun executable installed on this host.
+
+  .DESCRIPTION
+    WinGet adds bun's directory to the persisted User or Machine PATH, but an
+    apply process started before that install keeps its old process PATH.
+    Searching the persisted scopes finds the binary the install actually placed.
+    A supplied -SearchPath makes the resolver testable without reading the host
+    registry. No candidate means no executable, never an invented path.
+
+  .PARAMETER SearchPath
+    Directories to search instead of the persisted scopes. Optional.
+
+  .PARAMETER PersistedPath
+    Semicolon-delimited Machine and User PATH strings to search instead of the
+    host registry values. Optional. Each value is split into directories before
+    probing, matching how persisted PATH stores multiple entries.
+
+  .OUTPUTS
+    System.String. Full path to the bun executable, or $null when none is found.
+
+  .EXAMPLE
+    Get-NucleusBunExecutable
+
+  .EXAMPLE
+    Get-NucleusBunExecutable -SearchPath 'C:\Tools\bun'
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter()]
+    [string[]]$SearchPath,
+
+    [Parameter()]
+    [string[]]$PersistedPath
+  )
+
+  $candidatePaths = if ($PSBoundParameters.ContainsKey('SearchPath')) {
+    @($SearchPath)
+  } elseif ($IsWindows) {
+    $persistedPaths = if ($PSBoundParameters.ContainsKey('PersistedPath')) {
+      @($PersistedPath)
+    } else {
+      @(
+        ([Environment]::GetEnvironmentVariable('Path', 'Machine')),
+        ([Environment]::GetEnvironmentVariable('Path', 'User'))
+      )
+    }
+    @($persistedPaths | ForEach-Object { $_ -split ';' }) + @($env:PATH -split ';')
+  } else {
+    @($env:PATH -split [IO.Path]::PathSeparator)
+  }
+
+  foreach ($entry in $candidatePaths) {
+    if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+    # Persisted PATH entries can carry %VARIABLE% references, which Test-Path
+    # would otherwise treat as literal directory names.
+    $expandedEntry = [Environment]::ExpandEnvironmentVariables($entry)
+    foreach ($fileName in @('bun.exe', 'bun.cmd', 'bun')) {
+      $candidate = Join-Path -Path $expandedEntry -ChildPath $fileName
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+  }
+
+  return $null
+}
+
+
 function Invoke-PiSetup {
   [CmdletBinding()]
   param()
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
-  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  # WHY: an elevated apply sets NUCLEUS_REPO_ROOT to the live checkout. A setup
+  # module dot-sourced from a staged copy must still read the registry from that
+  # checkout, so the environment root wins over the script's own location.
+  $repoRootPath = if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
+    "$PSScriptRoot\..\..\..\..\.."
+  } else {
+    $env:NUCLEUS_REPO_ROOT
+  }
+  $repoRoot = (Resolve-Path -LiteralPath $repoRootPath -ErrorAction Stop).Path
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
   $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
 
@@ -124,13 +201,25 @@ function Invoke-PiSetup {
   # check-suppress:suppression_doc: probe -- bun is provisioned by the WinGet DSC baseline; absence is reported below.
   $bunCommand = Get-Command bun -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $bunCommand) {
+    # WHY the second probe: WinGet updates the persisted PATH after this process
+    # started, so a freshly installed bun can be missing from the process PATH
+    # while the executable is already on disk. An unresolved executable still
+    # hard-errors below; this only names where the installed binary lives.
+    $installedBun = Get-NucleusBunExecutable
+    if ($installedBun) {
+      $bunDir = Split-Path -Parent $installedBun
+      $env:PATH = "$bunDir$([IO.Path]::PathSeparator)$env:PATH"
+      $bunCommand = Get-Command bun -ErrorAction Stop | Select-Object -First 1
+    }
+  }
+  if (-not $bunCommand) {
     $errMessage = "bun not found on PATH; ensure Oven-sh.Bun was installed before this step"
     Write-NucleusError -CommandName 'pi-setup' $errMessage
     throw "Invoke-PiSetup: $errMessage"
   }
   foreach ($bunDir in @((Split-Path -Parent $bunCommand.Source), (Get-NucleusManagedBinDir "bun"))) {
     if ($env:PATH -notlike "*$bunDir*") {
-      $env:PATH = "$env:PATH;$bunDir"
+      $env:PATH = "$env:PATH$([IO.Path]::PathSeparator)$bunDir"
     }
   }
 
@@ -179,6 +268,6 @@ function Invoke-PiSetup {
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
-    Write-NucleusInfo -CommandName 'pi' "all managed extensions already converged — skipping"
+    Write-NucleusInfo -CommandName 'pi' "all managed extensions already converged, skipping"
   }
 }
