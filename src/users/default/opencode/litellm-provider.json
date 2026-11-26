@@ -1,0 +1,16 @@
+{
+  "models": {
+    "default": {
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000
+    },
+    "default-free": {
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000
+    }
+  },
+  "npm": "@ai-sdk/openai-compatible",
+  "options": {
+    "baseURL": "http://127.0.0.1:4000/v1"
+  }
+}

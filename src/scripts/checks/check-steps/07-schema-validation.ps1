@@ -28,6 +28,13 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
       $f -like '*users\*\claude\.claude-plugin\marketplace.json' -or $f -like '*users/*/claude/.claude-plugin/marketplace.json' -or
       $f -like '*users\*\vscode\mcp.json' -or $f -like '*users/*/vscode/mcp.json' -or
       $f -like '*users\*\vscode\chatLanguageModels*.json' -or $f -like '*users/*/vscode/chatLanguageModels*.json' -or
+      # ref: allow-and-deny-lists.instructions.md#A8 -- harness slot payloads merged into external config
+      $f -like '*users\*\pi\litellm-models.json' -or $f -like '*users/*/pi/litellm-models.json' -or
+      $f -like '*users\*\opencode\litellm-provider.json' -or $f -like '*users/*/opencode/litellm-provider.json' -or
+      $f -like '*users\*\claude\litellm-env.json' -or $f -like '*users/*/claude/litellm-env.json' -or
+      $f -like '*users\*\vscode\litellm-entry.json' -or $f -like '*users/*/vscode/litellm-entry.json' -or
+      $f -like '*users\*\copilot\litellm-providers.json' -or $f -like '*users/*/copilot/litellm-providers.json' -or
+      $f -like '*users\*\hermes\litellm-config.yaml' -or $f -like '*users/*/hermes/litellm-config.yaml' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
       $f -like '*.yamllint.yml' -or
       # Infrastructure

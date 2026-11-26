@@ -37,6 +37,8 @@ run_schema_validation() {
     */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */users/*/hermes/plugins/*/plugin.yaml | */users/*/claude/plugins/*/.claude-plugin/plugin.json | */users/*/claude/plugins/*/hooks/hooks.json | */users/*/claude/.claude-plugin/marketplace.json | */users/*/vscode/mcp.json | */users/*/vscode/chatLanguageModels*.json | */.sops.yaml | */.yamllint.yml)
       return 0
       ;;
+    # ref: allow-and-deny-lists.instructions.md#A8 -- harness slot payloads merged into external config
+    */users/*/pi/litellm-models.json | */users/*/opencode/litellm-provider.json | */users/*/claude/litellm-env.json | */users/*/vscode/litellm-entry.json | */users/*/copilot/litellm-providers.json | */users/*/hermes/litellm-config.yaml) return 0 ;;
     # Infrastructure
     */vendor/* | */secrets/* | */.github/*) return 0 ;;
     esac

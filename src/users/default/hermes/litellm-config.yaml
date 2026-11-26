@@ -1,0 +1,10 @@
+name: litellm
+api_key: sk-nucleus-dummy-litellm
+base_url: http://127.0.0.1:4000/v1
+models:
+  default:
+    maxInputTokens: 256000
+    maxOutputTokens: 16000
+  default-free:
+    maxInputTokens: 256000
+    maxOutputTokens: 16000

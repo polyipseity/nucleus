@@ -1,0 +1,17 @@
+{
+  "api": "openai-completions",
+  "apiKey": "sk-nucleus-dummy-litellm",
+  "baseUrl": "http://127.0.0.1:4000/v1",
+  "models": [
+    {
+      "id": "default",
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000
+    },
+    {
+      "id": "default-free",
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000
+    }
+  ]
+}

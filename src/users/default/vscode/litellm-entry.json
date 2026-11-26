@@ -1,0 +1,25 @@
+{
+  "apiType": "chat-completions",
+  "models": [
+    {
+      "id": "default",
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000,
+      "name": "LiteLLM Default",
+      "toolCalling": true,
+      "url": "http://127.0.0.1:4000/v1",
+      "vision": true
+    },
+    {
+      "id": "default-free",
+      "maxInputTokens": 256000,
+      "maxOutputTokens": 16000,
+      "name": "LiteLLM Default Free",
+      "toolCalling": true,
+      "url": "http://127.0.0.1:4000/v1",
+      "vision": true
+    }
+  ],
+  "name": "LiteLLM",
+  "vendor": "customendpoint"
+}

@@ -1,0 +1,5 @@
+{
+  "ANTHROPIC_AUTH_TOKEN": "sk-nucleus-dummy-litellm",
+  "ANTHROPIC_BASE_URL": "http://127.0.0.1:4000",
+  "ANTHROPIC_MODEL": "default"
+}
