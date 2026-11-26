@@ -291,6 +291,76 @@ else
   assert_fail "jsonc: corrupt file errors and is not overwritten" "rc=$jsonc_rc changed=$(cmp -s "$WORK/jsonc.corrupt.before" "$jsonc_target" && echo no || echo yes) err=$(cat "$jsonc_err")"
 fi
 
+cat >"$jsonc_target" <<'JSONC'
+{
+  // trailing comma probe
+  "provider": {
+    "other": {
+      "keep": true,
+    },
+    "litellm": {
+      "options": {
+        "baseURL": "http://old",
+      }
+    },
+  },
+  "plugins": [
+    "first",
+    "escaped \"comma,\" stays",
+  ],
+}
+JSONC
+cat >"$WORK/jsonc.trailing.expected" <<'JSONC'
+{
+  // trailing comma probe
+  "provider": {
+    "other": {
+      "keep": true,
+    },
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1"
+      }
+    },
+  },
+  "plugins": [
+    "first",
+    "escaped \"comma,\" stays",
+  ],
+}
+JSONC
+jsonc_rc="$(run_merge "$jsonc_registry" "$jsonc_home" "$jsonc_out" "$jsonc_err")"
+if [ "$jsonc_rc" -eq 0 ] && cmp -s "$WORK/jsonc.trailing.expected" "$jsonc_target"; then
+  assert_pass "jsonc: trailing comma and escaped string survive outside owned slot"
+else
+  assert_fail "jsonc: trailing comma and escaped string survive outside owned slot" "rc=$jsonc_rc target=$(cat "$jsonc_target") err=$(cat "$jsonc_err")"
+fi
+
+cat >"$jsonc_target" <<'JSONC'
+{
+  "provider": {
+    "litellm": {
+      "options": {
+        "baseURL": "http://old",,
+      }
+    }
+  }
+}
+JSONC
+cp "$jsonc_target" "$WORK/jsonc.double-comma.before"
+jsonc_rc="$(run_merge "$jsonc_registry" "$jsonc_home" "$jsonc_out" "$jsonc_err")"
+if [ "$jsonc_rc" -ne 0 ] && cmp -s "$WORK/jsonc.double-comma.before" "$jsonc_target"; then
+  assert_pass "jsonc: double comma fails and leaves the source untouched"
+else
+  assert_fail "jsonc: double comma fails and leaves the source untouched" "rc=$jsonc_rc changed=$(cmp -s "$WORK/jsonc.double-comma.before" "$jsonc_target" && echo no || echo yes) err=$(cat "$jsonc_err")"
+fi
+if grep -Eq 'line|column|invalid JSON' "$jsonc_err"; then
+  assert_pass "jsonc: double comma error names the parse failure"
+else
+  assert_fail "jsonc: double comma error names the parse failure" "$(cat "$jsonc_err")"
+fi
+
 # ---- YAML format -----------------------------------------------------------
 
 yaml_home="$WORK/yaml-home"
@@ -648,6 +718,53 @@ if [ "$toml_rc" -eq 0 ] && [ -f "$toml_missing_target" ] && grep -q 'model_provi
   assert_pass "toml: missing file is created"
 else
   assert_fail "toml: missing file is created" "rc=$toml_rc err=$(cat "$toml_err")"
+fi
+
+# ---- method-1 symlink write-through ----------------------------------------
+
+link_home="$WORK/link-home"
+link_source="$WORK/symlink-source.json"
+link_target="$link_home/.config/harness/config.json"
+mkdir -p "$(dirname "$link_target")"
+link_out="$WORK/link.out"
+link_err="$WORK/link.err"
+
+link_rc="$(run_merge "$json_registry" "$link_home" "$link_out" "$link_err")"
+if [ "$link_rc" -eq 0 ] && [ -f "$link_target" ]; then
+  mv "$link_target" "$link_source"
+  ln -s "$link_source" "$link_target"
+  cp "$link_source" "$WORK/link-correct.before"
+  link_rc="$(run_merge "$json_registry" "$link_home" "$link_out" "$link_err")"
+  if [ "$link_rc" -eq 0 ] && [ -L "$link_target" ] && cmp -s "$WORK/link-correct.before" "$link_source"; then
+    assert_pass "symlink: already-correct target is a no-op"
+  else
+    assert_fail "symlink: already-correct target is a no-op" "rc=$link_rc err=$(cat "$link_err")"
+  fi
+else
+  assert_fail "symlink: fixture target could not be seeded" "rc=$link_rc err=$(cat "$link_err")"
+fi
+
+python3 - "$link_source" <<'PY'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p, encoding='utf-8'))
+d['providers']['litellm']['baseUrl'] = 'http://127.0.0.1:9999/v1'
+json.dump(d, open(p, 'w', encoding='utf-8'), indent=2)
+open(p, 'a', encoding='utf-8').write('\n')
+PY
+cp "$link_source" "$WORK/link-drift.before"
+link_rc="$(run_merge "$json_registry" "$link_home" "$link_out" "$link_err")"
+if [ "$link_rc" -ne 0 ] && grep -Fq 'refusing to write through managed symlink' "$link_err" && grep -Fq '.config/harness/config.json' "$link_err" && grep -Fq 'update the tracked source' "$link_err" && cmp -s "$WORK/link-drift.before" "$link_source"; then
+  assert_pass "symlink: write mode refuses drift and leaves the source untouched"
+else
+  assert_fail "symlink: write mode refuses drift and leaves the source untouched" "rc=$link_rc err=$(cat "$link_err")"
+fi
+
+link_rc="$(run_merge "$json_registry" "$link_home" "$link_out" "$link_err" --check)"
+if [ "$link_rc" -ne 0 ] && grep -q 'slot drift' "$link_out" && cmp -s "$WORK/link-drift.before" "$link_source"; then
+  assert_pass "symlink: --check still reports drift"
+else
+  assert_fail "symlink: --check still reports drift" "rc=$link_rc out=$(cat "$link_out") err=$(cat "$link_err")"
 fi
 
 finish_tests

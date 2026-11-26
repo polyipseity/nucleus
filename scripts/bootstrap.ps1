@@ -502,6 +502,11 @@ if ($env:PATH -notlike "*$uvToolBin*") {
 # WHY before the uv tool installs below: CI runners ship no uv and it is
 # required for yamllint and check-jsonschema.
 Install-Uv
+# WHY after uv: the harness Python venv installs its pinned PyYAML through uv
+# and is read by the check pipeline in later CI steps.
+$harnessPythonSetupPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\setup\Invoke-HarnessPythonSetup.ps1'
+. $harnessPythonSetupPath
+$harnessPythonSetup = Invoke-HarnessPythonSetup
 
 if ($env:GITHUB_PATH) {
     $winGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
@@ -518,6 +523,9 @@ if ($env:GITHUB_PATH) {
     if (Test-Path $uvToolBin) {
         Add-Content -Path $env:GITHUB_PATH -Value $uvToolBin
     }
+    # The harness venv is the only interpreter with the pinned PyYAML needed by
+    # the check pipeline; the resolver in check step 13 prefers it on apply.
+    Add-Content -Path $env:GITHUB_PATH -Value $harnessPythonSetup.VenvScriptsDir
 }
 # yamllint: Python package, no WinGet ID. Requires uv on PATH.
 # check-suppress:suppression_doc: probe whether uv is installed; warns when absent

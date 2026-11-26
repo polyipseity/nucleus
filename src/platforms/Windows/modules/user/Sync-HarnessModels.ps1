@@ -1,15 +1,27 @@
+. (Join-Path -Path $PSScriptRoot -ChildPath '..\ManagedPaths.ps1')
+
 function Resolve-HarnessPythonExe {
   <#
   .SYNOPSIS
     Resolves the Python interpreter used by the harness model merge tool.
 
   .DESCRIPTION
-    Python is installed by WinGet, so PATH is the search surface. The first
-    match wins and the function boundary keeps absence stub-able for tests.
+    The uv venv under the nucleus USER root is the only interpreter with the
+    pinned PyYAML, so it wins before PATH. When the venv is absent, the first
+    python3.exe or python.exe on PATH is used and the function boundary keeps
+    absence stub-able for tests.
   #>
   [CmdletBinding()]
   [OutputType([object])]
   param()
+
+  # WHY: outside Windows the managed USER root may be undefined, which is the
+  # same as having no managed venv for this resolver.
+  $managedPython = try { Get-NucleusHarnessPythonExe } catch { $null }
+  if (-not [string]::IsNullOrWhiteSpace($managedPython) -and
+    (Test-Path -LiteralPath $managedPython -PathType Leaf)) {
+    return $managedPython
+  }
 
   $commands = @(
     Get-Command -Name 'python3.exe' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional interpreter name on PATH; absence is a hard error in the caller
@@ -41,8 +53,8 @@ function Sync-HarnessModel {
     Absolute path to the nucleus repository checkout.
 
   .PARAMETER PythonExe
-    Python interpreter path. When empty, the first python3.exe or python.exe on
-    PATH is used.
+    Python interpreter path. When empty, the managed harness venv interpreter
+    is used, falling back to the first python3.exe or python.exe on PATH.
 
   .PARAMETER HostName
     Host key used to select a host-split config path from the registry.

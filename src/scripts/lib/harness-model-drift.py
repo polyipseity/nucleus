@@ -4,7 +4,9 @@
 Run from either check twin with --repo-root. The validator reads B1's alias
 table, B2's merge registry, the B3 payloads, and the prompt-capability matrix,
 then proves the merge tool can seed a temporary HOME and pass --check against
-it. It never writes to the repository.
+it. It also checks the two method-1 tracked sources already carry their owned
+slots, so a symlink target cannot depend on a write the merge tool refuses.
+It never writes to the repository.
 """
 
 from __future__ import annotations
@@ -21,13 +23,18 @@ from types import ModuleType
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 except Exception as exc:  # pragma: no cover - runtime env dependency
     print(f"harness-model-drift: cannot import yaml: {exc}", file=sys.stderr)
     raise SystemExit(2) from exc
 
 
 LIMIT_KEYS = ("maxInputTokens", "maxOutputTokens")
+
+METHOD1_TRACKED_SOURCES = {
+    "claude": "src/users/default/claude/settings.json",
+    "opencode": "src/users/default/opencode/opencode.jsonc",
+}
 
 
 class DriftError(ValueError):
@@ -93,6 +100,27 @@ def _import_alias_module(root: Path) -> ModuleType:
         spec.loader.exec_module(module)
     except Exception as exc:
         raise DriftError(f"cannot load B1 alias module from {path}: {exc}") from exc
+    finally:
+        sys.dont_write_bytecode = previous
+    return module
+
+
+def _import_merge_module(root: Path) -> ModuleType:
+    path = root / "src/scripts/agents/merge-harness-models.py"
+    spec = importlib.util.spec_from_file_location("nucleus_merge_harness_models", path)
+    if spec is None or spec.loader is None:
+        raise DriftError(f"cannot import merge module from {path}")
+    module = importlib.util.module_from_spec(spec)
+    # WHY: dataclass in the merge module resolves annotations through
+    # sys.modules[__name__], so an unregistered module fails before any check.
+    sys.modules[spec.name] = module
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        sys.modules.pop(spec.name, None)
+        raise DriftError(f"cannot load merge module from {path}: {exc}") from exc
     finally:
         sys.dont_write_bytecode = previous
     return module
@@ -309,6 +337,32 @@ def _check_registry_parity(root: Path, entries: list[dict[str, Any]], errors: li
             errors.append(f"capabilities: harness '{harness}' declares prompt commands but has no model payload")
 
 
+def _check_tracked_sources(root: Path, errors: list[str]) -> None:
+    """Prove the method-1 sources carry the slots a symlink cannot receive."""
+    merge = _import_merge_module(root)
+    registry = root / "src/modules/configs/harness-models.json"
+    try:
+        entries = {entry.harness: entry for entry in merge._load_registry(registry)}
+    except merge.MergeError as exc:
+        errors.append(f"cannot load merge registry for tracked sources: {exc}")
+        return
+
+    for harness, relative in sorted(METHOD1_TRACKED_SOURCES.items()):
+        entry = entries.get(harness)
+        if entry is None:
+            errors.append(f"{harness}: no merge registry entry for tracked source")
+            continue
+        source = (root / relative).resolve()
+        try:
+            text = source.read_text(encoding="utf-8")
+            current = merge._extract_slot(entry, source, text)
+            payload = merge._payload_for_target(entry, root, harness)
+            if merge._normalize_for_compare(entry, current) != merge._normalize_for_compare(entry, payload):
+                errors.append(f"{harness}: tracked source {relative} slot is missing or stale")
+        except (OSError, merge.MergeError, KeyError, TypeError, ValueError) as exc:
+            errors.append(f"{harness}: tracked source {relative} slot is missing or stale: {exc}")
+
+
 def _run_merge(root: Path, home: Path, check: bool) -> subprocess.CompletedProcess[str]:
     command = [
         sys.executable,
@@ -352,6 +406,7 @@ def validate(root: Path) -> list[str]:
     for entry in entries:
         _check_payload(root, entry, aliases, errors)
     _check_vscode_hosts(root, entries, errors)
+    _check_tracked_sources(root, errors)
     _check_merge(root, errors)
     return errors
 

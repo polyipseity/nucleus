@@ -22,6 +22,24 @@
     // Superpowers is provisioned via method-1 symlink to Nix store.
     // See symlink-superpowers-for-opencode.sh and agents.nix.
   ],
+  "provider": {
+    "litellm": {
+      "models": {
+        "default": {
+          "maxInputTokens": 256000,
+          "maxOutputTokens": 16000
+        },
+        "default-free": {
+          "maxInputTokens": 256000,
+          "maxOutputTokens": 16000
+        }
+      },
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1"
+      }
+    }
+  },
   "permissions": {
     "bash": {
       "*": "allow",

@@ -308,7 +308,15 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   Write-Message "--- harness model drift ---"
   $validatorPath = Join-Path $r 'src\scripts\lib\harness-model-drift.py'
-  $driftOutput = & python3 $validatorPath --repo-root $r 2>&1
+  $resolverPath = Join-Path $r 'src\platforms\Windows\modules\user\Sync-HarnessModels.ps1'
+  if (-not (Test-Path -LiteralPath $resolverPath -PathType Leaf)) {
+    Write-ErrorMessage "harness Python resolver not found: $resolverPath"
+    return $false
+  }
+  . $resolverPath
+  $managedPython = [string](Resolve-HarnessPythonExe)
+  $pythonExe = if ([string]::IsNullOrWhiteSpace($managedPython)) { 'python3' } else { $managedPython }
+  $driftOutput = & $pythonExe $validatorPath --repo-root $r 2>&1
   $driftExit = $LASTEXITCODE
   if ($driftExit -ne 0) {
     foreach ($line in @($driftOutput)) {

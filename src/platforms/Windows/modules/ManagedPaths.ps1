@@ -114,6 +114,30 @@ function Get-NucleusUserRoot {
 
 <#
 .SYNOPSIS
+  Returns the managed harness Python interpreter under the nucleus USER root.
+.DESCRIPTION
+  The interpreter lives in a uv-managed venv at
+  <USER root>\envs\harness-python. Consumers must probe this path before
+  PATH so a stale system Python cannot replace the pinned PyYAML runtime.
+.PARAMETER UserRoot
+  Overrides the nucleus USER root for tests that must not touch the host root.
+.OUTPUTS
+  System.String.  Absolute path to the managed harness python.exe.
+.EXAMPLE
+  Get-NucleusHarnessPythonExe -> C:\Users\admin\AppData\Local\nucleus\envs\harness-python\Scripts\python.exe
+#>
+function Get-NucleusHarnessPythonExe {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [string]$UserRoot
+  )
+  $root = if ($PSBoundParameters.ContainsKey('UserRoot')) { $UserRoot } else { Get-NucleusUserRoot }
+  Join-Path -Path $root -ChildPath 'envs\harness-python\Scripts\python.exe'
+}
+
+<#
+.SYNOPSIS
   Prepends or appends a directory to the current session PATH, deduplicating.
 .DESCRIPTION
   Adds the specified directory to $env:PATH if it is not already present, at

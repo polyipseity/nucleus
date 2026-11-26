@@ -192,7 +192,7 @@ function ConvertTo-HarnessApprovalDocument {
           hookSpecificOutput = @{
             hookEventName             = 'PreToolUse'
             permissionDecision        = $Decision
-            permissionDecisionReason  = 'nucleus harness-approval'
+            permissionDecisionReason  = 'nucleus-utils harness request-approval'
           }
         } -Compress -Depth 5)
     }

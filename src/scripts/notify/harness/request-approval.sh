@@ -91,7 +91,7 @@ _ha_render() {
   case "$_ha_harness" in
   cursor) printf '{"permission":"%s"}\n' "$1" ;;
   copilot)
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"nucleus harness-approval"}}\n' "$1"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"nucleus-utils harness request-approval"}}\n' "$1"
     ;;
   *) printf '%s\n' "$1" ;;
   esac

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 except Exception as exc:  # pragma: no cover - exercised by runtime env
     print(f"litellm-aliases: cannot import yaml: {exc}", file=sys.stderr)
     raise SystemExit(2) from exc

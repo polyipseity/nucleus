@@ -287,6 +287,7 @@ try {
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaDSPSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaGUISetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-HarnessPythonSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-PiSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-PowerShellModuleSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
@@ -630,6 +631,8 @@ if ($EnablePiExtensionsParity) {
 # After WinGet DSC installs astral-sh.uv; Invoke-UvSetup prepends ~/.local/bin
 # to PATH for this session.
 Invoke-UvSetup
+# The harness resolver reads YAML through this venv before Sync-HarnessModel runs.
+Invoke-HarnessPythonSetup
 # PowerShell modules: pinned versions for DSC validation and code hygiene.
 Invoke-PowerShellModuleSetup
 Invoke-CamillaDSPSetup

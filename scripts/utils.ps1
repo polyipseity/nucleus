@@ -142,6 +142,9 @@ function ConvertTo-NucleusStripMetadataReport {
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
+$harnessResolverPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\user\Sync-HarnessModels.ps1'
+. $harnessResolverPath
+
 $script:SandboxedContextBlock = 'You are inside the srt sandbox. The repo and the granted scratch paths work normally, but the fence is real: network destinations and Unix sockets are allowlisted, some paths are read-only, git config hooks and secrets are protected, and deletions land in the Trash through the safe wrapper (Finder ''Put Back'' is unavailable because Apple Events are denied). If a command fails with a permission or socket error, assume the fence before assuming a bug, say what you need, and use `pi-unrestricted` only when the task genuinely needs the unsandboxed host.'
 $script:UnsandboxedContextBlock = 'You are outside the srt sandbox, so the full host is reachable. That is more power than the sandboxed default, so treat deletions, secrets, and network calls with extra care; the safe-delete rules still apply, and a command that worked here may be blocked in the sandbox when you switch back.'
 
@@ -303,7 +306,7 @@ function Invoke-NucleusSandboxContext {
 
   $argv = @($ArgumentList)
   if ($argv.Count -eq 0) {
-    Write-NucleusError 'sandbox-context requires a harness name'
+    Write-NucleusError 'harness report-sandbox requires a harness name'
     exit 1
   }
   if ($argv[0] -eq '-h' -or $argv[0] -eq '--help') {
@@ -339,7 +342,7 @@ function Invoke-NucleusSandboxContext {
       $i += 1
       continue
     }
-    Write-NucleusError "unknown sandbox-context option: $arg"
+    Write-NucleusError "unknown harness report-sandbox option: $arg"
     exit 1
   }
   if ($help) {
@@ -347,7 +350,7 @@ function Invoke-NucleusSandboxContext {
     exit 0
   }
   if ($format -notin @('text', 'claude', 'cursor', 'check')) {
-    Write-NucleusError "unknown sandbox-context format: $format"
+    Write-NucleusError "unknown harness report-sandbox format: $format"
     exit 1
   }
 
@@ -374,7 +377,7 @@ function Invoke-NucleusSandboxContext {
       $rawRecord = Get-Content -LiteralPath $recordFile -Raw -Encoding UTF8
       $record = ConvertFrom-Json -InputObject $rawRecord -AsHashtable
       if ($record -isnot [hashtable] -or -not $record.ContainsKey('version') -or $record['version'] -ne 1 -or -not $record.ContainsKey('sessions') -or $record['sessions'] -isnot [hashtable]) {
-        throw 'invalid sandbox-context record'
+        throw 'invalid harness report-sandbox record'
       }
       $sessions = $record['sessions']
       if ($sessions.ContainsKey($sessionId) -and $sessions[$sessionId] -is [hashtable] -and $sessions[$sessionId].ContainsKey('state')) {
@@ -386,7 +389,7 @@ function Invoke-NucleusSandboxContext {
     } catch {
       $corrupt = $true
       $record = $null
-      [Console]::Error.WriteLine("utils: warning: sandbox-context: corrupt or unreadable record '$recordFile'; treating prior state as unknown")
+      [Console]::Error.WriteLine("utils: warning: harness report-sandbox: corrupt or unreadable record '$recordFile'; treating prior state as unknown")
     }
   }
 
@@ -448,7 +451,7 @@ function Invoke-NucleusSandboxContext {
       [System.IO.File]::Move($tmpFile, $recordFile, $true)
     } catch {
       Remove-Item -LiteralPath $tmpFile -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temporary file may not exist after failed write
-      Write-NucleusWarning "sandbox-context: could not write record '$recordFile'"
+      Write-NucleusWarning "harness report-sandbox: could not write record '$recordFile'"
     }
   }
 
@@ -600,7 +603,9 @@ function Invoke-NucleusHarness {
     }
     'merge-models' {
       $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\agents\merge-harness-models.py'
-      & python3 $scriptPath @rest
+      $managedPython = [string](Resolve-HarnessPythonExe)
+      $pythonExe = if ([string]::IsNullOrWhiteSpace($managedPython)) { 'python3' } else { $managedPython }
+      & $pythonExe $scriptPath @rest
       exit $LASTEXITCODE
     }
     default {

@@ -506,24 +506,24 @@ try {
 
   if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
     Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'NUCLEUS_REPO_ROOT is unset: asking locally'
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read' -Rule registry-error
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'nucleus-utils harness decide-call (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read' -Rule registry-error
   }
   # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
   $registryPath = Join-Path -Path (Join-Path -Path (Join-Path -Path $env:NUCLEUS_REPO_ROOT -ChildPath 'src') -ChildPath 'modules') -ChildPath 'configs/harness-filters.json'
   if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) {
     Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "filter registry not found at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): no filter registry at $registryPath" -Rule registry-error
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "nucleus-utils harness decide-call (registry-error): no filter registry at $registryPath" -Rule registry-error
   }
 
   try { $entries = Get-HarnessFilterRegistryEntry -RegistryPath $registryPath }
   catch {
     Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "could not parse the filter registry at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable" -Rule registry-error
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "nucleus-utils harness decide-call (registry-error): the filter registry at $registryPath is unreadable" -Rule registry-error
   }
 
   $command = Read-HarnessFilterPayloadCommand -Payload $payload
   if ([string]::IsNullOrWhiteSpace($command)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (not-a-command): the payload carries no shell command' -Rule not-a-command
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'nucleus-utils harness decide-call (not-a-command): the payload carries no shell command' -Rule not-a-command
   }
   # The command is what the gate asks about, so it replaces the raw payload, and it
   # is collapsed to the one line the terminal prompt and the audit line carry: a
@@ -537,7 +537,7 @@ try {
   # WHY ask and never allow: an undecided call is not an authorisation, so the
   # runner allows only when a filter says so.
   if ([string]::IsNullOrEmpty($result.Decision)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (no-filter): no enabled filter produced a verdict' -Rule no-filter
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'nucleus-utils harness decide-call (no-filter): no enabled filter produced a verdict' -Rule no-filter
   }
   Complete-HarnessFilter -Harness $Harness -Decision $result.Decision -Tool $toolName -Summary $summaryText -Reason $result.Reason
 }
@@ -548,7 +548,7 @@ catch {
   # WHY its own call: a crash is exactly the outcome a review looks for, so the
   # fail-open document is audited rather than only printed.
   Write-HarnessFilterAudit -Harness $Harness -Decision 'ask' -Rule 'runner-error'
-  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason 'harness-filter (runner-error): the runner failed, so the harness prompts')
+  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason 'nucleus-utils harness decide-call (runner-error): the runner failed, so the harness prompts')
 }
 
 exit 0

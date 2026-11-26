@@ -625,7 +625,7 @@ do_sandbox_context() {
       ' 2>/dev/null || printf 'unknown')"
     else
       corrupt=1
-      warn "sandbox-context: corrupt or unreadable record '$record_file'; treating prior state as unknown"
+      warn "harness report-sandbox: corrupt or unreadable record '$record_file'; treating prior state as unknown"
     fi
   fi
 
@@ -671,7 +671,7 @@ do_sandbox_context() {
         )
     ' >"$tmp_file" 2>/dev/null; then
       rm -f "$tmp_file"
-      warn "sandbox-context: could not write record '$record_file'"
+      warn "harness report-sandbox: could not write record '$record_file'"
       # Do not emit on write failure? The decision was made; better to still emit
       # if we were going to, but record is lost. Brief states "record..." as part
       # of behavior; write failure is an operational issue. I'll warn and continue
@@ -679,7 +679,7 @@ do_sandbox_context() {
     else
       if ! mv -f "$tmp_file" "$record_file"; then
         rm -f "$tmp_file"
-        warn "sandbox-context: could not publish record '$record_file'"
+        warn "harness report-sandbox: could not publish record '$record_file'"
       fi
     fi
   fi

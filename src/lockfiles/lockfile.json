@@ -277,6 +277,7 @@
     "git-filter-repo": "2.47.0",
     "litellm": "1.100.1",
     "paddleocr": "3.6.0",
+    "pyyaml": "6.0.3",
     "yamllint": "1.35.1"
   },
   "version": 2,

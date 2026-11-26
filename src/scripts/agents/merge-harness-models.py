@@ -18,6 +18,9 @@ Contract (plan B2):
 - Missing target file is created with only the owned slot.
 - Corrupt/unparseable file is a hard error naming file and parse position;
   never replaced.
+- A managed method-1 config reaches this tool as a writable symlink into the
+  tracked source tree. Drift is reported in --check mode, but write mode
+  refuses to follow the link: the tracked source is the file to edit.
 - --check writes nothing, compares live slot to payload, exits non-zero
   listing each drifting harness.
 - --host limits host-split path maps to one host key, so activation never
@@ -35,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 except Exception as exc:  # pragma: no cover - runtime env dependency
     print(f"merge-harness-models: cannot import yaml: {exc}", file=sys.stderr)
     raise SystemExit(2) from exc
@@ -149,12 +152,15 @@ def _resolve_repo_path(repo_root: Path, raw: str) -> Path:
 
 
 def _resolve_home_path(raw: str, home: Path) -> Path:
+    # WHY: resolve() follows a method-1 symlink into the tracked source, which
+    # hides the link from the write-through guard. absolute() keeps the logical
+    # target path and still makes it independent of the caller's cwd.
     if raw.startswith("~/"):
-        return (home / raw[2:]).resolve()
+        return (home / raw[2:]).absolute()
     p = Path(raw)
     if p.is_absolute():
         return p
-    return (home / p).resolve()
+    return (home / p).absolute()
 
 
 def _json_text(value: Any) -> str:
@@ -371,7 +377,7 @@ def _find_object_key_span(text: str, obj_start: int, key: str, allow_comments: b
 
 def _parse_json_like(text: str, path: Path, allow_comments: bool) -> Any:
     if allow_comments:
-        stripped = _strip_json_comments(text, path)
+        stripped = _strip_json_trailing_commas(_strip_json_comments(text, path))
         try:
             return json.loads(stripped)
         except json.JSONDecodeError as exc:
@@ -384,6 +390,40 @@ def _parse_json_like(text: str, path: Path, allow_comments: bool) -> Any:
         raise MergeError(
             f"invalid JSON in {path}: line {exc.lineno} column {exc.colno}: {exc.msg}"
         ) from exc
+
+
+def _strip_json_trailing_commas(text: str) -> str:
+    """Blank trailing commas outside strings after comments are removed.
+
+    json.loads rejects the trailing comma in JSONC arrays such as the
+    OpenCode `plugins` list. Blanking instead of deleting keeps source spans
+    stable for the slot replacement pass.
+    """
+    chars = list(text)
+    index = 0
+    in_string = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            if char == "\\":
+                index += 2
+                continue
+            if char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            index += 1
+            continue
+        if char == ",":
+            lookahead = index + 1
+            while lookahead < len(text) and text[lookahead].isspace():
+                lookahead += 1
+            if lookahead < len(text) and text[lookahead] in "}]":
+                chars[index] = " "
+        index += 1
+    return "".join(chars)
 
 
 def _strip_json_comments(text: str, path: Path) -> str:
@@ -450,57 +490,6 @@ def _render_json_value(value: Any, indent: str, key_col: int) -> str:
     pad = " " * key_col
     lines = raw.splitlines()
     return "\n".join([lines[0], *[pad + line for line in lines[1:]]])
-
-
-def _replace_dotted_json_key(
-    text: str, dotted: str, value: Any, path: Path, allow_comments: bool
-) -> str:
-    keys = [k for k in dotted.split(".") if k]
-    if not keys:
-        raise MergeError(f"empty slot path for {path}")
-
-    # Ensure file parses.
-    parsed = _parse_json_like(text, path, allow_comments)
-    if not isinstance(parsed, dict):
-        raise MergeError(f"top-level JSON value must be object: {path}")
-
-    obj_start = _skip_ws_comments(text, 0, allow_comments)
-    if obj_start >= len(text) or text[obj_start] != "{":
-        raise MergeError(f"top-level JSON value must be object: {path}")
-
-    current_obj = obj_start
-    for key in keys[:-1]:
-        try:
-            _, _, value_start, value_end = _find_object_key_span(
-                text, current_obj, key, allow_comments, path
-            )
-        except KeyError as exc:
-            raise MergeError(f"missing slot path '{dotted}' in {path}: '{key}' not found") from exc
-        inner_start = _skip_ws_comments(text, value_start, allow_comments)
-        if inner_start >= len(text) or text[inner_start] != "{":
-            raise MergeError(
-                f"slot path '{dotted}' does not traverse objects at '{key}' in {path}"
-            )
-        current_obj = inner_start
-
-    leaf = keys[-1]
-    try:
-        key_start, colon_end, value_start, value_end = _find_object_key_span(
-            text, current_obj, leaf, allow_comments, path
-        )
-    except KeyError as exc:
-        raise MergeError(f"missing slot key '{leaf}' in {path}") from exc
-
-    key_col = key_start - (text.rfind("\n", 0, key_start) + 1)
-    rendered = _render_json_value(value, _detect_json_indent(text, current_obj, key_start), key_col)
-    # Preserve single space after colon if present.
-    between = text[colon_end:value_start]
-    if not between:
-        between = " "
-    # If original had comments between colon and value, keep them? No: the owned
-    # region is the value; comments between colon and value belong to value area
-    # and would be ambiguous. Preserve whitespace exactly as-is.
-    return text[:colon_end] + between[: len(between) - len(between.lstrip(" \t"))] + ("" if between.lstrip(" \t") == "" else "") + rendered + text[value_end:]
 
 
 def _replace_dotted_json_key_preserving_between(
@@ -1174,6 +1163,12 @@ def _process_entry(
             if check:
                 changed.append(f"{label}: missing target {target}")
                 continue
+            if target.is_symlink():
+                errors.append(
+                    f"{label}: refusing to create {target} through a managed symlink; "
+                    "update the tracked source and re-apply"
+                )
+                continue
             try:
                 _ensure_parent(target)
                 content = _create_minimal_file(entry, target, payload)
@@ -1183,6 +1178,7 @@ def _process_entry(
                 errors.append(f"{label}: cannot create {target}: {exc}")
             continue
 
+        is_managed_symlink = target.is_symlink()
         try:
             text = target.read_text(encoding="utf-8")
         except OSError as exc:
@@ -1206,6 +1202,11 @@ def _process_entry(
         if merged != text:
             if check:
                 changed.append(f"{label}: would change {target}")
+            elif is_managed_symlink:
+                errors.append(
+                    f"{label}: refusing to write through managed symlink {target}; "
+                    "update the tracked source and re-apply"
+                )
             else:
                 try:
                     target.write_text(merged, encoding="utf-8")

@@ -41,6 +41,7 @@ make_fixture() { # <name>
     cp "$REPO_ROOT/src/modules/configs/$file" "$FIXTURE/src/modules/configs/$file"
   done
   for file in pi/litellm-models.json opencode/litellm-provider.json claude/litellm-env.json \
+    opencode/opencode.jsonc claude/settings.json \
     vscode/litellm-entry.json vscode/chatLanguageModels.MacBook.json \
     vscode/chatLanguageModels.NixOS.json vscode/chatLanguageModels.Windows.json \
     copilot/litellm-providers.json hermes/litellm-config.yaml codex/litellm-config.toml; do
@@ -273,6 +274,43 @@ test_merge_drift_fails() {
   remove_tree "$FIXTURE"
 }
 
+test_missing_tracked_source_slot_fails() {
+  make_fixture source-missing
+  python3 - "$FIXTURE/src/users/default/opencode/opencode.jsonc" <<'PY'
+import re
+import sys
+path = sys.argv[1]
+text = open(path, encoding='utf-8').read()
+updated, count = re.subn(r'  "provider": \{.*?\n  \},\n', '', text, count=1, flags=re.DOTALL)
+assert count == 1
+open(path, 'w', encoding='utf-8').write(updated)
+PY
+  local out="$WORK/source-missing.out"
+  local rc
+  rc="$(run_validator "$FIXTURE" "$out")"
+  if [ "$rc" -ne 0 ] && grep -q 'opencode: tracked source src/users/default/opencode/opencode.jsonc slot is missing or stale' "$out"; then
+    assert_pass "a tracked source without its owned slot fails"
+  else
+    assert_fail "a tracked source without its owned slot fails" "rc=$rc output=[$(cat "$out")]"
+  fi
+  remove_tree "$FIXTURE"
+}
+
+test_stale_tracked_source_slot_fails() {
+  make_fixture source-stale
+  mutate_json "$FIXTURE/src/users/default/claude/settings.json" \
+    "data['env']['ANTHROPIC_MODEL'] = 'stray'"
+  local out="$WORK/source-stale.out"
+  local rc
+  rc="$(run_validator "$FIXTURE" "$out")"
+  if [ "$rc" -ne 0 ] && grep -q 'claude: tracked source src/users/default/claude/settings.json slot is missing or stale' "$out"; then
+    assert_pass "a tracked source with a stale owned slot fails"
+  else
+    assert_fail "a tracked source with a stale owned slot fails" "rc=$rc output=[$(cat "$out")]"
+  fi
+  remove_tree "$FIXTURE"
+}
+
 test_both_steps_declare_the_validator() {
   local out rc=0
   out="$(
@@ -314,7 +352,11 @@ section 3 "registry drift"
 test_registry_id_missing_from_capabilities_fails
 test_prompt_capability_without_payload_fails
 
-section 4 "merge proof and wiring"
+section 4 "tracked source slots"
+test_missing_tracked_source_slot_fails
+test_stale_tracked_source_slot_fails
+
+section 5 "merge proof and wiring"
 test_merge_drift_fails
 test_both_steps_declare_the_validator
 

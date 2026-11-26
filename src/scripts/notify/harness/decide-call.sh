@@ -160,7 +160,7 @@ _hf_rank() { # <decision>
 _hf_repo_root=""
 if ! _hf_repo_root="$(derive_repo_root)"; then
   warn "could not resolve the repository root: asking locally"
-  _hf_finish ask "harness-filter (registry-error): the repository root is unknown, so the filter registry cannot be read" registry-error
+  _hf_finish ask "nucleus-utils harness decide-call (registry-error): the repository root is unknown, so the filter registry cannot be read" registry-error
 fi
 # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
 _hf_registry="$_hf_repo_root/src/modules/configs/harness-filters.json"
@@ -168,11 +168,11 @@ _hf_registry="$_hf_repo_root/src/modules/configs/harness-filters.json"
 _hf_entries=""
 if [ ! -f "$_hf_registry" ]; then
   warn "filter registry not found at $_hf_registry: asking locally"
-  _hf_finish ask "harness-filter (registry-error): no filter registry at $_hf_registry" registry-error
+  _hf_finish ask "nucleus-utils harness decide-call (registry-error): no filter registry at $_hf_registry" registry-error
 fi
 if ! _hf_entries="$(jq -c '.filters[] | select(.enabled == true) | {id: .id, settings: .settings}' "$_hf_registry")"; then
   warn "could not parse the filter registry at $_hf_registry: asking locally"
-  _hf_finish ask "harness-filter (registry-error): the filter registry at $_hf_registry is unreadable" registry-error
+  _hf_finish ask "nucleus-utils harness decide-call (registry-error): the filter registry at $_hf_registry is unreadable" registry-error
 fi
 
 # WHY the leading whitespace is stripped first: a payload that is JSON behind a
@@ -196,7 +196,7 @@ case "$_hf_payload" in
 *) _hf_command="$_hf_payload" ;;
 esac
 if [ -z "$_hf_command" ]; then
-  _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command" not-a-command
+  _hf_finish ask "nucleus-utils harness decide-call (not-a-command): the payload carries no shell command" not-a-command
 fi
 # The command is what the gate asks about, so it replaces the raw payload, and it
 # is collapsed to the one line the terminal prompt and the audit line carry: a
@@ -211,7 +211,7 @@ _hf_description="${_hf_description:0:200}"
 _hf_bun=""
 if ! _hf_bun="$(command -v bun)"; then
   warn "bun is not on PATH, so no filter can run: asking locally"
-  _hf_finish ask "harness-filter (filter-error): bun is not on PATH, so the filter runtime is missing" filter-error
+  _hf_finish ask "nucleus-utils harness decide-call (filter-error): bun is not on PATH, so the filter runtime is missing" filter-error
 fi
 
 # WHY empty: "no filter spoke" is not a verdict, so it must not win the
@@ -269,6 +269,6 @@ while IFS= read -r _hf_entry; do
 done <<<"$_hf_entries"
 
 if [ -z "$_hf_best_decision" ]; then
-  _hf_finish ask "harness-filter (no-filter): no enabled filter produced a verdict" no-filter
+  _hf_finish ask "nucleus-utils harness decide-call (no-filter): no enabled filter produced a verdict" no-filter
 fi
 _hf_finish "$_hf_best_decision" "$_hf_best_reason"

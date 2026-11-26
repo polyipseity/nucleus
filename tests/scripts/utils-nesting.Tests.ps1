@@ -9,6 +9,7 @@ BeforeAll {
   $script:RepoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPath '..\..')).Path
   $script:UtilsPs1 = Join-Path -Path $script:RepoRoot -ChildPath 'scripts/utils.ps1'
   $script:PwshPath = [Environment]::ProcessPath
+  . (Join-Path -Path $script:RepoRoot -ChildPath 'src/platforms/Windows/modules/ManagedPaths.ps1')
 
   function New-UtilsTestHome {
     [CmdletBinding(SupportsShouldProcess = $true)]
@@ -42,6 +43,41 @@ BeforeAll {
     }
     $json = ConvertTo-Json -InputObject $config -Compress -Depth 10
     [System.IO.File]::WriteAllText($path, $json, [System.Text.UTF8Encoding]::new($false))
+  }
+
+  function New-FakeManagedHarnessPython {
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][string]$HomePath)
+    $localAppData = Join-Path -Path $HomePath -ChildPath 'AppData/Local'
+    $null = New-Item -ItemType Directory -Path $localAppData -Force
+    $userRoot = Join-Path -Path $localAppData -ChildPath 'nucleus'
+    $fakePython = Get-NucleusHarnessPythonExe -UserRoot $userRoot
+    $null = New-Item -ItemType Directory -Path (Split-Path -Path $fakePython -Parent) -Force
+    if ($IsWindows) {
+      $typeName = 'FakeHarnessPython' + [guid]::NewGuid().ToString('N')
+      $source = @"
+using System;
+using System.IO;
+public static class $typeName
+{
+  public static void Main()
+  {
+    string marker = Environment.GetEnvironmentVariable("NUCLEUS_TEST_PY_MARKER");
+    if (!string.IsNullOrEmpty(marker))
+    {
+      File.AppendAllText(marker, "managed-python\n");
+    }
+  }
+}
+"@
+      $null = Add-Type -TypeDefinition $source -OutputAssembly $fakePython -OutputType ConsoleApplication
+    } else {
+      $body = "#!/bin/sh`nprintf 'managed-python\n' >> `"`$NUCLEUS_TEST_PY_MARKER`"`nexit 0`n"
+      $null = Set-Content -LiteralPath $fakePython -Value $body -NoNewline
+      [System.IO.File]::SetUnixFileMode($fakePython, [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute)
+    }
+    return $fakePython
   }
 
   function Invoke-UtilsScript {
@@ -211,6 +247,24 @@ Describe 'nucleus-utils harness nesting (PowerShell)' {
         'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi', '--check'
       )
       $check.ExitCode | Should -Not -Be 0
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'uses the managed harness Python for merge-models when the venv exists' {
+    $testHome = New-UtilsTestHome
+    try {
+      $fakePython = New-FakeManagedHarnessPython -HomePath $testHome
+      Test-Path -LiteralPath $fakePython -PathType Leaf | Should -BeTrue
+      $marker = Join-Path -Path $testHome -ChildPath 'fake-python-invoked.log'
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @(
+        'harness', 'merge-models', '--home', $testHome, '--repo-root', $script:RepoRoot, '--harness', 'pi'
+      ) -ExtraEnv @{
+        LOCALAPPDATA           = (Join-Path -Path $testHome -ChildPath 'AppData/Local')
+        NUCLEUS_TEST_PY_MARKER = $marker
+      }
+      $result.ExitCode | Should -Be 0
+      Test-Path -LiteralPath $marker -PathType Leaf | Should -BeTrue
+      (Get-Content -LiteralPath $marker -Raw).Trim() | Should -Be 'managed-python'
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
