@@ -624,7 +624,9 @@ Invoke-StepPipeline
 # a lib that throws on its second load kills the runspace before the step body
 # runs. Both cases below drive Invoke-StepPipeline, so each half of the fix is
 # guarded on its own: deleting the recording reddens the report case, deleting the
-# tail skip reddens the finished-line case.
+# tail skip reddens the finished-line case. The driver wraps both calls in an
+# outer try/catch so a swallowed process exit appears as `leaked:` and exit 99
+# instead of the required exit 1.
 function Invoke-RunspaceFailureRun {
     param([Parameter(Mandatory)][string]$RepoRoot)
 
@@ -656,8 +658,13 @@ $script:FAIL_FAST = $false
 $script:StepLibPath = $LibPath
 $env:PARALLEL_JOBS = '1'
 Register-Step -Id 'broken' -Number 1 -Name 'Broken step' -Action { $true }
-Invoke-StepPipeline
-Format-StepSummary
+try {
+    Invoke-StepPipeline
+    Format-StepSummary
+} catch {
+    Write-Output "leaked: $($_.Exception.Message)"
+    exit 99
+}
 '@
     Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
     try {
@@ -677,10 +684,11 @@ function Test-PipelineRecordsRunspaceFailure {
     $reported = $run.Out -match 'step runspace failed: ' -and $run.Out -match 'RUNSPACE-BOOM'
     $failed = $run.Out -match 'some checks failed: steps 1'
     $green = $run.Out -match 'all checks passed'
-    if ($run.Code -eq 1 -and $reported -and $failed -and -not $green) {
+    $leaked = $run.Out -match 'leaked:'
+    if ($run.Code -eq 1 -and $reported -and $failed -and -not $green -and -not $leaked) {
         Assert-Pass "a runspace that throws is reported as a failed step with its reason"
     } else {
-        Assert-Fail "runspace failure report" "exit=$($run.Code) reported=$reported failed=$failed green=$green output=[$($run.Out)]"
+        Assert-Fail "runspace failure report" "exit=$($run.Code) reported=$reported failed=$failed green=$green leaked=$leaked output=[$($run.Out)]"
     }
 }
 
@@ -690,10 +698,53 @@ function Test-PipelineDoesNotReportRunspaceFailureAsFinished {
     $run = Invoke-RunspaceFailureRun -RepoRoot $repoRoot
     $failed = $run.Out -match 'some checks failed: steps 1'
     $finished = $run.Out -match 'step\s+1 finished'
-    if ($run.Code -eq 1 -and $failed -and -not $finished) {
+    $leaked = $run.Out -match 'leaked:'
+    if ($run.Code -eq 1 -and $failed -and -not $finished -and -not $leaked) {
         Assert-Pass "a runspace that throws is not reported as finished"
     } else {
-        Assert-Fail "runspace failure finished line" "exit=$($run.Code) failed=$failed finished=$finished output=[$($run.Out)]"
+        Assert-Fail "runspace failure finished line" "exit=$($run.Code) failed=$failed finished=$finished leaked=$leaked output=[$($run.Out)]"
+    }
+}
+
+# [Environment]::Exit skips PowerShell.Exiting, the only normal trigger for
+# Remove-WaveTempDir and Save-WaveStepOutput. Drive Format-StepSummary in a child
+# process so the exit boundary is real, then check that the fixture's step-1.out
+# reached NUCLEUS_STEP_OUTPUT_DIR and the wave tree is gone.
+function Test-StepSummaryHardExitPreservesOutput {
+    $testHome = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-summary-$([System.IO.Path]::GetRandomFileName())"
+    $outputDir = Join-Path $testHome 'output'
+    $null = New-Item -ItemType Directory -Path $outputDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $driver = Join-Path $testHome 'driver.ps1'
+    $driverText = @'
+param([string]$RepoRoot, [string]$OutputDir, [string]$FixtureDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $FixtureDir
+$env:NUCLEUS_STEP_OUTPUT_DIR = $OutputDir
+. (Join-Path $RepoRoot 'src/scripts/lib/step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Initialize-WaveTempDir
+Set-Content -LiteralPath (Join-Path $script:WaveTmpDir 'step-1.out') -Value 'ARTIFACT-CONTENT' -Encoding utf8
+Write-Output "WAVE=$($script:WaveTmpDir)"
+Format-StepSummary
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -OutputDir $outputDir -FixtureDir $testHome 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $waveMatch = [regex]::Match($out, '(?m)^WAVE=(.+)$')
+        $waveDir = if ($waveMatch.Success) { $waveMatch.Groups[1].Value.Trim() } else { '' }
+        $artifact = Join-Path $outputDir 'step-1.out'
+        $preserved = (Test-Path -LiteralPath $artifact) -and (((Get-Content -LiteralPath $artifact -Raw).Trim()) -eq 'ARTIFACT-CONTENT')
+        $removed = $waveDir -and -not (Test-Path -LiteralPath $waveDir)
+        if ($code -eq 0 -and $preserved -and $removed) {
+            Assert-Pass "Format-StepSummary preserves step output and removes the wave dir on hard exit"
+        } else {
+            Assert-Fail "step summary hard-exit cleanup" "exit=$code preserved=$preserved removed=$removed wave=[$waveDir] output=[$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $testHome -Recurse -Force
     }
 }
 
@@ -732,6 +783,7 @@ Test-FailFastReport-ReplaysFailedStep
 Test-PipelineFailFastReportsLaunchOrder
 Test-PipelineRecordsRunspaceFailure
 Test-PipelineDoesNotReportRunspaceFailureAsFinished
+Test-StepSummaryHardExitPreservesOutput
 
 function Test-SaveFileListCache-NoPathBeyondSymlink {
     . $stepRunner

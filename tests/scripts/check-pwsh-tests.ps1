@@ -47,4 +47,6 @@ try {
 }
 
 Write-Output "$($script:Passed) passed, $($script:Failed) failed"
-if ($script:Failed -gt 0) { exit 1 }
+# WHY: the expected-failure child runs set $LASTEXITCODE; this suite's result is
+# its own failure count, not the last native command it happened to invoke.
+exit $script:Failed

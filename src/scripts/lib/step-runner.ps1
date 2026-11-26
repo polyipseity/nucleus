@@ -468,7 +468,28 @@ function Save-FileListCache {
   $script:CachedShellFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name | Select-GitIgnored
 }
 
+# WHY: the body owns the pipeline's top-level try/catch. Its outcomes are
+# reported through -ExitCode, and this wrapper sets the process exit after the
+# catch can no longer intercept control flow. This wrapper uses the plain exit
+# keyword because it is an early return to the caller; Format-StepSummary uses
+# [Environment]::Exit for its final boundary, where a caller's try/catch is the
+# failure mode under test. Both wrappers clean up explicitly: the summary exit
+# bypasses the PowerShell.Exiting event, and a second pass after a normal exit
+# is a no-op because both helpers guard on path existence.
 function Invoke-StepPipeline {
+  $pipelineExitCode = 0
+  Invoke-StepPipelineBody -ExitCode ([ref]$pipelineExitCode)
+  if ($pipelineExitCode -ne 0) {
+    Remove-WaveTempDir
+    exit $pipelineExitCode
+  }
+}
+
+function Invoke-StepPipelineBody {
+  param(
+    [Parameter(Mandatory)]
+    [ref]$ExitCode
+  )
   $startedSteps = 0
   try {
   Initialize-WaveTempDir
@@ -509,7 +530,8 @@ function Invoke-StepPipeline {
     $parsedProgress = 0
     if (-not [int]::TryParse($env:NUCLEUS_STEP_PROGRESS_INTERVAL, [ref]$parsedProgress) -or $parsedProgress -lt 0) {
       Write-NucleusError ("NUCLEUS_STEP_PROGRESS_INTERVAL must be whole seconds (got '{0}')" -f $env:NUCLEUS_STEP_PROGRESS_INTERVAL)
-      exit 2
+      $ExitCode.Value = 2
+      return
     }
     $progressSeconds = $parsedProgress
   }
@@ -519,7 +541,8 @@ function Invoke-StepPipeline {
     $parsedTimeout = 0
     if (-not [int]::TryParse($env:NUCLEUS_STEP_TIMEOUT, [ref]$parsedTimeout) -or $parsedTimeout -lt 0) {
       Write-NucleusError ("NUCLEUS_STEP_TIMEOUT must be whole seconds (got '{0}')" -f $env:NUCLEUS_STEP_TIMEOUT)
-      exit 2
+      $ExitCode.Value = 2
+      return
     }
     $stepTimeoutSeconds = $parsedTimeout
   }
@@ -778,7 +801,8 @@ function Invoke-StepPipeline {
     # catch records every one there, so the set is the single source for this
     # branch.
     Write-ErrorMessage "step runspace failed (fail-fast)"
-    exit 1
+    $ExitCode.Value = 1
+    return
   }
 
   if ($script:FAIL_FAST -and $failFastNumbers.Count -gt 0) {
@@ -791,7 +815,8 @@ function Invoke-StepPipeline {
       if ($failFastNumbers.Contains($n)) { $orderedFailed += $n }
     }
     Format-FailFastReport -Number $orderedFailed
-    exit 1
+    $ExitCode.Value = 1
+    return
   }
 
   $pipelineStart.Stop()
@@ -803,14 +828,15 @@ function Invoke-StepPipeline {
       $_.Exception -is [System.ArgumentException] -or
       $_.Exception -is [System.ArgumentNullException]
     if ($startedSteps -eq 0 -and -not $isParseOrValidation) {
-      $exitCode = if ((Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue) -and $LASTEXITCODE -and $LASTEXITCODE -ne 0) { [int]$LASTEXITCODE } else { 1 } # check-suppress:suppression_doc: LASTEXITCODE may be unset in a fresh session; absence means no native exit code
-      $msg = "error: runner aborted before any step started (exit $exitCode): $($_.Exception.Message)"
+      $abortExitCode = if ((Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue) -and $LASTEXITCODE -and $LASTEXITCODE -ne 0) { [int]$LASTEXITCODE } else { 1 } # check-suppress:suppression_doc: LASTEXITCODE may be unset in a fresh session; absence means no native exit code
+      $msg = "error: runner aborted before any step started (exit $abortExitCode): $($_.Exception.Message)"
       if (Get-Command -Name Write-ErrorMessage -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: Write-ErrorMessage is optional in minimal harnesses; fall back to Write-Error
         Write-ErrorMessage $msg
       } else {
         Write-Error $msg
       }
-      exit $exitCode
+      $ExitCode.Value = $abortExitCode
+      return
     }
     throw
   }
@@ -899,7 +925,25 @@ function Format-FailFastReport {
 }
 
 # --- Format-StepSummary ---
+# WHY: the body renders the summary and reports its outcome through -ExitCode;
+# the wrapper sets the process exit after the body returns, so a caller's
+# try/catch cannot intercept it. [Environment]::Exit skips the
+# PowerShell.Exiting event that normally calls Remove-WaveTempDir, so the
+# explicit call here preserves step output and removes the wave tree. The same
+# call after a plain exit is a no-op because both helpers guard on path
+# existence.
 function Format-StepSummary {
+  $summaryExitCode = 0
+  Format-StepSummaryBody -ExitCode ([ref]$summaryExitCode)
+  Remove-WaveTempDir
+  [Environment]::Exit($summaryExitCode)
+}
+
+function Format-StepSummaryBody {
+  param(
+    [Parameter(Mandatory)]
+    [ref]$ExitCode
+  )
   $totalSteps = $script:StepActions.Count
   $failedSteps = ""
   $totalElapsed = 0
@@ -915,14 +959,14 @@ function Format-StepSummary {
     }
 
     # check-suppress:suppression_doc: probe -- exit file may not exist if step never ran; $null defaulted to '1' below
-    $exitCode = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.exit") -ErrorAction SilentlyContinue
-    if (-not $exitCode) { $exitCode = "1" }
+    $stepExitCode = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.exit") -ErrorAction SilentlyContinue
+    if (-not $stepExitCode) { $stepExitCode = "1" }
     # check-suppress:suppression_doc: probe -- time file may not exist if step never ran; $null defaulted to '0' below
     $elapsed = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.time") -ErrorAction SilentlyContinue
     if (-not $elapsed) { $elapsed = "0" }
     $totalElapsed += [int]$elapsed
 
-    if ($exitCode -eq "0") {
+    if ($stepExitCode -eq "0") {
       Format-StepLine -Number $n -Glyph "✓" -Color $script:NucStyleGreen
     } else {
       Format-StepLine -Number $n -Glyph "✗" -Color $script:NucStyleRed
@@ -932,7 +976,7 @@ function Format-StepSummary {
     # Replay step output (verbose mode, failed steps, or nothing in scope)
     $stepId = $script:StepIds[$i]
     $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
-    $isFailed = $exitCode -ne '0'
+    $isFailed = $stepExitCode -ne '0'
     # WHY: a passing step that had nothing in scope is replayed too. Its exit code
     # is 0 and its output is otherwise dropped, so the run would print the same ✓
     # for "checked and found nothing" and "never ran".
@@ -955,11 +999,11 @@ function Format-StepSummary {
   if ($failedSteps) {
     Write-ErrorMessage "$($script:NucStyleRed)some checks failed: steps $failedSteps$($script:NucStyleReset)"
     "  Failed steps: $failedSteps" | Write-Output
-    exit 1
-  } else {
-    Write-Message "$($script:NucStyleGreen)all checks passed.$($script:NucStyleReset)"
-    exit 0
+    $ExitCode.Value = 1
+    return
   }
+  Write-Message "$($script:NucStyleGreen)all checks passed.$($script:NucStyleReset)"
+  $ExitCode.Value = 0
 }
 
 function Test-Prerequisite {
