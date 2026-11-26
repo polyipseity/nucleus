@@ -101,10 +101,15 @@ Verbs:
     --command <text>   Command text to evaluate.
     --hook             Read hook payload on stdin and emit hook protocol output.
 
-  merge-models [--check]
+  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>]
               Merge LiteLLM gateway model aliases into harness config files.
-              Not implemented in this slice.
-    --check            Verify merged state without writing.
+              # check-suppress:config-method: method 4 (runtime direct read) -- registry is read by merge-harness-models.py at runtime.
+              Registry: src/modules/configs/harness-models.json.
+    --check            Verify merged state without writing; exit non-zero on drift.
+    --registry <path>  Registry JSON path.
+    --home <dir>       Home directory for resolving target paths.
+    --repo-root <dir>  Repository root for resolving payload and registry paths.
+    --harness <id>     Only process this harness id (repeatable).
 EOF
 }
 
@@ -713,8 +718,7 @@ do_harness() {
     exec "$SCRIPT_DIR/../src/scripts/notify/filters/safe-delete.ts" "$@"
     ;;
   merge-models)
-    error "harness merge-models is not implemented in this slice"
-    return 1
+    exec python3 "$SCRIPT_DIR/../src/scripts/agents/merge-harness-models.py" "$@"
     ;;
   *)
     error "unknown harness verb: $verb" || true # check-suppress:suppression_doc: print usage after error; return below carries the non-zero contract

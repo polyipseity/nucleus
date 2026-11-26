@@ -499,7 +499,7 @@ function Show-HarnessUsage {
   Write-NucleusInfo "  continue-turn <harness>"
   Write-NucleusInfo "  report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]"
   Write-NucleusInfo "  check-deletion [--settings <json>] [--command <text>] [--hook]"
-  Write-NucleusInfo "  merge-models [--check]"
+  Write-NucleusInfo "  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>]"
 }
 
 if (-not $Action) {
@@ -602,8 +602,9 @@ function Invoke-NucleusHarness {
       exit $LASTEXITCODE
     }
     'merge-models' {
-      Write-NucleusError 'harness merge-models is not implemented in this slice'
-      exit 1
+      $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\agents\merge-harness-models.py'
+      & python3 $scriptPath @rest
+      exit $LASTEXITCODE
     }
     default {
       Write-NucleusError "unknown harness verb: $verb" -ErrorAction Continue

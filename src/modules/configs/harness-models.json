@@ -1,0 +1,89 @@
+{
+  "$schema": "./harness-models.schema.json",
+  "version": 1,
+  "harnesses": [
+    {
+      "harness": "pi",
+      "path": "~/.pi/agent/models.json",
+      "format": "json",
+      "slot": {
+        "kind": "dotted-key",
+        "path": "providers.litellm"
+      },
+      "payload": "src/users/default/pi/litellm-models.json"
+    },
+    {
+      "harness": "opencode",
+      "path": "~/.config/opencode/opencode.jsonc",
+      "format": "jsonc",
+      "slot": {
+        "kind": "dotted-key",
+        "path": "provider.litellm"
+      },
+      "payload": "src/users/default/opencode/litellm-provider.json"
+    },
+    {
+      "harness": "claude",
+      "path": "~/.claude/settings.json",
+      "format": "json",
+      "slot": {
+        "kind": "dotted-key",
+        "path": "env"
+      },
+      "payload": "src/users/default/claude/litellm-env.json"
+    },
+    {
+      "harness": "vscode",
+      "path": {
+        "MacBook": "~/Library/Application Support/Code/User/chatLanguageModels.MacBook.json",
+        "NixOS": "~/.config/Code/User/chatLanguageModels.NixOS.json",
+        "Windows": "~/AppData/Roaming/Code/User/chatLanguageModels.Windows.json"
+      },
+      "format": "json",
+      "slot": {
+        "kind": "named-array-item",
+        "arrayPath": "$",
+        "matchKey": "name",
+        "matchValue": "LiteLLM"
+      },
+      "payload": {
+        "MacBook": "src/users/default/vscode/chatLanguageModels.MacBook.json",
+        "NixOS": "src/users/default/vscode/chatLanguageModels.NixOS.json",
+        "Windows": "src/users/default/vscode/chatLanguageModels.Windows.json"
+      }
+    },
+    {
+      "harness": "copilot",
+      "path": "~/.copilot/providers.json",
+      "format": "json",
+      "slot": {
+        "kind": "dotted-key",
+        "path": "providers.litellm"
+      },
+      "payload": "src/users/default/copilot/litellm-providers.json"
+    },
+    {
+      "harness": "hermes",
+      "path": "~/.hermes/config.yaml",
+      "format": "yaml",
+      "slot": {
+        "kind": "yaml-named-item",
+        "listKey": "custom_providers",
+        "itemKey": "name",
+        "itemName": "litellm"
+      },
+      "payload": "src/users/default/hermes/litellm-config.yaml"
+    },
+    {
+      "harness": "codex",
+      "path": "~/.codex/config.toml",
+      "format": "toml",
+      "slot": {
+        "kind": "toml-provider-table",
+        "topLevelKey": "model_provider",
+        "table": "model_providers.litellm"
+      },
+      "payload": "src/users/default/codex/litellm-config.toml"
+    }
+  ]
+}

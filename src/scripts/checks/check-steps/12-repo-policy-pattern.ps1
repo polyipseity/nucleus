@@ -89,7 +89,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
 
     # Skip configs deployed via provision-data-directory or flake inputs (not direct src/ references)
     # ref: allow-and-deny-lists.instructions.md#A2 -- non-standard deployment mechanisms
-    if ($relPath -in 'harness-capabilities.json', 'hermes-agent/SOUL.md', 'ollama/models.json') { return $null }
+    if ($relPath -in 'harness-capabilities.json', 'harness-models.json', 'hermes-agent/SOUL.md', 'ollama/models.json') { return $null }
 
     # Relative path first, then basename.
     $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($relPath) })

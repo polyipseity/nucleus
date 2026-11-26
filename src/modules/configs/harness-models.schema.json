@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nucleus.local/schemas/harness-models.schema.json",
+  "title": "Harness model merge registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "harnesses"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "harnesses": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/harness"
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "MacBook",
+            "NixOS",
+            "Windows"
+          ],
+          "properties": {
+            "MacBook": {
+              "type": "string",
+              "minLength": 1
+            },
+            "NixOS": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Windows": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dotted-key",
+            "named-array-item",
+            "yaml-named-item",
+            "toml-provider-table"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "arrayPath": {
+          "type": "string"
+        },
+        "matchKey": {
+          "type": "string"
+        },
+        "matchValue": {
+          "type": "string"
+        },
+        "listKey": {
+          "type": "string"
+        },
+        "itemKey": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "topLevelKey": {
+          "type": "string"
+        },
+        "table": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "dotted-key"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "kind",
+              "path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "named-array-item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "kind",
+              "arrayPath",
+              "matchKey",
+              "matchValue"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "yaml-named-item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "kind",
+              "listKey",
+              "itemName"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "toml-provider-table"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "kind"
+            ]
+          }
+        }
+      ]
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "harness",
+        "path",
+        "format",
+        "slot",
+        "payload"
+      ],
+      "properties": {
+        "harness": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "jsonc",
+            "yaml",
+            "toml"
+          ]
+        },
+        "slot": {
+          "$ref": "#/$defs/slot"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "MacBook",
+                "NixOS",
+                "Windows"
+              ],
+              "properties": {
+                "MacBook": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "NixOS": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "Windows": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
