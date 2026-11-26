@@ -38,6 +38,19 @@ BeforeAll {
   $Script:StateRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("watchdog-health-{0}" -f [guid]::NewGuid().ToString('N'))
   $env:LOCALAPPDATA = $Script:StateRoot
 
+  # WHY: the AST extraction above defines functions only. Invoke-WatchdogIteration
+  # indexes the raw services registry for each declared service's endpoint, so the
+  # harness has to build that top-level state instead of leaving it null.
+  function Get-WatchdogRegistryFixture {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param([Parameter(Mandatory)][string[]]$Keys)
+
+    $fixture = @{}
+    foreach ($key in $Keys) { $fixture[$key] = @{ network = @{} } }
+    return $fixture
+  }
+
   # The supervisor interface is stubbed so the rule table is driven from
   # explicit primitives.  Import-SupervisorAdapter itself is left as extracted
   # and neutralised with Mock in the rule describes, so the real adapters (which
@@ -63,6 +76,15 @@ BeforeAll {
 AfterAll {
   $env:LOCALAPPDATA = $Script:SavedLocalAppData
   if (Test-Path -Path $Script:StateRoot) { Remove-Item -Path $Script:StateRoot -Recurse -Force }
+}
+
+Describe 'Get-WatchdogRegistryFixture' {
+  It 'returns a non-null registry entry for every declared service' {
+    $fixture = Get-WatchdogRegistryFixture -Keys @('ollama', 'cloud-drive')
+
+    $fixture | Should -Not -BeNullOrEmpty
+    @($fixture.Keys | Sort-Object) | Should -Be @('cloud-drive', 'ollama')
+  }
 }
 
 Describe 'Invoke-WatchdogIteration rule table' {
@@ -94,6 +116,7 @@ Describe 'Invoke-WatchdogIteration rule table' {
         hostEntry = @{ type = 'windows-native'; service = 'ollama' }
       }
     )
+    $Script:RegistryRaw = Get-WatchdogRegistryFixture -Keys @($Script:Services.key)
   }
 
   It 'rule 1: leaves a disabled service alone' {
@@ -249,6 +272,7 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
         hostEntry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount' }
       }
     )
+    $Script:RegistryRaw = Get-WatchdogRegistryFixture -Keys @($Script:Services.key)
   }
 
   It 'checks every declared instance on its own' {
