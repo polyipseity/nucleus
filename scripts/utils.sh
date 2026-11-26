@@ -101,7 +101,7 @@ Verbs:
     --command <text>   Command text to evaluate.
     --hook             Read hook payload on stdin and emit hook protocol output.
 
-  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>]
+  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>] [--host <host>]
               Merge LiteLLM gateway model aliases into harness config files.
               # check-suppress:config-method: method 4 (runtime direct read) -- registry is read by merge-harness-models.py at runtime.
               Registry: src/modules/configs/harness-models.json.
@@ -110,6 +110,7 @@ Verbs:
     --home <dir>       Home directory for resolving target paths.
     --repo-root <dir>  Repository root for resolving payload and registry paths.
     --harness <id>     Only process this harness id (repeatable).
+    --host <host>      Limit host-split config paths to this host key.
 EOF
 }
 

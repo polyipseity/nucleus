@@ -177,6 +177,7 @@ $EnableVsCodeSettingsParity = -not $noUserStateParity
 $EnableVsCodeWorkspaceTrustParity = -not $noUserStateParity
 $EnablePiProjectTrustParity = -not $noUserStateParity
 $EnableHarnessBridgeParity = -not $noUserStateParity
+$EnableHarnessModelsParity = -not $noUserStateParity
 
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
 $systemModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "system"
@@ -325,6 +326,7 @@ try {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-HarnessModels.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-NucleusAppShim.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SafeDelete.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ClaudeConfig.ps1")
@@ -717,6 +719,9 @@ Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 Sync-NucleusAppShim -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot
 Sync-SafeDelete -Enabled:$true -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 Sync-ClaudeConfig -Enabled:$true -RepoRoot $repoRoot -UserProfile $HOME
+# After the harness config syncs above, so a harness whose config file is
+# deployed by sync has its final shape before the model slots are merged.
+Sync-HarnessModel -Enabled:$EnableHarnessModelsParity -RepoRoot $repoRoot -PythonExe '' -HostName $env:NUCLEUS_HOST -HomeDirectory $sessionUserRecord.homeDirectory
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory

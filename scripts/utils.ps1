@@ -499,7 +499,7 @@ function Show-HarnessUsage {
   Write-NucleusInfo "  continue-turn <harness>"
   Write-NucleusInfo "  report-sandbox <harness> [--format <text|claude|cursor|check>] [--session-id <id>]"
   Write-NucleusInfo "  check-deletion [--settings <json>] [--command <text>] [--hook]"
-  Write-NucleusInfo "  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>]"
+  Write-NucleusInfo "  merge-models [--check] [--registry <path>] [--home <dir>] [--repo-root <dir>] [--harness <id>] [--host <host>]"
 }
 
 if (-not $Action) {

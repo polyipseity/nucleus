@@ -57,6 +57,10 @@ let
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
+  # WHY: merge-harness-models.py imports PyYAML, which the bare python3 attr
+  # does not carry. The check pipeline already depends on the same package set.
+  harnessModelsPython = pkgs.python3.withPackages (p: [ p.pyyaml ]);
+
 in
 {
   # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
@@ -236,6 +240,26 @@ in
       lib.hm.dag.entryAfter [ "linkGeneration" "symlink-superpowers-plugin" ]
         ''
           "${activationBundle}/src/scripts/agents/symlink-superpowers-for-opencode.sh"
+        '';
+
+    # WHY: a harness whose install is disabled has no config directory, so the
+    # bundle script reports and skips it instead of creating an empty stub.
+    provision-harness-models =
+      lib.hm.dag.entryAfter
+        [
+          "symlink-agent-config"
+          "symlink-pi-agent-config"
+          "symlink-vscode-config"
+          "seed-claude-settings"
+        ]
+        ''
+          "${activationBundle}/src/scripts/agents/provision-harness-models.sh" \
+            "${harnessModelsPython}/bin/python3" \
+            "${pkgs.jq}/bin/jq" \
+            "${repoRoot}" \
+            "${repoRoot}/src/modules/configs/harness-models.json" \
+            "${hostName}" \
+            "${config.home.homeDirectory}"
         '';
 
   };

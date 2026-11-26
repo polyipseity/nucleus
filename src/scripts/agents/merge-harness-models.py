@@ -20,6 +20,8 @@ Contract (plan B2):
   never replaced.
 - --check writes nothing, compares live slot to payload, exits non-zero
   listing each drifting harness.
+- --host limits host-split path maps to one host key, so activation never
+  creates a config file for a platform that is not running.
 """
 
 from __future__ import annotations
@@ -1109,13 +1111,19 @@ def _normalize_for_compare(entry: HarnessEntry, value: Any) -> Any:
     return json.loads(json.dumps(value))
 
 
-def _target_paths(entry: HarnessEntry, home: Path) -> list[tuple[str, Path]]:
+def _target_paths(entry: HarnessEntry, home: Path, host: str | None) -> list[tuple[str, Path]]:
     if isinstance(entry.path, str):
         return [(entry.harness, _resolve_home_path(entry.path, home))]
-    # Host map.
+    # Host map. Without --host, --check seeds every host into one temporary
+    # home so each host-split slot is verified.
+    selected = [host] if host is not None else sorted(entry.path.keys())
     items = []
-    for host in sorted(entry.path.keys()):
-        items.append((f"{entry.harness}:{host}", _resolve_home_path(entry.path[host], home)))
+    for host_key in selected:
+        if host_key not in entry.path:
+            raise MergeError(f"{entry.harness}: no config path for host {host_key}")
+        items.append(
+            (f"{entry.harness}:{host_key}", _resolve_home_path(entry.path[host_key], home))
+        )
     return items
 
 
@@ -1151,11 +1159,11 @@ def _payload_for_target(entry: HarnessEntry, repo_root: Path, target_label: str)
 
 
 def _process_entry(
-    entry: HarnessEntry, repo_root: Path, home: Path, check: bool
+    entry: HarnessEntry, repo_root: Path, home: Path, check: bool, host: str | None
 ) -> tuple[list[str], list[str]]:
     changed: list[str] = []
     errors: list[str] = []
-    for label, target in _target_paths(entry, home):
+    for label, target in _target_paths(entry, home, host):
         try:
             payload = _payload_for_target(entry, repo_root, label)
         except Exception as exc:
@@ -1240,6 +1248,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=[],
         help="Only process this harness id (repeatable).",
     )
+    parser.add_argument(
+        "--host",
+        default=None,
+        help="Limit host-split config paths to this host key (default: all hosts).",
+    )
     return parser.parse_args(argv)
 
 
@@ -1267,7 +1280,7 @@ def main(argv: list[str]) -> int:
     all_changed: list[str] = []
     all_errors: list[str] = []
     for entry in entries:
-        changed, errors = _process_entry(entry, repo_root, home, args.check)
+        changed, errors = _process_entry(entry, repo_root, home, args.check, args.host)
         all_changed.extend(changed)
         all_errors.extend(errors)
 
