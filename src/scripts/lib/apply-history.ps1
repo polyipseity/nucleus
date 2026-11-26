@@ -53,7 +53,9 @@ function Get-ApplyHistoryUserRoot {
 function Get-ApplyHistoryPath {
   [CmdletBinding()]
   param()
-  Join-Path -Path (Get-ApplyHistoryUserRoot) -ChildPath 'state\apply\history.jsonl'
+  $stateDir = Join-Path -Path (Get-ApplyHistoryUserRoot) -ChildPath 'state'
+  $applyDir = Join-Path -Path $stateDir -ChildPath 'apply'
+  Join-Path -Path $applyDir -ChildPath 'history.jsonl'
 }
 
 function Get-ApplyHistoryNowRfc3339Utc {
@@ -147,8 +149,8 @@ function Add-ApplyHistoryRecord {
 
   $histPath = Get-ApplyHistoryPath
   $histDir = Split-Path -Parent $histPath
-  if (-not (Test-Path -LiteralPath $histDir)) {
-    $null = New-Item -ItemType Directory -Path $histDir -Force # check-suppress:suppression_doc: directory creation output not needed
+  if (-not [System.IO.Directory]::Exists($histDir)) {
+    $null = & { [System.IO.Directory]::CreateDirectory($histDir) } # check-suppress:suppression_doc: directory creation output not needed
   }
 
   $appliedAt = Get-ApplyHistoryNowRfc3339Utc
@@ -207,8 +209,8 @@ function Add-ApplyHistoryRecord {
 
   $tmp = Join-Path -Path $histDir -ChildPath (".history.$([System.Guid]::NewGuid().ToString('N')).tmp")
   try {
-    Set-Content -LiteralPath $tmp -Value ($allLines -join "`n") -Encoding utf8 -NoNewline
-    Add-Content -LiteralPath $tmp -Value "" -Encoding utf8
+    # WHY: one write with an explicit final newline keeps one record as one JSONL line.
+    [System.IO.File]::WriteAllText($tmp, ($allLines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
     if ($hadExisting) {
       try {
         if ($IsWindows -and $null -ne $origAcl) {
