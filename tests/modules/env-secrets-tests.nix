@@ -80,8 +80,8 @@ in
   # === Expected key count and providers ===
 
   test_key_count = assert' (
-    builtins.length entries == 9
-  ) "env-secrets must contain exactly 9 entries";
+    builtins.length entries == 7
+  ) "env-secrets must contain exactly 7 entries";
 
   test_expected_providers_present = assert' (builtins.all
     (expected: builtins.any (e: e.name == expected.name && e.envVar == expected.envVar) entries)
@@ -99,16 +99,8 @@ in
         envVar = "KEY_AI_OPENCODE_GO";
       }
       {
-        name = "env_key_ai_opencode_go_1";
-        envVar = "KEY_AI_OPENCODE_GO_1";
-      }
-      {
         name = "env_key_ai_opencode_zen";
         envVar = "KEY_AI_OPENCODE_ZEN";
-      }
-      {
-        name = "env_key_ai_opencode_zen_1";
-        envVar = "KEY_AI_OPENCODE_ZEN_1";
       }
       {
         name = "env_key_ai_openrouter";
@@ -123,7 +115,7 @@ in
         envVar = "REDIS_USER_LITELLM_PASSWORD";
       }
     ]
-  ) "all 9 expected entries with correct envVar mappings must be present";
+  ) "all 7 expected entries with correct envVar mappings must be present";
 
   # === Consumer scoping ===
 
