@@ -28,6 +28,7 @@ Default operating mode for all agent interactions.
 - **Defer privileged operations.** Do not run anything needing `sudo` or admin elevation. Name the required privilege in the completion summary and let the user run it.
 - **Path hygiene.** Never type a literal home or working-directory path in commands, examples, or docs; use the variable/shortcut form (`$HOME`, `$PWD`, `~` on POSIX; `$env:USERPROFILE`, `$env:HOME`, `$env:PWD` in PowerShell; `$REPO_ROOT`/`$NUCLEUS_REPO_ROOT` for a repo root). Hand-typed user directories get misspelled. Scope is home/working-directory paths only; legitimate system paths (`/nix/store`, `/etc`, `/var/lib/nucleus`, `/Library/Application Support/nucleus`) stay literal.
 - **Strict scope adherence.** When the user scopes a task to one pass, phase, file, or rule, do exactly that. Do not fix adjacent issues or pre-empt later passes.
+- **Disk-space stop condition.** For the nucleus repository only, pause execution and stop if free space is below 1% or a command reports an out-of-space error. Do not clean, prune, or delete files under this rule. Other repositories keep their own policies.
 - Enumerate which subproblems could be delegated before starting, and record the list in session memory for complex tasks.
 - Record animated CLIs and TUIs with asciinema: invoke the `asciinema` skill.
 - **Standing orders win.** `~/.agents/instructions/standing-orders.instructions.md` is user scope, so it governs every repository, and it overrides every default in this file: its trigger phrases, boundary stickiness, and STOP conditions. A repository may add project-scope rules of its own. Re-read it after each compaction.
@@ -49,7 +50,7 @@ Use a subagent for every delegatable subproblem; each gets its own context windo
 - An implementation child for focused implementations and for tasks phrased as "do X in file Y".
 - 2 or more independently modifiable files means parallel subagents; 2 or more separable questions means one subagent each. Max 2 concurrent.
 
-Prompt shape is in `delegate.prompt.md`: 2-3 sentences of context, one-sentence task, hard constraints, expected return.
+Prompt shape is in `delegate.prompt.md`: 2-3 sentences of context, one-sentence task, hard constraints, expected return. Put exact absolute SKILL.md paths in child prompts when a skill applies; do not ask a child to discover skills by scanning user directories.
 
 ## Terminal output pipes
 
@@ -80,7 +81,7 @@ Path hygiene applies here too: see the Path hygiene rule under Execution.
 
 ## Filesystem search scope
 
-Run `find`, `rg`, `ls -R`, `tree`, or `git ls-files` only inside the current working directory or the directory the task targets. If a needed file lives outside the project tree, ask where it is instead of searching outward.
+Run `find`, `rg`, `ls -R`, `tree`, or `git ls-files` only inside the current working directory or the directory the task targets. Never run them on `/`, `$HOME`, `~`, or a user directory. If a needed file lives outside the project tree, ask for its exact path instead of searching outward.
 
 ## Instruction compliance
 

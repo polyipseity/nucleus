@@ -38,6 +38,7 @@ Inspect the on-disk tree before assuming source files, tests, or commands exist.
 - Sentence case for user-facing UI labels (`documentation.instructions.md`). `.yml` for YAML files, except required `.sops.yaml`.
 - Prefer preview/beta/canary channels when viable; when stable is required, add a short `# WHY:` comment.
 - Do not hide meaningful errors (`2>/dev/null`, `|| true`, `-ErrorAction SilentlyContinue`) unless the failure is expected, justified, and still checked.
+- Respect resource boundaries: pause when free space is below 1% or an out-of-space error occurs, and keep filesystem searches inside the task's target directory (`resource-boundaries.instructions.md`).
 - Output format and severity: `output-handling.instructions.md`. Comment annotations: `comment-annotations.instructions.md`. Privilege gating (hard error in `src/`, escalate in `scripts/`): `script-authoring.instructions.md`. Package installation: `package-installation-scope.instructions.md`. Host filesystem scope: `host-filesystem-scope.instructions.md`. Testing: `testing.instructions.md`. Step-runner framework: `step-runner.instructions.md`.
 - Shared state flows through the step-runner context object, never ambient scope.
 
