@@ -30,6 +30,8 @@ bash_guard_require 5 1 svc
 . "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
+# shellcheck source=../src/scripts/lib/service-targets.sh
+. "$SCRIPT_DIR/../src/scripts/lib/service-targets.sh"
 # shellcheck source=../src/scripts/lib/service-liveness.sh
 [ -n "${_NUCLEUS_SERVICE_LIVENESS_SOURCED-}" ] || . "$SCRIPT_DIR/../src/scripts/lib/service-liveness.sh"
 
@@ -100,21 +102,14 @@ if [ "$EUID" -eq 0 ] && [ -n "${SUDO_UID:-}" ]; then
   REAL_USER_UID="$SUDO_UID"
 fi
 
-# WHY: host filtering happens here so every caller sees a uniform registry
-# shape and never repeats the filter logic.
+# WHY: the shared filter keeps apply and this CLI on the same registry shape.
 read_registry() {
-  if [ ! -f "$SERVICES_JSON" ]; then
-    error "services registry not found at $SERVICES_JSON"
+  local filtered
+  if ! filtered="$(service_registry_for_host "$SERVICES_JSON" "$HOST")"; then
+    error "cannot read services registry at $SERVICES_JSON"
+    return 1
   fi
-  require_command jq
-  jq -c --arg host "$HOST" '
-    to_entries | map(
-      select(.value | type == "object")
-      | select(.value.hosts | has($host))
-      | select(.value.hosts[$host].type != "omitted")
-      | {key: .key, value: {displayName: .value.displayName, description: .value.description, network: .value.network, hostEntry: .value.hosts[$host]}}
-    ) | from_entries
-  ' "$SERVICES_JSON"
+  printf '%s\n' "$filtered"
 }
 
 # WHY: a prefix-match entry stands in for one runtime service per configured
@@ -128,7 +123,7 @@ resolve_entry() {
     return 0
   fi
 
-  instances=$(svc_prefix_instances "$plat_json")
+  instances=$(service_live_instances "$key" "$plat_json")
   configured=$(svc_configured_instance_ids "$plat_json" "$(configured_mounts)")
 
   while IFS= read -r instance; do
@@ -1799,20 +1794,28 @@ fi
 
 [ -z "$action" ] && {
   if [ "$list_services" = true ]; then
-    require_command jq
-    registry=$(read_registry)
-    entries=$(resolve_service_names "$registry")
-    while IFS=$'	' read -r key display svc_json instance row_class; do
-      [ -n "$instance" ] || continue
-      case "$key" in
-      ERROR:*) continue ;;
-      esac
-      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
-      if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
-      if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
-      printf '%s
-' "$instance"
-    done <<<"$entries"
+    if [ "$domain_filter" = "all" ]; then
+      service_targets_for_host "$SERVICES_JSON" "$HOST"
+      exit 0
+    fi
+    # WHY: scope filtering is display state, not target enumeration, so it runs
+    # on the shared list instead of repeating the registry expansion here.
+    registry="$(read_registry)"
+    while IFS= read -r target; do
+      [ -n "$target" ] || continue
+      scope="$(printf '%s' "$registry" | jq -r --arg target "$target" '
+        first(
+          (.[$target].hostEntry.scope // empty),
+          ([ .[] | .value.hostEntry as $entry
+             | select($entry.prefixMatch == true)
+             | select($target | startswith($entry.service))
+             | $entry.scope ][0] // empty)
+        ) // "system"
+      ')"
+      if [ "$scope" = "$domain_filter" ]; then
+        printf '%s\n' "$target"
+      fi
+    done < <(service_targets_for_host "$SERVICES_JSON" "$HOST")
     exit 0
   fi
   error "missing action (list, status, start, stop, restart, enable, disable, unblock, verify, endpoint, logs, log-paths, log-config)"

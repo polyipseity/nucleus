@@ -20,6 +20,12 @@ bash_guard_require 5 1 apply
 . "$SCRIPT_DIR/lib/apply-history.sh"
 # shellcheck source=lib/store-lock.sh
 . "$SCRIPT_DIR/lib/store-lock.sh"
+# shellcheck source=lib/service-targets.sh
+. "$SCRIPT_DIR/lib/service-targets.sh"
+# shellcheck source=lib/macos-launch-services.sh
+. "$SCRIPT_DIR/lib/macos-launch-services.sh"
+# shellcheck source=lib/supervisor-systemd.sh
+. "$SCRIPT_DIR/lib/supervisor-systemd.sh"
 
 usage() {
   cat "$SCRIPT_DIR/apply-usage.txt"
@@ -627,6 +633,125 @@ run_post_apply() {
   return "$_rpa_rc"
 }
 
+_apply_cleared_targets=""
+
+clear_managed_service_gates() {
+  local host="$1" registry="$REPO_ROOT/src/modules/services.json"
+  local svc_script="$REPO_ROOT/scripts/svc.sh"
+
+  if ! bash "$SCRIPT_DIR/services/managed-services-enable.sh" \
+    "$registry" "$host" "$svc_script"; then
+    die -l enable "could not clear managed service enable gates for $host"
+  fi
+  _apply_cleared_targets="$(service_targets_for_host "$registry" "$host")" ||
+    die -l enable "could not list managed service targets for $host"
+}
+
+repair_managed_service_gates() {
+  local host="$1" registry="$REPO_ROOT/src/modules/services.json"
+  local svc_script="$REPO_ROOT/scripts/svc.sh" target entry svc_type id scope unit_path
+  local launchd_domain probe_target sudo_prefix scope_flag load_state rc probe_out probe_rc seen=" "
+
+  [ -n "$_apply_cleared_targets" ] || return 0
+
+  while IFS= read -r target; do
+    [ -n "$target" ] || continue
+    case "$seen" in
+    *" $target "*) continue ;;
+    esac
+    seen="$seen$target "
+
+    # WHY: the registry starts with a string $schema row, which cannot be
+    # indexed as a service object.
+    entry="$(jq -c --arg host "$host" --arg id "$target" '
+      . as $registry
+      | first(
+          ($registry[$id].hosts[$host] // empty),
+          ([ $registry[]
+             | select(type == "object")
+             | . as $service
+             | select($service.hosts[$host].prefixMatch == true)
+             | select($id | startswith($service.hosts[$host].service))
+             | $service.hosts[$host] ][0] // empty)
+        )
+    ' "$registry")" || die -l enable "cannot resolve the registry entry for $target"
+    [ -n "$entry" ] || die -l enable "no registry entry for $target"
+
+    svc_type="$(printf '%s' "$entry" | jq -r '.type')"
+    scope="$(printf '%s' "$entry" | jq -r '.scope // "system"')"
+    unit_path="$(printf '%s' "$entry" | jq -r '.unitPath // ""')"
+    id="$target"
+    if [ "$(printf '%s' "$entry" | jq -r '.prefixMatch // false')" != "true" ]; then
+      id="$(printf '%s' "$entry" | jq -r '.service')"
+    fi
+
+    case "$svc_type" in
+    macos-launchctl)
+      sudo_prefix=""
+      [ "$scope" = "system" ] && sudo_prefix="sudo"
+      launchd_domain="$(printf '%s' "$entry" | jq -r '.launchdDomain // "gui"')"
+      [ "$scope" = "system" ] && launchd_domain="system"
+      probe_target="$(supervisor_resolve_target "$scope" "$launchd_domain" "$id")"
+      if ! command -v launchctl >/dev/null 2>&1; then
+        die -l enable "launchctl is unavailable; cannot probe $target"
+      fi
+      if launchctl_job_loaded "$probe_target" "$sudo_prefix"; then
+        rc=0
+      else
+        # WHY: launchctl reports an unloaded job as exit 113, so a boolean
+        # probe needs a second read to tell absence from a failed probe.
+        probe_out=""
+        probe_rc=0
+        probe_out="$($sudo_prefix launchctl print "$probe_target" 2>&1)" || probe_rc=$?
+        case "$probe_rc" in
+        0) rc=0 ;;
+        113) rc=1 ;;
+        *)
+          case "$probe_out" in
+          *"Could not find service"* | *"could not find service"*) rc=1 ;;
+          *) die -l enable "loaded-state probe for $target failed with launchctl exit $probe_rc" ;;
+          esac
+          ;;
+        esac
+      fi
+      ;;
+    nixos-systemctl)
+      if ! command -v systemctl >/dev/null 2>&1; then
+        die -l enable "systemctl is unavailable; cannot probe $target"
+      fi
+      # WHY: supervisor_enabled fails closed when the rebuild did not install
+      # the unit, so an unreadable unit is never treated as loaded.
+      if ! supervisor_enabled "$id" "$unit_path" "$scope"; then
+        rc=1
+      else
+        scope_flag="--system"
+        [ "$scope" = "user" ] && scope_flag="--user"
+        load_state="$(systemctl "$scope_flag" show -p LoadState --value "$id")" ||
+          die -l enable "could not read the load state of $target"
+        case "$load_state" in
+        loaded) rc=0 ;;
+        not-found | stub | masked) rc=1 ;;
+        *) die -l enable "unexpected load state '$load_state' for $target" ;;
+        esac
+      fi
+      ;;
+    *)
+      die -l enable "unsupported service type '$svc_type' for $target"
+      ;;
+    esac
+
+    case "$rc" in
+    0) continue ;;
+    1) ;;
+    *) die -l enable "loaded-state probe for $target failed with status $rc" ;;
+    esac
+
+    say -l enable "starting $target after rebuild"
+    "$svc_script" start "$target" ||
+      die -l enable "could not start $target after rebuild"
+  done <<<"$_apply_cleared_targets"
+}
+
 run_terminal_activations() {
   # Commands needing the user's terminal TCC context (macOS Full Disk Access,
   # Accessibility), serialised by the write-terminal-activations HM step into
@@ -743,6 +868,7 @@ Darwin)
   sudo -H install -d -m 0755 "/Library/Application Support/nucleus"
   printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   # WHY -H: root-owned HOME keeps Nix from inheriting a user-owned one.
+  clear_managed_service_gates "$(resolve_nucleus_host)"
   _apply_history_phase="rebuild"
   _apply_store_lock_seen="$(mktemp "${TMPDIR:-/tmp}/nucleus-apply-store-lock.XXXXXX")"
   store_lock_run_bounded \
@@ -751,6 +877,7 @@ Darwin)
     "waiting for the big garbage collector lock" \
     "$_apply_store_lock_seen" \
     -- run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
+  repair_managed_service_gates "$(resolve_nucleus_host)"
   _apply_history_phase="post-apply"
   # refresh the recorded live repo root in case the checkout moved during activation
   _post_rebuild_repo_root="$(derive_repo_root)"
@@ -788,6 +915,7 @@ Linux)
     sudo -H install -d -m 0755 "/var/lib/nucleus"
     printf '%s\n' "$REPO_ROOT" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
+    clear_managed_service_gates "$(resolve_nucleus_host)"
     _apply_history_phase="rebuild"
     _apply_store_lock_seen="$(mktemp "${TMPDIR:-/tmp}/nucleus-apply-store-lock.XXXXXX")"
     store_lock_run_bounded \
@@ -796,6 +924,7 @@ Linux)
       "waiting for the big garbage collector lock" \
       "$_apply_store_lock_seen" \
       -- run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
+    repair_managed_service_gates "$(resolve_nucleus_host)"
     _apply_history_phase="post-apply"
     # refresh in case the checkout moved during activation
     _post_rebuild_repo_root="$(derive_repo_root)"
@@ -816,8 +945,10 @@ Linux)
     # Front-load the devShell/flake-inputs closures (see Darwin branch).
     run_pin_flake_inputs
     run_pin_devshell
+    clear_managed_service_gates "$(resolve_nucleus_host)"
     _apply_history_phase="rebuild"
     run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+    repair_managed_service_gates "$(resolve_nucleus_host)"
     _apply_history_phase="post-apply"
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
