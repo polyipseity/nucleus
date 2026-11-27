@@ -74,6 +74,7 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
   }
 
   if ($parallelScripts.Count -gt 0) {
+    $currentPwsh = [Environment]::ProcessPath
     $captureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ([System.Guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $captureDir -Force > $null
     $throttle = if ($env:PARALLEL_JOBS) { [int]$env:PARALLEL_JOBS } else { [System.Environment]::ProcessorCount }
@@ -93,15 +94,18 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       $startMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
       $LASTEXITCODE = 0
       $scriptThrew = $false
+      $pwshExe = $using:currentPwsh
       try {
-        & $script *> $captureFile
+        & $pwshExe -NoLogo -NoProfile -NonInteractive -File $script *> $captureFile
+        $childExit = $LASTEXITCODE
       } catch {
         $scriptThrew = $true
         Add-Content -Path $captureFile -Value $_.Exception.Message
+        $childExit = 1
       }
       $endMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-      if ($scriptThrew -or $LASTEXITCODE -ne 0) {
-        $reason = if ($scriptThrew) { 'threw' } else { "exit $LASTEXITCODE" }
+      if ($scriptThrew -or $childExit -ne 0) {
+        $reason = if ($scriptThrew) { 'threw' } else { "exit $childExit" }
         Set-Content -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Value $reason
       }
       # Written after the failure marker so a write error cannot cost a failed
