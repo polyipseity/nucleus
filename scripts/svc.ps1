@@ -191,31 +191,23 @@ if (-not $Elevated -and -not $isAdmin) {
   }
 }
 
+# Load log management helpers
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
+# The host filter is shared with apply's enable gate, so omitted rows are
+# excluded by one implementation on both paths.
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Enable-ManagedServiceSet.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\ServiceHealth.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\scripts\lib\ServiceLiveness.ps1")
+
 # Read and parse registry
 if (-not (Test-Path $ServicesJson)) {
   throw "svc: services registry not found at $ServicesJson"
 }
 $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
 
-# Filter to Windows-relevant services
-$Registry = @{}
-foreach ($svc in $RegistryRaw.Keys) {
-  $entry = $RegistryRaw[$svc]
-  if ($entry -is [hashtable] -and $entry.ContainsKey('hosts') -and $entry.hosts.ContainsKey($NucleusHost) -and $entry.hosts[$NucleusHost].type -ne 'omitted') {
-    $Registry[$svc] = @{
-      displayName = $entry.displayName
-      description = $entry.description
-      network     = if ($entry.ContainsKey('network')) { $entry.network } else { $null }
-      hostEntry   = $entry.hosts[$NucleusHost]
-    }
-  }
-}
-
-# Load log management helpers
-. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
-. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
-. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\ServiceHealth.ps1")
-. (Join-Path -Path $RepoRoot -ChildPath "src\scripts\lib\ServiceLiveness.ps1")
+# Filter to Windows-relevant services with the same function apply uses.
+$Registry = Get-NucleusHostServiceEntries -RegistryRaw $RegistryRaw -HostKey $NucleusHost
 
 function New-ResolvedRow {
   <#

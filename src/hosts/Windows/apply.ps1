@@ -245,6 +245,9 @@ try {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
 # Load before the apply-time health re-arm, which calls Clear-HealthRecordAll.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ServiceHealth.ps1")
+# Registry-driven enable gates run before DSC and are repaired after the
+# service Sync-* calls; both passes share this module.
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Enable-ManagedServiceSet.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
 # calls it (Register-HostAgeKey, Invoke-SecretVerification).
@@ -593,6 +596,11 @@ $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
   else { $_ }
 })
 
+$managedServicesJson = Join-Path -Path $repoRoot -ChildPath "src\modules\services.json"
+# Enable gates are cleared before DSC so the rebuild sees enabled targets.
+# No target starts here; repair runs after the service Sync-* calls.
+$clearedManagedServices = @(Enable-ManagedServiceSet -RegistryPath $managedServicesJson -HostKey 'Windows')
+
 $script:ApplyHistoryPhase = 'rebuild'
 foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
@@ -773,6 +781,10 @@ if ($EnableHostAgeKeyRegistration) {
     -RepoRoot $repoRoot
 }
 Sync-WindowsRDP -Enabled:$EnableRdpParity
+# WHY: Sync-WindowsRDP stops TermService and sets it to Manual when RDP parity
+# is off, so repair must follow the last service-mutating Sync call. It stays
+# ahead of post-apply, which verifies the result.
+Repair-ManagedServiceSet -RegistryPath $managedServicesJson -HostKey 'Windows' -Targets $clearedManagedServices
 Sync-PowerPolicy -Enabled:$EnablePowerParity
 Sync-UserPath -Enabled:$EnableShellParity
 Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
