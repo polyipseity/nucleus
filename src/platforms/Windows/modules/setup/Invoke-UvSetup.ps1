@@ -115,7 +115,7 @@ function Invoke-UvSetup {
     uv python install $ver
   }
 
-  # Prepend ~/.local/bin so binaries installed during this apply run resolve in
+  # Append ~/.local/bin so binaries installed during this apply run resolve in
   # later steps without a new terminal session.
   if ($env:PATH -notlike "*$uvBinDir*") {
     $env:PATH = "$env:PATH;$uvBinDir"

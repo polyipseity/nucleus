@@ -50,9 +50,10 @@ BeforeAll {
     [OutputType([string])]
     param([Parameter(Mandatory)][string]$HomePath)
     $localAppData = Join-Path -Path $HomePath -ChildPath 'AppData/Local'
-    $null = New-Item -ItemType Directory -Path $localAppData -Force
     $userRoot = Join-Path -Path $localAppData -ChildPath 'nucleus'
     $fakePython = Get-NucleusHarnessPythonExe -UserRoot $userRoot
+    if (-not $PSCmdlet.ShouldProcess($fakePython, 'Create fake Python stub')) { return $fakePython }
+    $null = New-Item -ItemType Directory -Path $localAppData -Force
     $null = New-Item -ItemType Directory -Path (Split-Path -Path $fakePython -Parent) -Force
     if ($IsWindows) {
       $typeName = 'FakeHarnessPython' + [guid]::NewGuid().ToString('N')
@@ -61,19 +62,19 @@ using System;
 using System.IO;
 public static class $typeName
 {
-  public static void Main()
+  public static void Main(string[] args)
   {
     string marker = Environment.GetEnvironmentVariable("NUCLEUS_TEST_PY_MARKER");
     if (!string.IsNullOrEmpty(marker))
     {
-      File.AppendAllText(marker, "managed-python\n");
+      File.AppendAllText(marker, "managed-python " + string.Join(" ", args) + "\n");
     }
   }
 }
 "@
       $null = Add-Type -TypeDefinition $source -OutputAssembly $fakePython -OutputType ConsoleApplication
     } else {
-      $body = "#!/bin/sh`nprintf 'managed-python\n' >> `"`$NUCLEUS_TEST_PY_MARKER`"`nexit 0`n"
+      $body = "#!/bin/sh`nprintf 'managed-python %s\n' `"`$*`" >> `"`$NUCLEUS_TEST_PY_MARKER`"`nexit 0`n"
       $null = Set-Content -LiteralPath $fakePython -Value $body -NoNewline
       [System.IO.File]::SetUnixFileMode($fakePython, [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute)
     }
@@ -264,7 +265,26 @@ Describe 'nucleus-utils harness nesting (PowerShell)' {
       }
       $result.ExitCode | Should -Be 0
       Test-Path -LiteralPath $marker -PathType Leaf | Should -BeTrue
-      (Get-Content -LiteralPath $marker -Raw).Trim() | Should -Be 'managed-python'
+      $markerText = (Get-Content -LiteralPath $marker -Raw).Trim()
+      $markerText | Should -Match 'managed-python'
+      $markerText | Should -Match 'merge-harness-models.py'
+    } finally { Remove-UtilsTestHome -HomePath $testHome }
+  }
+
+  It 'executes the compiled Python stub directly on Windows' {
+    if (-not $IsWindows) { Set-ItResult -Skipped -Because 'the compiled stub is built only on Windows' }
+    $testHome = New-UtilsTestHome
+    try {
+      $fakePython = New-FakeManagedHarnessPython -HomePath $testHome
+      $marker = Join-Path -Path $testHome -ChildPath 'direct-stub-invoked.log'
+      $env:NUCLEUS_TEST_PY_MARKER = $marker
+      try {
+        & $fakePython '--repo-root', $script:RepoRoot, 'merge-harness-models.py'
+        $LASTEXITCODE | Should -Be 0
+      } finally {
+        Remove-Item Env:NUCLEUS_TEST_PY_MARKER -ErrorAction SilentlyContinue # check-suppress:suppression_doc: restore the process environment after a Windows-only fixture
+      }
+      (Get-Content -LiteralPath $marker -Raw) | Should -Match 'merge-harness-models.py'
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 

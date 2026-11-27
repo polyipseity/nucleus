@@ -150,7 +150,7 @@ function Add-ApplyHistoryRecord {
   $histPath = Get-ApplyHistoryPath
   $histDir = Split-Path -Parent $histPath
   if (-not [System.IO.Directory]::Exists($histDir)) {
-    $null = & { [System.IO.Directory]::CreateDirectory($histDir) } # check-suppress:suppression_doc: directory creation output not needed
+    $null = [System.IO.Directory]::CreateDirectory($histDir) # check-suppress:suppression_doc: directory creation return value is intentionally discarded
   }
 
   $appliedAt = Get-ApplyHistoryNowRfc3339Utc

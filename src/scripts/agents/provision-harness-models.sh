@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Merge LiteLLM model slots into harness configs whose install directory exists.
 # Args: <python3> <jq> <repo-root> <registry> <host> <home>
-# Exit: non-zero only when python, the registry, or the merge tool is missing,
-# or when the merge itself fails. A harness with no config directory is skipped.
+# Exit: non-zero when python, jq, the registry, or the merge tool is missing, when a registry path is absent for the current host, or when the merge fails. A harness with no config directory is skipped.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -29,12 +28,13 @@ if [ ! -f "$SCRIPT_DIR/merge-harness-models.py" ]; then
   die -l harness-models "merge tool not found: $SCRIPT_DIR/merge-harness-models.py"
 fi
 
-_pm_targets="$("$_pm_jq_bin" -r --arg host "$_pm_host" --arg home "$_pm_home" "
-  def expand_home: if startswith(\"~/\") then (\$home + \"/\" + .[2:]) else . end;
+# shellcheck disable=SC2016 # reason: $home and $host are jq variables bound by --arg
+_pm_targets="$("$_pm_jq_bin" -r --arg host "$_pm_host" --arg home "$_pm_home" '
+  def expand_home: if startswith("~/") then ($home + "/" + .[2:]) else . end;
   .harnesses[] |
-  [.harness, ((if (.path | type) == \"object\" then (.path[\$host] // \"\") else .path end) | expand_home)] |
+  [.harness, ((if (.path | type) == "object" then (.path[$host] // "") else .path end) | expand_home)] |
   @tsv
-" "$_pm_registry")"
+' "$_pm_registry")"
 
 _pm_installed=()
 while IFS=$'\t' read -r _pm_id _pm_config_file; do

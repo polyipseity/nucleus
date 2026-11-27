@@ -293,8 +293,14 @@ def _check_vscode_hosts(root: Path, entries: list[dict[str, Any]], errors: list[
             errors.append(str(exc))
             return
 
+        paths_seen: dict[str, str] = {}
         for host in sorted(paths):
-            live_name = Path(str(paths[host])).name
+            live_path = str(paths[host])
+            if live_path in paths_seen:
+                errors.append(f"vscode:{host}: duplicate live path {live_path}, already used by {paths_seen[live_path]}")
+                continue
+            paths_seen[live_path] = host
+            live_name = Path(live_path).name
             if live_name != "chatLanguageModels.json":
                 errors.append(
                     f"vscode:{host}: registry path basename must be chatLanguageModels.json, got {live_name}"
@@ -378,6 +384,7 @@ def _run_merge(root: Path, home: Path, check: bool) -> subprocess.CompletedProce
 
 
 def _check_merge(root: Path, errors: list[str]) -> None:
+    label = "merge"
     with tempfile.TemporaryDirectory(prefix="harness-model-drift-") as tmp:
         home = Path(tmp) / "home"
         home.mkdir()
@@ -389,8 +396,11 @@ def _check_merge(root: Path, errors: list[str]) -> None:
             *[line for line in check.stdout.splitlines() if line],
             *[line for line in check.stderr.splitlines() if line],
         ]
-        if seed.returncode != 0 or check.returncode != 0:
-            errors.append("merge --check failed")
+        if seed.returncode != 0:
+            errors.append(f"{label}: merge --seed failed: {seed.stderr.strip()}")
+            errors.extend(f"  merge: {line}" for line in detail)
+        if check.returncode != 0:
+            errors.append(f"{label}: merge --check failed: {check.stderr.strip()}")
             errors.extend(f"  merge: {line}" for line in detail)
 
 

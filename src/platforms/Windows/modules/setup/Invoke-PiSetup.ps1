@@ -24,77 +24,9 @@
   Invoke-PiSetup
 
 .NOTES
-  Environment variables: (none)
+  Environment variables: NUCLEUS_REPO_ROOT and PATH/bun resolution inputs
 #>
-function Get-NucleusBunExecutable {
-  <#
-  .SYNOPSIS
-    Finds the bun executable installed on this host.
-
-  .DESCRIPTION
-    WinGet adds bun's directory to the persisted User or Machine PATH, but an
-    apply process started before that install keeps its old process PATH.
-    Searching the persisted scopes finds the binary the install actually placed.
-    A supplied -SearchPath makes the resolver testable without reading the host
-    registry. No candidate means no executable, never an invented path.
-
-  .PARAMETER SearchPath
-    Directories to search instead of the persisted scopes. Optional.
-
-  .PARAMETER PersistedPath
-    Semicolon-delimited Machine and User PATH strings to search instead of the
-    host registry values. Optional. Each value is split into directories before
-    probing, matching how persisted PATH stores multiple entries.
-
-  .OUTPUTS
-    System.String. Full path to the bun executable, or $null when none is found.
-
-  .EXAMPLE
-    Get-NucleusBunExecutable
-
-  .EXAMPLE
-    Get-NucleusBunExecutable -SearchPath 'C:\Tools\bun'
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param(
-    [Parameter()]
-    [string[]]$SearchPath,
-
-    [Parameter()]
-    [string[]]$PersistedPath
-  )
-
-  $candidatePaths = if ($PSBoundParameters.ContainsKey('SearchPath')) {
-    @($SearchPath)
-  } elseif ($IsWindows) {
-    $persistedPaths = if ($PSBoundParameters.ContainsKey('PersistedPath')) {
-      @($PersistedPath)
-    } else {
-      @(
-        ([Environment]::GetEnvironmentVariable('Path', 'Machine')),
-        ([Environment]::GetEnvironmentVariable('Path', 'User'))
-      )
-    }
-    @($persistedPaths | ForEach-Object { $_ -split ';' }) + @($env:PATH -split ';')
-  } else {
-    @($env:PATH -split [IO.Path]::PathSeparator)
-  }
-
-  foreach ($entry in $candidatePaths) {
-    if ([string]::IsNullOrWhiteSpace($entry)) { continue }
-    # Persisted PATH entries can carry %VARIABLE% references, which Test-Path
-    # would otherwise treat as literal directory names.
-    $expandedEntry = [Environment]::ExpandEnvironmentVariables($entry)
-    foreach ($fileName in @('bun.exe', 'bun.cmd', 'bun')) {
-      $candidate = Join-Path -Path $expandedEntry -ChildPath $fileName
-      if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
-    }
-  }
-
-  return $null
-}
-
+. (Join-Path -Path $PSScriptRoot -ChildPath '..\ManagedPaths.ps1')
 
 function Invoke-PiSetup {
   [CmdletBinding()]

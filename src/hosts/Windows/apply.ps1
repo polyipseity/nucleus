@@ -617,7 +617,7 @@ Invoke-CargoBinstallSetup
 if ($EnableBunParity) {
   $bunExecutable = Get-NucleusBunExecutable
   if ([string]::IsNullOrWhiteSpace($bunExecutable)) {
-    throw "bun not found in the process PATH or the persisted User/Machine PATH; ensure the Oven-sh.Bun DSC package installed before this setup step"
+    throw "bun not found in the process PATH or the persisted User/Machine PATH; ensure the Oven-sh.Bun DSC package was installed before this setup step"
   }
   Add-NucleusPathEntry -Path (Split-Path -Parent $bunExecutable) -Position Prepend
   # Invoke-BunSetup prepends ~/.bun/bin to PATH for this session.
@@ -628,7 +628,7 @@ if ($EnableBunParity) {
 if ($EnablePiExtensionsParity) {
   Invoke-PiSetup
 }
-# After WinGet DSC installs astral-sh.uv; Invoke-UvSetup prepends ~/.local/bin
+# After WinGet DSC installs astral-sh.uv; Invoke-UvSetup appends ~/.local/bin
 # to PATH for this session.
 Invoke-UvSetup
 # The harness resolver reads YAML through this venv before Sync-HarnessModel runs.

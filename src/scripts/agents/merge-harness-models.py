@@ -474,14 +474,6 @@ def _strip_json_comments(text: str, path: Path) -> str:
     return "".join(out)
 
 
-def _detect_json_indent(text: str, obj_start: int, key_start: int) -> str:
-    line_start = text.rfind("\n", 0, key_start) + 1
-    indent = text[line_start:key_start]
-    if indent.strip("") == "":
-        return indent
-    return "  "
-
-
 def _render_json_value(value: Any, indent: str, key_col: int) -> str:
     raw = json.dumps(value, indent=2, ensure_ascii=False)
     if "\n" not in raw:

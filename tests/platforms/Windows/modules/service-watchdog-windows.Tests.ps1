@@ -31,6 +31,7 @@ BeforeAll {
   $Script:ModulesDir = Join-Path $PSScriptRoot '../../../../src/platforms/Windows/modules'
   Import-Module (Join-Path $Script:ModulesDir 'Format-NucleusOutput.psm1') -Force -DisableNameChecking
   . (Join-Path $Script:ModulesDir 'ServiceHealth.ps1')
+  . (Join-Path $PSScriptRoot '../../../../src/scripts/lib/ServiceLiveness.ps1')
 
   # The health record is under test, so point the storage root at a per-run
   # temporary directory instead of the real per-user one.
@@ -47,7 +48,19 @@ BeforeAll {
     param([Parameter(Mandatory)][string[]]$Keys)
 
     $fixture = @{}
-    foreach ($key in $Keys) { $fixture[$key] = @{ network = @{} } }
+    foreach ($key in $Keys) {
+      $fixture[$key] = @{
+        network = @{
+          default = @{
+            endpoints = @('https://example.invalid/health')
+            host = 'example.invalid'
+            port = 443
+            protocol = 'https'
+            health = @{ path = '/health' }
+          }
+        }
+      }
+    }
     return $fixture
   }
 
@@ -234,6 +247,19 @@ Describe 'Invoke-WatchdogIteration rule table' {
     (Get-HealthField -Instance 'ollama' -Field 'class') | Should -Be 'crash-loop'
     $Script:Stopped | Should -Be @('ollama')
     $Script:Started.Count | Should -Be 0
+  }
+
+  It 'rule 6: probes the declared network endpoint' {
+    $Script:ProbeEndpoints = @()
+    Mock Invoke-ServiceLivenessProbe {
+      $Script:ProbeEndpoints += $Endpoint
+      return [pscustomobject]@{ Status = 'live'; Reason = 'live' }
+    }
+
+    Invoke-WatchdogIteration > $null
+
+    @($Script:ProbeEndpoints).Count | Should -Be 1
+    @($Script:ProbeEndpoints[0].endpoints) | Should -Contain 'https://example.invalid/health'
   }
 
   It 'stays silent when nothing is declared' {

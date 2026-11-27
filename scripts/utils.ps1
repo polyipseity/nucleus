@@ -142,7 +142,7 @@ function ConvertTo-NucleusStripMetadataReport {
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-$harnessResolverPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\user\Sync-HarnessModels.ps1'
+$harnessResolverPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\ManagedPaths.ps1'
 . $harnessResolverPath
 
 $script:SandboxedContextBlock = 'You are inside the srt sandbox. The repo and the granted scratch paths work normally, but the fence is real: network destinations and Unix sockets are allowlisted, some paths are read-only, git config hooks and secrets are protected, and deletions land in the Trash through the safe wrapper (Finder ''Put Back'' is unavailable because Apple Events are denied). If a command fails with a permission or socket error, assume the fence before assuming a bug, say what you need, and use `pi-unrestricted` only when the task genuinely needs the unsandboxed host.'

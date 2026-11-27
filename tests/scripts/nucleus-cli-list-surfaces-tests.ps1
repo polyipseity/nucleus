@@ -59,7 +59,9 @@ function Invoke-LogCommandWithoutRepoRoot {
   $stderr = $process.StandardError.ReadToEndAsync()
   $process.WaitForExit()
   $combined = ($stdout.Result + "`n" + $stderr.Result).Trim()
-  return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $combined }
+  $exitCode = $process.ExitCode
+  $process.Dispose()
+  return [pscustomobject]@{ ExitCode = $exitCode; Output = $combined }
 }
 
 Write-Output "`n=== [1] config list --json ==="
@@ -125,7 +127,23 @@ $svcAstTokens = $null
 $svcAstErrors = $null
 $svcSource = Get-Content (Join-Path $repoRoot 'scripts/svc.ps1') -Raw
 $svcAst = [System.Management.Automation.Language.Parser]::ParseInput($svcSource, [ref]$svcAstTokens, [ref]$svcAstErrors)
-$filterAsts = @($svcAst.FindAll({ $args[0] -is [System.Management.Automation.Language.ForEachStatementAst] -and $args[0].Extent.Text -match 'RegistryRaw\.Keys' }, $true))
+$filterAsts = @($svcAst.FindAll({
+  param($node)
+  if ($node -isnot [System.Management.Automation.Language.ForEachStatementAst]) { return $false }
+  $collection = $node.Condition
+  if ($collection -is [System.Management.Automation.Language.PipelineAst]) {
+    $elements = @($collection.PipelineElements)
+    if ($elements.Count -ne 1) { return $false }
+    $collection = $elements[0]
+  }
+  if ($collection -is [System.Management.Automation.Language.CommandExpressionAst]) {
+    $collection = $collection.Expression
+  }
+  $member = $collection -as [System.Management.Automation.Language.MemberExpressionAst]
+  if ($null -eq $member -or $member.Member.Value -ne 'Keys') { return $false }
+  $variable = $member.Expression -as [System.Management.Automation.Language.VariableExpressionAst]
+  return ($null -ne $variable -and $variable.VariablePath.UserPath -eq 'RegistryRaw')
+}, $true))
 $filterCode = if ($svcAstErrors.Count -eq 0 -and $filterAsts.Count -eq 1) { $filterAsts[0].Extent.Text } else { '' }
 
 function Invoke-SvcRegistryFilter {
@@ -296,6 +314,7 @@ Write-Output "`n=== [6a] log list without ambient NUCLEUS_REPO_ROOT ==="
 $rootlessCases = @(
   @{ name='gc.ps1 --list-logs resolves its own repo root'; path='scripts/gc.ps1'; args=@('--list-logs') },
   @{ name='gc.ps1 --dry-run --list-logs resolves its own repo root'; path='scripts/gc.ps1'; args=@('--dry-run', '--list-logs') },
+  @{ name='gc.ps1 --log-max-size 1000000 --dry-run --list-logs resolves its own repo root'; path='scripts/gc.ps1'; args=@('--log-max-size', '1000000', '--dry-run', '--list-logs') },
   @{ name='logs.ps1 --list-logs resolves its own repo root'; path='scripts/logs.ps1'; args=@('--list-logs') }
 )
 foreach ($case in $rootlessCases) {

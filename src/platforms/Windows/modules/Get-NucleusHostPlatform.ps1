@@ -8,10 +8,24 @@
 #>
 
 function Get-NucleusHostPlatformRegistryPath {
-  $repoRoot = $env:NUCLEUS_REPO_ROOT
-  if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-    throw 'NUCLEUS_REPO_ROOT not set'
+  function Resolve-NucleusRegistryRepoRoot {
+    $startDirs = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) { $startDirs += $env:NUCLEUS_REPO_ROOT }
+    $startDirs += $PSScriptRoot
+    foreach ($startDir in $startDirs) {
+      $candidate = $startDir
+      while (-not [string]::IsNullOrWhiteSpace($candidate)) {
+        $marker = Join-Path -Path $candidate -ChildPath 'src' -AdditionalChildPath 'flake.nix'
+        if (Test-Path -LiteralPath $marker -PathType Leaf) { return $candidate }
+        $parent = Split-Path -Parent $candidate
+        if ($parent -eq $candidate) { break }
+        $candidate = $parent
+      }
+    }
+    throw 'cannot resolve nucleus repository root for the host platform registry'
   }
+
+  $repoRoot = Resolve-NucleusRegistryRepoRoot
   return Join-Path -Path $repoRoot -ChildPath 'src\modules\host-platform-registry.json'
 }
 

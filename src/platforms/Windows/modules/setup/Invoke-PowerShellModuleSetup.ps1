@@ -487,7 +487,7 @@ function Get-ModuleRemovalDiagnosis {
       # WHY it names both and picks neither: a write open is refused by an ACL
       # and by a surviving read-only attribute alike, and the open cannot tell
       # the two apart, so the refusal is what gets reported.
-      $handleFinding = 'this account is refused write access to the file itself, which a surviving read-only attribute alone also causes'
+      $handleFinding = 'write access to the file was refused, which may come from an ACL or a surviving read-only attribute'
       $causeFound = $true
     } catch {
       $handleFinding = "the file could not be probed ($($_.Exception.Message))"

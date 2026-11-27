@@ -1,9 +1,7 @@
 # tests/modules/harness-bridge-tests.nix: harness bridge wiring and default parity.
 #
-# Hook JSON files call nested nucleus-utils harness subcommands (harness decide-call,
-# harness continue-turn) by bare PATH name, so one shared hook definition drives
-# every platform. The implementations stay in src/scripts/notify/harness/
-# and are dispatched by scripts/utils.sh and scripts/utils.ps1.
+# Hook JSON files call nested nucleus-utils harness subcommands (harness decide-call and harness continue-turn) by bare PATH name, so one shared hook definition drives every platform.
+# The implementations stay in src/scripts/notify/harness/ and are dispatched by scripts/utils.sh and scripts/utils.ps1.
 #
 # Failures this test makes loud:
 #   1. a hook that names a command/shape no platform deploys: silent no-op;
@@ -168,7 +166,7 @@ in
     ) "VS Code Copilot must drive turn ends with exactly one Stop hook")
     (assert'
       ((builtins.head copilotHooks.Stop).command == "nucleus-utils harness continue-turn copilot")
-      "VS Code Copilot Stop must run harness-drive via nucleus-utils, which notifies and injects a queued prompt"
+      "VS Code Copilot Stop must run harness continue-turn via nucleus-utils, which notifies and injects a queued prompt"
     )
 
     # --- Cursor wiring ---
@@ -185,9 +183,9 @@ in
       &&
         (builtins.head cursorHooks.beforeMCPExecution).command == "nucleus-utils harness decide-call cursor"
     ) "Cursor MCP calls must run the filter runner via nucleus-utils too")
-    (assert' (
-      (builtins.head cursorHooks.stop).command == "nucleus-utils harness continue-turn cursor"
-    ) "Cursor stop must run harness-drive via nucleus-utils")
+    (assert' ((builtins.head cursorHooks.stop).command == "nucleus-utils harness continue-turn cursor")
+      "Cursor stop must run harness continue-turn via nucleus-utils, which notifies and injects a queued prompt"
+    )
 
     # --- Per-action gates: master on, prompt approval, drive on ---
     # WHY: defaults are declared independently in nucleus-config implementations

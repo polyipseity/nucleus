@@ -87,7 +87,12 @@ case $state in
                 ;;
               merge-models)
                 _arguments \
-                  '--check[Verify merged state without writing]'
+                  '--check[Verify merged state without writing]' \
+                  '--registry[Registry JSON path]:registry:_files' \
+                  '--home[Home directory for resolving target paths]:home:_files' \
+                  '--repo-root[Repository root for resolving payload and registry paths]:repo root:_files' \
+                  '--harness[Only process this harness id (repeatable)]:harness:' \
+                  '--host[Limit host-split config paths to this host key]:host:'
                 ;;
             esac
             ;;

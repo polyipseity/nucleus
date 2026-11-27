@@ -309,6 +309,7 @@ let
   dscIdsRaw = builtins.filter (l: builtins.match "^        id: .*" l != null) dscLines;
   dscIds = builtins.map (l: builtins.substring 12 (builtins.stringLength l - 12) l) dscIdsRaw;
   wpDscCovered = builtins.all (id: builtins.elem id resolvedWindowsPackages) dscIds;
+  dscOutsideEnableList = builtins.filter (id: !(builtins.elem id resolvedWindowsPackages)) dscIds;
 
   # The Scoop bootstrap is a Script resource, so its id sits at the resource
   # level and the settings.id scan above cannot see it. WHY anchor to the
@@ -408,12 +409,10 @@ let
     && codexWinGetAbsent
     && spIsValid
     && wpDscCoversEnableList
-    && wpDscExceptionsFresh
     && wpScoopInstallPresent
     && wpResolvedMatchesCommitted
     && wpObsEnabled
     && wpJdkEnabled
-    && wpDscCovered
     && dscSorted
     && wpJsonTerminated
     && wpJsonMultiline
@@ -465,7 +464,7 @@ in
     builtins.concatStringsSep ", " (builtins.map (pair: "${pair.fst} before ${pair.snd}") dscInversions)
   }";
   test_wp_scoop_install_present = assert' wpScoopInstallPresent "the DSC file must keep the six-space id: ScoopInstall block with its GitInstall dependency";
-  test_wp_dsc_covers_enable_list = assert' wpDscCoversEnableList "DSC coverage must be two-way; enabled WinGet ids with no DSC resource: ${builtins.concatStringsSep ", " wingetMissingDscResources}; stale DSC exceptions: ${builtins.concatStringsSep ", " wingetStaleDscExceptions}";
+  test_wp_dsc_covers_enable_list = assert' wpDscCoversEnableList "DSC coverage must be two-way; enabled WinGet ids with no DSC resource: ${builtins.concatStringsSep ", " wingetMissingDscResources}; stale DSC exceptions: ${builtins.concatStringsSep ", " wingetStaleDscExceptions}; DSC ids outside the enable set: ${builtins.concatStringsSep ", " dscOutsideEnableList}";
   test_wp_dsc_exceptions_fresh = assert' wpDscExceptionsFresh "stale WinGet DSC exceptions (no longer enabled, or now carrying a DSC resource): ${builtins.concatStringsSep ", " wingetStaleDscExceptions}";
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys

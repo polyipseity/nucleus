@@ -1146,7 +1146,7 @@ try {
         $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
         $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
         $code = $LASTEXITCODE
-        if ($code -ne 0 -and $out -match 'runner aborted before any step started' -and $out -match 'forced pre-launch failure') {
+        if ($code -eq 1 -and $out -match 'runner aborted before any step started' -and $out -match 'forced pre-launch failure') {
             Assert-Pass "runner abort before any step started reports diagnostic"
         } else {
             Assert-Fail "runner abort before any step started reports diagnostic" "exit=$code output=[$out]"

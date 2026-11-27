@@ -47,7 +47,7 @@ function Resolve-NucleusLogRepoRoot {
   } else {
     ''
   }
-  for ($i = 0; $i -lt 6 -and -not [string]::IsNullOrWhiteSpace($candidate); $i++) {
+  while (-not [string]::IsNullOrWhiteSpace($candidate)) {
     $marker = Join-Path -Path $candidate -ChildPath 'src' -AdditionalChildPath 'flake.nix'
     if (Test-Path -LiteralPath $marker -PathType Leaf) {
       return $candidate

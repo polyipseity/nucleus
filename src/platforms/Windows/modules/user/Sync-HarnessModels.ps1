@@ -1,38 +1,5 @@
 . (Join-Path -Path $PSScriptRoot -ChildPath '..\ManagedPaths.ps1')
 
-function Resolve-HarnessPythonExe {
-  <#
-  .SYNOPSIS
-    Resolves the Python interpreter used by the harness model merge tool.
-
-  .DESCRIPTION
-    The uv venv under the nucleus USER root is the only interpreter with the
-    pinned PyYAML, so it wins before PATH. When the venv is absent, the first
-    python3.exe or python.exe on PATH is used and the function boundary keeps
-    absence stub-able for tests.
-  #>
-  [CmdletBinding()]
-  [OutputType([object])]
-  param()
-
-  # WHY: outside Windows the managed USER root may be undefined, which is the
-  # same as having no managed venv for this resolver.
-  $managedPython = try { Get-NucleusHarnessPythonExe } catch { $null }
-  if (-not [string]::IsNullOrWhiteSpace($managedPython) -and
-    (Test-Path -LiteralPath $managedPython -PathType Leaf)) {
-    return $managedPython
-  }
-
-  $commands = @(
-    Get-Command -Name 'python3.exe' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional interpreter name on PATH; absence is a hard error in the caller
-    Get-Command -Name 'python.exe' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional interpreter name on PATH; absence is a hard error in the caller
-  )
-  if ($commands.Count -eq 0) {
-    return $null
-  }
-  return $commands[0].Source
-}
-
 # File name is fixed by the provisioning contract; the exported function uses
 # the singular noun required by PSScriptAnalyzer.
 function Sync-HarnessModel {
@@ -118,11 +85,13 @@ function Sync-HarnessModel {
     if ($entry.path -is [System.Management.Automation.PSCustomObject]) {
       $hostProperty = $entry.path.PSObject.Properties[$HostName]
       if ($null -eq $hostProperty) {
+        Write-NucleusError -CommandName $label "harness $($entry.harness) has no config path for host $HostName"
         throw "harness $($entry.harness) has no config path for host $HostName"
       }
       $configuredPath = [string]$hostProperty.Value
     }
     if ([string]::IsNullOrWhiteSpace($configuredPath)) {
+      Write-NucleusError -CommandName $label "harness $($entry.harness) has no config path for host $HostName"
       throw "harness $($entry.harness) has no config path for host $HostName"
     }
 

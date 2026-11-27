@@ -1978,6 +1978,36 @@
                   "long": "--check",
                   "takesValue": false,
                   "description": "Verify merged state without writing"
+                },
+                {
+                  "long": "--registry",
+                  "takesValue": true,
+                  "valueType": "path",
+                  "description": "Registry JSON path"
+                },
+                {
+                  "long": "--home",
+                  "takesValue": true,
+                  "valueType": "path",
+                  "description": "Home directory for resolving target paths"
+                },
+                {
+                  "long": "--repo-root",
+                  "takesValue": true,
+                  "valueType": "path",
+                  "description": "Repository root for resolving payload and registry paths"
+                },
+                {
+                  "long": "--harness",
+                  "takesValue": true,
+                  "valueType": "string",
+                  "description": "Only process this harness id (repeatable)"
+                },
+                {
+                  "long": "--host",
+                  "takesValue": true,
+                  "valueType": "string",
+                  "description": "Limit host-split config paths to this host key"
                 }
               ],
               "positionals": [],

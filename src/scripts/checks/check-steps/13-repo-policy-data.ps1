@@ -103,7 +103,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     foreach ($v in $preflightViolations) {
       Write-ErrorMessage $v
     }
-    Write-Message "  Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
+    Write-Message "  Remove -InstallCommand parameters from Assert-ToolAvailable calls: preflight checks must hard-fail, not suggest install."
     $failed = $true
   } else {
     Write-Message "no preflight InstallCommand violations found."
@@ -184,7 +184,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
       }
       if ($cited) { continue }
 
-      $embeddedViolations += "${file}:$($hs.Extent.StartLineNumber): here-string with $contentLines content lines (limit 10) — extract to a shared file per the embedded-content policy"
+      $embeddedViolations += "${file}:$($hs.Extent.StartLineNumber): here-string with $contentLines content lines (limit 10), extract to a shared file per the embedded-content policy"
     }
   }
 
@@ -192,7 +192,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     foreach ($v in $embeddedViolations) {
       Write-ErrorMessage $v
     }
-    Write-Message "  Extract here-strings above 10 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
+    Write-Message "  Extract here-strings above 10 content lines to shared files: see .agents/instructions/embedded-content.instructions.md."
     $failed = $true
   } else {
     Write-Message "no embedded-content violations found."
@@ -308,7 +308,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   Write-Message "--- harness model drift ---"
   $validatorPath = Join-Path $r 'src\scripts\lib\harness-model-drift.py'
-  $resolverPath = Join-Path $r 'src\platforms\Windows\modules\user\Sync-HarnessModels.ps1'
+  $resolverPath = Join-Path $r 'src\platforms\Windows\modules\ManagedPaths.ps1'
   if (-not (Test-Path -LiteralPath $resolverPath -PathType Leaf)) {
     Write-ErrorMessage "harness Python resolver not found: $resolverPath"
     return $false

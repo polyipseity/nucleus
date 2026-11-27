@@ -9,7 +9,7 @@
     bun without a resolver mock, and a missing desired-package registry is a hard
     error rather than a silent skip.
 .NOTES
-    Environment variables: (none: $HOME is overridden at script scope)
+    Environment variables: NUCLEUS_REPO_ROOT and PATH/bun resolution inputs
     Exit codes: 0 on success; 1 on failure
     The recording shim is written as pi.cmd on Windows and as an executable
     pi script elsewhere so the suite also runs on macOS/Linux.
@@ -174,6 +174,8 @@ Describe 'Invoke-PiSetup pi extension convergence' {
             $stagedSetupDir = Join-Path $stagedRoot 'src\platforms\Windows\modules\setup'
             $null = New-Item -ItemType Directory -Path $stagedSetupDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
             Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PiSetup.ps1') -Destination (Join-Path $stagedSetupDir 'Invoke-PiSetup.ps1')
+            $stagedModuleDir = Split-Path -Parent $stagedSetupDir
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\ManagedPaths.ps1') -Destination (Join-Path $stagedModuleDir 'ManagedPaths.ps1')
             . (Join-Path $stagedSetupDir 'Invoke-PiSetup.ps1')
 
             $env:NUCLEUS_REPO_ROOT = $script:realRepoRoot
@@ -203,6 +205,7 @@ Describe 'Invoke-PiSetup pi extension convergence' {
             $null = New-Item -ItemType Directory -Path (Join-Path $fakeRoot 'src\lockfiles') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
             Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\lockfiles\lockfile.json') -Destination (Join-Path $fakeRoot 'src\lockfiles\lockfile.json')
             Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1') -Destination (Join-Path $fakeModuleDir 'Get-NucleusHostPlatform.ps1')
+            Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\ManagedPaths.ps1') -Destination (Join-Path $fakeModuleDir 'ManagedPaths.ps1')
             Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PiSetup.ps1') -Destination (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
             . (Join-Path $fakeSetupDir 'Invoke-PiSetup.ps1')
             $env:NUCLEUS_REPO_ROOT = $fakeRoot
@@ -258,6 +261,11 @@ Describe 'Invoke-PiSetup pi extension convergence' {
             Set-Variable -Name IsWindows -Value $savedIsWindows -Force
             $env:PATH = $savedPath
         }
+    }
+
+    It 'rejects SearchPath and PersistedPath together' {
+        { Get-NucleusBunExecutable -SearchPath @($script:bunDir) -PersistedPath @('C:\Tools\bun') } |
+            Should -Throw -ExpectedMessage '*mutually exclusive*'
     }
 
     It 'resolves bun from a persisted install directory when the process PATH is stale' {

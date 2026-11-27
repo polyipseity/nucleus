@@ -136,6 +136,114 @@ function Get-NucleusHarnessPythonExe {
   Join-Path -Path $root -ChildPath 'envs\harness-python\Scripts\python.exe'
 }
 
+function Resolve-HarnessPythonExe {
+  <#
+  .SYNOPSIS
+    Resolves the Python interpreter used by the harness model merge tool.
+
+  .DESCRIPTION
+    The uv venv under the nucleus USER root is the only interpreter with the
+    pinned PyYAML, so it wins before PATH. When the venv is absent, the first
+    python3.exe or python.exe on PATH is used and the function boundary keeps
+    absence stub-able for tests.
+  .OUTPUTS
+    The resolved Python interpreter path, or $null when no interpreter exists.
+  #>
+  [CmdletBinding()]
+  [OutputType([object])]
+  param()
+
+  # WHY: outside Windows the managed USER root may be undefined, which is the
+  # same as having no managed venv for this resolver.
+  $managedPython = try { Get-NucleusHarnessPythonExe } catch { $null }
+  if (-not [string]::IsNullOrWhiteSpace($managedPython) -and
+    (Test-Path -LiteralPath $managedPython -PathType Leaf)) {
+    return $managedPython
+  }
+
+  $commands = @(
+    Get-Command -Name 'python3.exe' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional interpreter name on PATH; absence is a hard error in the caller
+    Get-Command -Name 'python.exe' -CommandType Application -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe optional interpreter name on PATH; absence is a hard error in the caller
+  )
+  if ($commands.Count -eq 0) {
+    return $null
+  }
+  return $commands[0].Source
+}
+
+function Get-NucleusBunExecutable {
+  <#
+  .SYNOPSIS
+    Finds the bun executable installed on this host.
+
+  .DESCRIPTION
+    WinGet adds bun's directory to the persisted User or Machine PATH, but an
+    apply process started before that install keeps its old process PATH.
+    Searching the persisted scopes finds the binary the install actually placed.
+    A supplied -SearchPath makes the resolver testable without reading the host
+    registry. No candidate means no executable, never an invented path.
+
+  .PARAMETER SearchPath
+    Directories to search instead of the persisted scopes. Optional.
+
+  .PARAMETER PersistedPath
+    Semicolon-delimited Machine and User PATH strings to search instead of the
+    host registry values. Optional. Each value is split into directories before
+    probing, matching how persisted PATH stores multiple entries.
+
+  .OUTPUTS
+    System.String. Full path to the bun executable, or $null when none is found.
+
+  .EXAMPLE
+    Get-NucleusBunExecutable
+
+  .EXAMPLE
+    Get-NucleusBunExecutable -SearchPath 'C:\Tools\bun'
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter()]
+    [string[]]$SearchPath,
+
+    [Parameter()]
+    [string[]]$PersistedPath
+  )
+
+  if ($PSBoundParameters.ContainsKey('SearchPath') -and $PSBoundParameters.ContainsKey('PersistedPath')) {
+    throw 'SearchPath and PersistedPath are mutually exclusive'
+  }
+
+  $candidatePaths = if ($PSBoundParameters.ContainsKey('SearchPath')) {
+    @($SearchPath)
+  } elseif ($IsWindows) {
+    $persistedPaths = if ($PSBoundParameters.ContainsKey('PersistedPath')) {
+      @($PersistedPath)
+    } else {
+      @(
+        ([Environment]::GetEnvironmentVariable('Path', 'Machine')),
+        ([Environment]::GetEnvironmentVariable('Path', 'User'))
+      )
+    }
+    @($persistedPaths | ForEach-Object { $_ -split ';' }) + @($env:PATH -split ';')
+  } else {
+    @($env:PATH -split [IO.Path]::PathSeparator)
+  }
+
+  foreach ($entry in $candidatePaths) {
+    if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+    # Persisted PATH entries can carry %VARIABLE% references, which Test-Path
+    # would otherwise treat as literal directory names.
+    $expandedEntry = [Environment]::ExpandEnvironmentVariables($entry)
+    foreach ($fileName in @('bun.exe', 'bun.cmd', 'bun')) {
+      $candidate = Join-Path -Path $expandedEntry -ChildPath $fileName
+      if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+  }
+
+  return $null
+}
+
 <#
 .SYNOPSIS
   Prepends or appends a directory to the current session PATH, deduplicating.

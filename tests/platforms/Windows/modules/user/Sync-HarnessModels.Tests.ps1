@@ -6,8 +6,7 @@
     Python stub. The assertions cover harness selection, host-split path
     selection, absent harness skips, hard errors, and merge failure propagation.
 .NOTES
-    Environment variables: a temporary Python stub log and exit code are set at
-    script scope and restored afterward.
+    Environment variables: a temporary Python stub log, exit code, and the original argument log are set at script scope and restored afterward.
     Exit codes: 0 on success; 1 on failure
 #>
 
@@ -86,12 +85,14 @@ if ($env:HARNESS_PY_EXIT) {
 '@
         $script:argsLog = Join-Path -Path $script:tempRoot -ChildPath 'python-args.log'
         Set-Content -Path $script:argsLog -Value ''
+        $script:originalPyArgsLog = $env:HARNESS_PY_ARGS_LOG
         $env:HARNESS_PY_ARGS_LOG = $script:argsLog
         $script:originalPyExit = $env:HARNESS_PY_EXIT
     }
 
     AfterAll {
         $env:HARNESS_PY_EXIT = $script:originalPyExit
+        $env:HARNESS_PY_ARGS_LOG = $script:originalPyArgsLog
         if ($script:tempRoot -and (Test-Path -LiteralPath $script:tempRoot)) {
             # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
             Remove-Item -LiteralPath $script:tempRoot -Recurse -Force -ErrorAction SilentlyContinue

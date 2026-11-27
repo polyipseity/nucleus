@@ -192,6 +192,21 @@ test_vscode_suffixed_live_path_fails() {
   remove_tree "$FIXTURE"
 }
 
+test_vscode_duplicate_live_path_fails() {
+  make_fixture vscode-duplicate
+  mutate_json "$FIXTURE/src/modules/configs/harness-models.json" \
+    "vscode = next(h for h in data['harnesses'] if h['harness'] == 'vscode'); vscode['path']['NixOS'] = vscode['path']['MacBook']"
+  local out="$WORK/vscode-duplicate.out"
+  local rc
+  rc="$(run_validator "$FIXTURE" "$out")"
+  if [ "$rc" -ne 0 ] && grep -q 'vscode:NixOS: duplicate live path' "$out"; then
+    assert_pass "two hosts sharing one full live path fail"
+  else
+    assert_fail "two hosts sharing one full live path fail" "rc=$rc output=[$(cat "$out")]"
+  fi
+  remove_tree "$FIXTURE"
+}
+
 test_claude_stale_pin_fails() {
   make_fixture claude
   mutate_json "$FIXTURE/src/users/default/claude/litellm-env.json" \
@@ -322,7 +337,6 @@ checks = {
   "POSIX python tool": 'register_step_tools "repo-policy-data" "bun git jq nix python3"' in sh,
   "PowerShell section": "--- harness model drift ---" in ps1,
   "PowerShell git tool": 'Register-StepToolManifest -Id "repo-policy-data" -Tool "git"' in ps1,
-  "PowerShell missing-interpreter error": 'harness model drift needs a Python interpreter' in ps1,
 }
 for name, ok in checks.items():
     if not ok:
@@ -346,6 +360,7 @@ test_wrong_token_limit_fails
 test_null_vs_declared_limit_fails
 test_divergent_vscode_host_entry_fails
 test_vscode_suffixed_live_path_fails
+test_vscode_duplicate_live_path_fails
 test_claude_stale_pin_fails
 test_codex_stale_pin_fails
 

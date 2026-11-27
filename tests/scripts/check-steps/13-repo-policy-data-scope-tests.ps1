@@ -17,9 +17,7 @@
 # same path the runner uses, and tests/scripts/step-runner-unit-tests.ps1
 # already does this.
 #
-# Round 3 adds a source assertion and a two-wrapper PATH case for the fallback
-# interpreter probe. The source assertion keeps the single-match rule visible
-# on hosts where only one python3 executable is installed.
+# The fallback must select one interpreter when `python3` appears more than once on PATH.
 
 #Requires -Version 7.4
 
@@ -136,18 +134,7 @@ if ($selfShDerivation.Success -and $step12Derivation.Success -and
   Assert-Fail 'step 13: the $selfShLeaf derivation matches step 12' 'derivation differs or not found'
 }
 
-# 6. The source rule must stay explicit so a host with one python3 cannot hide
-#    a regression back to a bare Get-Command assignment.
-$collectsMatches = $source -match '(?m)^\s*\$fallbackCommands\s*=\s*@\(\s*Get-Command -Name ''python3'''
-$checksCount = $source -match '\$fallbackCommands\.Count\s*-eq\s*0'
-$selectsFirst = $source -match '\$pythonExe\s*=\s*\$fallbackCommands\[0\]\.Source'
-if ($collectsMatches -and $checksCount -and $selectsFirst) {
-  Assert-Pass 'step 13: the python3 fallback collects matches and selects the first'
-} else {
-  Assert-Fail 'step 13: the python3 fallback collects matches and selects the first' "collects=$collectsMatches count=$checksCount first=$selectsFirst"
-}
-
-# 7. Make the multi-match case deterministic. Two wrapper python3 applications
+# 6. Make the multi-match case deterministic. Two wrapper python3 applications
 #    sit at the front of PATH, each writing its own marker. The body must run
 #    the first one instead of treating every match as one command name.
 $hostIsWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(

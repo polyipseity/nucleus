@@ -205,7 +205,7 @@ foreach ($svc in $RegistryRaw.Keys) {
     $Registry[$svc] = @{
       displayName = $entry.displayName
       description = $entry.description
-      network     = if ($entry.PSObject.Properties.Name -contains 'network') { $entry.network } else { $null }
+      network     = if ($entry.ContainsKey('network')) { $entry.network } else { $null }
       hostEntry   = $entry.hosts[$NucleusHost]
     }
   }
