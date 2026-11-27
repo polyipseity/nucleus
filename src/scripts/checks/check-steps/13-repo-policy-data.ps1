@@ -347,6 +347,30 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     }
   }
 
+  Write-Message "--- instruction byte cap ---"
+  $capValidatorPath = Join-Path $r 'src\scripts\lib\instruction-byte-cap.py'
+  # WHY: the drift check already resolved one interpreter; reuse it so both
+  #   Python validators run with the same executable on this host.
+  if (-not (Test-Path -LiteralPath $capValidatorPath -PathType Leaf)) {
+    Write-ErrorMessage "instruction byte cap validator not found: $capValidatorPath"
+    $failed = $true
+  } elseif (-not $pythonExe) {
+    Write-ErrorMessage 'instruction byte cap needs a Python interpreter: python3 is unavailable on PATH'
+    $failed = $true
+  }
+  else {
+    $capOutput = & $pythonExe $capValidatorPath $r 2>&1
+    $capExit = $LASTEXITCODE
+    if ($capExit -ne 0) {
+      foreach ($line in @($capOutput)) {
+        if ([string]$line) { Write-ErrorMessage ([string]$line) }
+      }
+      $failed = $true
+    } else {
+      Write-Message ([string]$capOutput)
+    }
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (data-driven) check failed"
     return $false

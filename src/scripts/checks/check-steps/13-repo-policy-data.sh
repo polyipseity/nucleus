@@ -16,6 +16,7 @@ _POLICY_DATA_CHECKS=(
   "dummy key uniformity|run_dummy_key_uniformity|files"
   "preflight install command policy|run_preflight_install_command_policy|ctx"
   "agents policy|run_agents_policy|files"
+  "instruction byte cap|run_instruction_byte_cap|ctx"
   "embedded content enforcement|run_embedded_content_enforcement|files"
   "PowerShell here-string enforcement|run_here_string_policy|ctx"
   "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
@@ -546,6 +547,27 @@ run_upstream_workaround_staleness() {
   if [ "$_errors" -ne 0 ]; then
     return 1
   fi
+  return 0
+}
+
+# run_instruction_byte_cap: the shared validator applies one cap to both check
+# twins; passing the repo root keeps fixture runs and live runs identical.
+run_instruction_byte_cap() {
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  cd "$_repo_root" || return 1
+  local _output _rc=0
+  _output=$(python3 "$_repo_root/src/scripts/lib/instruction-byte-cap.py" "$_repo_root" 2>&1) || _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    local _line
+    while IFS= read -r _line; do
+      [ -z "$_line" ] || error "$_line"
+    done <<<"$_output"
+    error "instruction byte cap failed."
+    return 1
+  fi
+  say "$_output"
   return 0
 }
 
