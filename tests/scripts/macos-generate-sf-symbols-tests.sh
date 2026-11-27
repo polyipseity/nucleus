@@ -204,7 +204,7 @@ test_skill_points_at_generated_path() {
     assert_fail "skill path" "expected the generated path in SKILL.md"
   fi
 
-  if grep -q 'macos-generate-sf-symbols' "$SKILL_MD"; then
+  if grep -q 'macosGenerateSfSymbols' "$SKILL_MD"; then
     assert_pass "skill documents the activation step that generates the list"
   else
     assert_fail "skill provenance" "expected the activation step named in SKILL.md"
@@ -230,10 +230,10 @@ test_committed_list_removed() {
 test_activation_wiring() {
   section 7 "activation wiring"
 
-  if grep -q 'macos-generate-sf-symbols = lib.hm.dag.entryAfter' "$MODULE_NIX"; then
+  if grep -q 'macosGenerateSfSymbols = lib.hm.dag.entryAfter' "$MODULE_NIX"; then
     assert_pass "macOS module declares the activation entry"
   else
-    assert_fail "activation entry" "expected macos-generate-sf-symbols in the module"
+    assert_fail "activation entry" "expected macosGenerateSfSymbols in the module"
   fi
 
   if grep -q 'macos-generate-sf-symbols.sh' "$MODULE_NIX"; then

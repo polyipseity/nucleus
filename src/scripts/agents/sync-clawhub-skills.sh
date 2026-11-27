@@ -24,7 +24,7 @@ _scs_repo_root="$(derive_repo_root)" || die -l clawhub "cannot resolve repo root
 _scs_do_sync=true
 
 # Add the managed bin directories (managed-paths.nix pathComponents) so the
-# ClawHub binary installed by install-bun-packages is on PATH here.
+# ClawHub binary installed by installBunPackages is on PATH here.
 PATH="${_scs_path_prepend}$PATH${_scs_path_append}"
 export PATH
 
@@ -53,9 +53,9 @@ if [ ! -d "$_scs_skills_dir" ]; then
   mkdir -p "$_scs_skills_dir"
 fi
 
-# install-bun-packages owns installing the ClawHub CLI; this step never does.
+# installBunPackages owns installing the ClawHub CLI; this step never does.
 if [ "$_scs_do_sync" = true ] && ! command -v clawhub >/dev/null 2>&1; then
-  warn -l clawhub "clawhub not found in PATH; install-bun-packages must complete before fetched skill sync; skipping"
+  warn -l clawhub "clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping"
   _scs_do_sync=false
 fi
 

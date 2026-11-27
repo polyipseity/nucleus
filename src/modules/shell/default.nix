@@ -146,7 +146,7 @@ in
   # https://bun.sh/docs/runtime/bunfig#install
   # Seeded against the LIVE repo root so repo edits apply without a rebuild.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-bunfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedBunfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.bunfig.toml" \
       "${overlay.toRepoRelPath (overlay.selectFile "bun" "bunfig.toml")}" \
@@ -156,7 +156,7 @@ in
   # sections are silently ignored: Linux uses mold, macOS native ld64, Windows
   # the bundled rust-lld.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-cargo-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedCargoConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.cargo/config.toml" \
       "${overlay.toRepoRelPath (overlay.selectFile "cargo" "config.toml")}" \
@@ -164,7 +164,7 @@ in
 
   # nextest runner UI settings.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-nextest-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedNextestConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/nextest/config.toml" \
       "${overlay.toRepoRelPath (overlay.selectFile "nextest" "config.toml")}" \
@@ -176,7 +176,7 @@ in
   # set. direnv sources lib/*.sh before direnvrc, so the override runs before
   # use_flake sets _nix_direnv_nix.
   # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
-  home.activation.seed-direnvrc = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedDirenvrc = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/direnv/direnvrc" \
       "${overlay.toRepoRelPath (overlay.selectFile "direnv" "direnvrc")}" \
@@ -184,7 +184,7 @@ in
 
   # WHY POSIX only: Windows deploys the base direnvrc without this override.
   # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
-  home.activation.seed-direnv-apple-sdk-override = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedDirenvAppleSdkOverride = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/direnv/lib/apple-sdk-override.sh" \
       "${overlay.toRepoRelPath (overlay.selectFile "direnv" "lib/apple-sdk-override.sh")}" \
@@ -194,7 +194,7 @@ in
   # https://docs.astral.sh/uv/reference/settings/#add-bounds
   # https://docs.astral.sh/uv/reference/settings/#exclude-newer
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-uv-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedUvConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/uv/uv.toml" \
       "${overlay.toRepoRelPath (overlay.selectFile "uv" "uv.toml")}" \
@@ -247,7 +247,7 @@ in
   # Claude Code settings and nucleus plugin marketplace: deploy via writable symlinks (method 1).
   # settings.json carries extraKnownMarketplaces/enabledPlugins for nucleus-prompt-tools;
   # the marketplace and plugin directories must exist after activation so Claude can load them.
-  home.activation.seed-claude-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedClaudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     mkdir -p "${config.home.homeDirectory}/.claude/.claude-plugin" "${config.home.homeDirectory}/.claude/plugins"
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.claude/settings.json" \
@@ -269,7 +269,7 @@ in
   # Probes each tool's Nix store binary, skips regeneration when the completion
   # file is newer than the binary, and soft-fails on a non-zero subcommand exit.
   home.activation = {
-    install-zsh-completions = lib.hm.dag.entryAfter [ "install-cargo-binstall-packages" ] ''
+    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] ''
       "${activationBundle}/src/scripts/shell/install-zsh-completions.sh" \
         "${pkgs.bat}/bin/bat" \
         "${pkgs.bun}/bin/bun" \

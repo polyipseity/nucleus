@@ -8,7 +8,7 @@ function Sync-HarnessModel {
     Merges LiteLLM model slots into installed harness configs on Windows.
 
   .DESCRIPTION
-    Windows twin of the POSIX provision-harness-models activation. The registry
+    Windows twin of the POSIX provisionHarnessModels activation. The registry
     is the single list of harnesses and target paths. A harness with no config
     directory is reported and skipped; a missing interpreter, registry, or merge
     tool is a hard error. No directory is created for an absent harness.

@@ -52,7 +52,7 @@ in
     };
 
   config = mkIf cfg.enable {
-    home.activation.fetch-whisper-models = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.fetchWhisperModels = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/ai/fetch-whisper-models.sh" \
         "${nucleusUserRoot}/models" \
         "${pkgs.coreutils}/bin/sha256sum" \

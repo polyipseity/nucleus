@@ -48,7 +48,7 @@ Timing values live at their point of use, so a change edits the source file and 
 
 ## Provisioned symlinks
 
-Every provisioned symlink must be writable and delete-protected where the platform allows it: `chflags uchg` on macOS, `icacls /deny` on Windows. A user-scope Linux activation cannot set the immutable flag (`chattr` needs `CAP_LINUX_IMMUTABLE`, see `chattr(1)`), so NixOS enforces the same contract by detection instead: check step 13 (`run_method1_symlink_resolution`) and `home.activation.verify-managed-symlink-paths`. The platforms that can prevent removal still warn on failure rather than aborting.
+Every provisioned symlink must be writable and delete-protected where the platform allows it: `chflags uchg` on macOS, `icacls /deny` on Windows. A user-scope Linux activation cannot set the immutable flag (`chattr` needs `CAP_LINUX_IMMUTABLE`, see `chattr(1)`), so NixOS enforces the same contract by detection instead: check step 13 (`run_method1_symlink_resolution`) and `home.activation.verifyManagedSymlinkPaths`. The platforms that can prevent removal still warn on failure rather than aborting.
 
 Read-only is required when the target lives in the Nix store, because store content is immutable, and Windows mirrors the POSIX writability semantics. Any deviation needs a `# WHY:`.
 

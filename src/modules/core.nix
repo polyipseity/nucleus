@@ -18,7 +18,7 @@ let
   # silently diverge. cli routes to nixpkgs, gui to Homebrew on macOS and to
   # nixpkgs on NixOS; any GUI component makes an entry gui.
   # pkgs.cargo must not be added: it conflicts with pkgs.rustup over bin/cargo.
-  # install-cargo-binstall-packages takes cargo as a store-path argument.
+  # installCargoBinstallPackages takes cargo as a store-path argument.
   # Entries are byte-ordered by name, so `@canary` suffixes sort after their
   # neighbours instead of grouping with them; test_registry_names_sorted in
   # tests/modules/package-parity-tests.nix enforces it.
@@ -159,7 +159,7 @@ let
     };
     codex = {
       # WHY: config-only. Every install carrier is disabled; the LiteLLM slot in
-      # ~/.codex/config.toml is provisioned by provision-harness-models instead.
+      # ~/.codex/config.toml is provisioned by provisionHarnessModels instead.
       enable = {
         MacBook = false;
         NixOS = false;

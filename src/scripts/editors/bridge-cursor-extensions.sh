@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cursor extension bridge, called by home-manager activation
-# symlink-cursor-extensions.
+# symlinkCursorExtensions.
 # Provides: _nucleus_protect_symlink, _nucleus_unprotect_symlink (from symlink-hardening.sh)
 
 set -euo pipefail

@@ -167,30 +167,26 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
-  home.activation.macos-unprotect-icloud-downloads-symlink =
+  home.activation.macosUnprotectIcloudDownloadsSymlink =
     lib.hm.dag.entryBefore [ "linkGeneration" ]
       ''
         "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "macos.nix" "$HOME/Downloads/iCloud"
       '';
 
-  home.activation.macos-protect-icloud-downloads-symlink =
-    lib.hm.dag.entryAfter [ "linkGeneration" ]
-      ''
-        "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "macos.nix" "$HOME/Downloads/iCloud"
-      '';
+  home.activation.macosProtectIcloudDownloadsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "macos.nix" "$HOME/Downloads/iCloud"
+  '';
 
   home.activation = {
-    macos-configure-display-resolutions =
-      lib.hm.dag.entryAfter [ "macos-configure-headless-display" ]
-        ''
-          "${activationBundle}/src/platforms/macOS/scripts/macos-display-resolutions.sh"
-        '';
+    macosConfigureDisplayResolutions = lib.hm.dag.entryAfter [ "macosConfigureHeadlessDisplay" ] ''
+      "${activationBundle}/src/platforms/macOS/scripts/macos-display-resolutions.sh"
+    '';
 
-    macos-configure-input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macosConfigureInputConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-input-config.sh"
     '';
 
-    macos-reload-user-preference-state = lib.hm.dag.entryAfter [ "macos-configure-input-config" ] ''
+    macosReloadUserPreferenceState = lib.hm.dag.entryAfter [ "macosConfigureInputConfig" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-reload-user-preference-state.sh"
     '';
 
@@ -201,11 +197,11 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # time so the link survives repo relocations and rebuilds without stale
     # store paths.
     # check-suppress:config-method: method 1 (writable symlink) -- linearmouse/linearmouse.json deployed via linearmouse-config.sh
-    macos-configure-linearmouse = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macosConfigureLinearmouse = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-linearmouse.sh" ${lib.escapeShellArg linearmouseConfigFile}
     '';
 
-    macos-configure-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macosConfigureLaunchServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-launch-services.sh" "${dutiBin}" '${
         builtins.toJSON [
           {
@@ -231,7 +227,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # Mitigation: publish a managed set of English-named .app symlink aliases
     # under ~/Applications/Nucleus App Aliases so Spotlight/Raycast can index
     # additional English tokens without changing the system UI language.
-    macos-install-raycast-aliases = lib.hm.dag.entryAfter [ "macos-configure-launch-services" ] ''
+    macosInstallRaycastAliases = lib.hm.dag.entryAfter [ "macosConfigureLaunchServices" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-install-raycast-aliases.sh"
     '';
 
@@ -239,7 +235,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # WHY not the HM module: sync-trampolines only processes .app bundles in
     # ~/Applications/Home Manager Apps/, and Homebrew binaries are not bundles.
     # Source: https://github.com/hraban/mac-app-util
-    macos-create-app-trampolines = lib.hm.dag.entryAfter [ "macos-install-raycast-aliases" ] ''
+    macosCreateAppTrampolines = lib.hm.dag.entryAfter [ "macosInstallRaycastAliases" ] ''
       _trampoline_dir="${config.home.homeDirectory}/Applications/Nucleus App Aliases"
       _mac_app_util="${mac-app-util.packages.${pkgs.stdenv.system}.default}/bin/mac-app-util"
 
@@ -258,11 +254,11 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # Schedule: 18:00 → 06:00 (nightlight schedule start uses default times).
     # No-op if nightlight is not installed.
     # Source: https://github.com/smudge/nightlight
-    macos-install-nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macosInstallNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-install-nightlight.sh"
     '';
 
-    # macos-configure-icloud-exclusions
+    # macosConfigureIcloudExclusions
     # Marks matching directories with the com.apple.fileprovider .ignore#P xattr
     # so they stay out of iCloud sync.
     # Scope guard: roots come from the src/users/ registry, evaluation discards
@@ -270,56 +266,56 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # directories, and find -prune keeps the scan fast. Names come from
     # src/users/.
     # Source: https://developer.apple.com/documentation/fileprovider
-    macos-configure-icloud-exclusions = lib.hm.dag.entryAfter [ "cloud-drives-setup" ] ''
+    macosConfigureIcloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-icloud-exclusions.sh" "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
 
-    # macos-check-privacy-permissions
+    # macosCheckPrivacyPermissions
     # Probe a privacy-gated domain, print the FDA guide when the probe hits
     # permission text, and continue either way so ungated settings still
     # converge in the same run.
-    macos-check-privacy-permissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macosCheckPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-preflight-privacy.sh" "${repoRoot}"
     '';
 
     # WHY separate from ~/dev: the directory is cross-host provisioning state,
     # while the macOS-only cleanup and indexing steps are session-side work.
-    ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    ensureDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev"
     '';
 
     # WHY separate from ~/dev: a Dock refresh is a UI cache reload, and coupling
     # it to dev-tree work would be fake.
-    macos-reload-dock = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macosReloadDock = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-reload-dock-preference-state.sh"
     '';
 
-    macos-configure-finder-sidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macosConfigureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-finder-sidebar.sh" ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides" ${lib.escapeShellArg finderSidebar.finderSidebarExpectedOrder} ${toString finderSidebar.finderSidebarManagedCount}
     '';
 
-    macos-relaunch-desktop-services = lib.hm.dag.entryAfter [ "macos-configure-finder-sidebar" ] ''
+    macosRelaunchDesktopServices = lib.hm.dag.entryAfter [ "macosConfigureFinderSidebar" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-relaunch-desktop-services.sh" ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides"
     '';
 
-    macos-verify-archiving-stack =
-      lib.hm.dag.entryAfter [ "macos-configure-launch-services" "installPackages" ]
+    macosVerifyArchivingStack =
+      lib.hm.dag.entryAfter [ "macosConfigureLaunchServices" "installPackages" ]
         ''
           "${activationBundle}/src/scripts/packages/verify-archiving-stack.sh" "${pkgs.p7zip}/bin/7z"
         '';
 
-    macos-configure-headless-display = lib.hm.dag.entryAfter [ "macos-install-nightlight" ] ''
+    macosConfigureHeadlessDisplay = lib.hm.dag.entryAfter [ "macosInstallNightlight" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-headless-display.sh"
     '';
 
-    # macos-generate-sf-symbols
+    # macosGenerateSfSymbols
     # WHY generate the SF Symbols list: the committed 10,943-line data file
     # drifted from the installed macOS, and generated data does not belong in
     # the repository. The sf-symbols skill greps the generated file.
     # WHY /usr/bin/plutil: it is a macOS system binary with no nixpkgs
     # attribute (nixpkgs.aarch64-darwin lacks `plutil`), so it is passed as its
     # stable absolute path; grep, sort, and cmp are store paths.
-    macos-generate-sf-symbols = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macosGenerateSfSymbols = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-generate-sf-symbols.sh" "/usr/bin/plutil" "${pkgs.gnugrep}/bin/grep" "${pkgs.coreutils}/bin/sort" "${pkgs.diffutils}/bin/cmp"
     '';
   };
@@ -358,7 +354,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # 01ebf5e8 to prevent Nix store path poisoning).
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.
-  home.activation.macos-gui-env-path = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+  home.activation.macosGuiEnvPath = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
     "${activationBundle}/src/platforms/macOS/scripts/macos-set-gui-env-path.sh" \
       "${managedPaths.toShellPrependPath}" \
       "${managedPaths.toShellAppendPath}" \

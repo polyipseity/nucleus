@@ -3,7 +3,7 @@
     Post-apply secret health check for SOPS file recipient verification.
 
 .DESCRIPTION
-    Mirrors the POSIX verify-secret-decryption activation in secrets.nix. SOPS
+    Mirrors the POSIX verifySecretDecryption activation in secrets.nix. SOPS
     recipient checks read unencrypted metadata, but a managed private SSH key is
     probed directly, so an unparsable key fails here as it does on POSIX.
 

@@ -22,15 +22,15 @@ in
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  # WHY: after macos-deploy-automator-workflows, not just linkGeneration.
+  # WHY: after macosDeployAutomatorWorkflows, not just linkGeneration.
   #   That step rewrites the whole NSServicesStatus dictionary, because
   #   `defaults -dict-add` rejects old-style plist array syntax at parse time
   #   and so cannot merge those keys. The whole-dict write erases every other
   #   entry, so the app-bundle entries have to be re-added with `-dict-add`
   #   afterwards. Siblings default to linkGeneration, where the attribute-name
   #   tie-break orders this correctly.
-  home.activation.macos-deploy-app-bundles =
-    lib.hm.dag.entryAfter [ "linkGeneration" "macos-deploy-automator-workflows" ]
+  home.activation.macosDeployAppBundles =
+    lib.hm.dag.entryAfter [ "linkGeneration" "macosDeployAutomatorWorkflows" ]
       ''
         "${activationBundle}/src/hosts/MacBook/scripts/macos-deploy-app-bundles.sh" \
           "${pkgs.jq}/bin/jq" \

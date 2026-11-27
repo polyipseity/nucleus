@@ -754,7 +754,7 @@ repair_managed_service_gates() {
 
 run_terminal_activations() {
   # Commands needing the user's terminal TCC context (macOS Full Disk Access,
-  # Accessibility), serialised by the write-terminal-activations HM step into
+  # Accessibility), serialised by the writeTerminalActivations HM step into
   # $NUCLEUS_USER_ROOT/terminal-activations.list. Runs after the rebuild so the
   # manifest exists, before post-apply steps that may depend on those changes.
   # Last resort for macOS TCC workarounds only; the full policy lives in

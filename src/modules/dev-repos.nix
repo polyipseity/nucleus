@@ -100,11 +100,11 @@ in
     # identity include, and decryption health checks from secrets.nix. Keep
     # this activation ordered after the secrets pipeline so every managed user
     # sees the same post-secrets provisioning order on both macOS and NixOS.
-    home.activation.provision-dev-repos =
+    home.activation.provisionDevRepos =
       lib.hm.dag.entryAfter
         [
-          "materialize-user-secrets"
-          "verify-secret-decryption"
+          "materializeUserSecrets"
+          "verifySecretDecryption"
           "writeBoundary"
         ]
         ''

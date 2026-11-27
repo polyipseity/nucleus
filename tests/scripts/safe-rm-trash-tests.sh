@@ -257,7 +257,7 @@ config_sets_applescript_no_in_sandbox() { # <root>
 
 selector_resolves() { # <root>
   local _block _selector _config_name _relative _resolved
-  _block="$(activation_block "$1" "seed-safe-rm-config")"
+  _block="$(activation_block "$1" "seedSafeRmConfig")"
   [ -n "$_block" ] || return 1
   _selector="$(grep -m1 -oE 'selectFile "[^"]*" "[^"]*"' <<<"$_block")" || return 1
   _config_name="$(awk -F'"' '{ print $2 }' <<<"$_selector")" || return 1
@@ -268,7 +268,7 @@ selector_resolves() { # <root>
 
 seed_entry_uses_overlay() { # <root>
   local _block
-  _block="$(activation_block "$1" "seed-safe-rm-config")"
+  _block="$(activation_block "$1" "seedSafeRmConfig")"
   [ -n "$_block" ] || return 1
   contains "$_block" 'entryAfter [ "linkGeneration" ]' || return 1
   contains "$_block" 'seed-writable-symlink.sh' || return 1
@@ -286,12 +286,12 @@ symlink_entry_is_writable() { # <root>
 
 verify_list_names_seed() { # <root>
   local _block
-  _block="$(activation_block "$1" "verify-managed-symlink-paths")"
+  _block="$(activation_block "$1" "verifyManagedSymlinkPaths")"
   [ -n "$_block" ] || return 1
   # The ordering is half the claim: a membership-only check stays green when the
   # entry is moved to entryBefore and the verify runs on the pre-seed state.
   contains "$_block" 'entryAfter' || return 1
-  contains "$_block" '"seed-safe-rm-config"'
+  contains "$_block" '"seedSafeRmConfig"'
 }
 
 # copy_fixture <dest-root>: copy the three files the predicates read. A source
@@ -438,7 +438,7 @@ expect_failure "anti-vacuity: without the gate the unmarked source sets the vari
 
 section 4 "the activation selector resolves to a real file"
 
-expect "selectFile in seed-safe-rm-config resolves under src/users" selector_resolves "$REPO_ROOT"
+expect "selectFile in seedSafeRmConfig resolves under src/users" selector_resolves "$REPO_ROOT"
 copy_fixture "$_tmp/selector-typo"
 home_with_selector_typo "$REPO_ROOT" "$_tmp/selector-typo"
 expect_removal "the selector copy lost exactly the original selector line" "$_tmp/selector-typo" "$HOME_NIX_REL" 1
@@ -446,9 +446,9 @@ expect_failure "anti-vacuity: a selector typo stops resolving" selector_resolves
 
 section 5 "the seed entry deploys the config through the overlay"
 
-expect "seed-safe-rm-config seeds ~/.safe-rm/config after linkGeneration" seed_entry_uses_overlay "$REPO_ROOT"
+expect "seedSafeRmConfig seeds ~/.safe-rm/config after linkGeneration" seed_entry_uses_overlay "$REPO_ROOT"
 copy_fixture "$_tmp/no-seeder"
-block_without_line "seed-safe-rm-config" 'seed-writable-symlink.sh' "$REPO_ROOT" "$_tmp/no-seeder"
+block_without_line "seedSafeRmConfig" 'seed-writable-symlink.sh' "$REPO_ROOT" "$_tmp/no-seeder"
 expect_removal "the no-seeder copy lost exactly the seeder line" "$_tmp/no-seeder" "$HOME_NIX_REL" 1
 expect_failure "anti-vacuity: without the seeder call the seed entry check fails" seed_entry_uses_overlay "$_tmp/no-seeder"
 
@@ -466,15 +466,15 @@ expect_failure "anti-vacuity: without the suppression comment the entry check fa
 
 section 7 "the post-seed verify list covers the new entry"
 
-expect "the verify activation runs after seed-safe-rm-config" verify_list_names_seed "$REPO_ROOT"
+expect "the verify activation runs after seedSafeRmConfig" verify_list_names_seed "$REPO_ROOT"
 copy_fixture "$_tmp/verify-missing"
-block_without_line "verify-managed-symlink-paths" '"seed-safe-rm-config"' "$REPO_ROOT" "$_tmp/verify-missing"
+block_without_line "verifyManagedSymlinkPaths" '"seedSafeRmConfig"' "$REPO_ROOT" "$_tmp/verify-missing"
 expect_removal "the verify copy lost exactly the list entry" "$_tmp/verify-missing" "$HOME_NIX_REL" 1
 expect_failure "anti-vacuity: without the list entry the verify check fails" verify_list_names_seed "$_tmp/verify-missing"
 # The ordering check needs a twin of its own: dropping the entry proves nothing
 # about it, because the predicate would fail for the missing entry alone.
 copy_fixture "$_tmp/verify-before"
-block_with_word_change "verify-managed-symlink-paths" 'entryAfter' 'entryBefore' "$REPO_ROOT" "$_tmp/verify-before"
+block_with_word_change "verifyManagedSymlinkPaths" 'entryAfter' 'entryBefore' "$REPO_ROOT" "$_tmp/verify-before"
 expect_removal "the ordering copy changed exactly one line" "$_tmp/verify-before" "$HOME_NIX_REL" 1
 expect_failure "anti-vacuity: entryBefore fails the ordering check" verify_list_names_seed "$_tmp/verify-before"
 

@@ -1,5 +1,5 @@
 # safe-rm configuration. Seeded to ~/.safe-rm/config as a writable symlink by
-# the seed-safe-rm-config activation entry in src/modules/home.nix, and sourced
+# the seedSafeRmConfig activation entry in src/modules/home.nix, and sourced
 # by safe-rm's bin/rm.sh, so it is read by every rm on this host.
 #
 # WHY: the opt-out is gated. Inside srt the sandbox denies appleevent-send, so

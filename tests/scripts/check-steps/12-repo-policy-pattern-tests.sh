@@ -51,7 +51,7 @@ test_step12_naming_behavioral_kebab_fails() {
   _out=$(mktemp)
   mkdir -p "$_tmp/src/modules"
   cat >"$_tmp/src/modules/bad.nix" <<'EOF'
-home.activation.provision-dev-repos = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.bad-name = lib.hm.dag.entryAfter ["writeBoundary"] "x";
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?

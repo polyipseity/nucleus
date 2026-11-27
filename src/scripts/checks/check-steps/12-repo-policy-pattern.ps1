@@ -87,7 +87,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     $relPath = $cfgEntry.File.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 
-    # Skip configs deployed via provision-data-directory or flake inputs (not direct src/ references)
+    # Skip configs deployed via provisionDataDirectory or flake inputs (not direct src/ references)
     # ref: allow-and-deny-lists.instructions.md#A2 -- non-standard deployment mechanisms
     if ($relPath -in 'harness-capabilities.json', 'harness-models.json', 'hermes-agent/SOUL.md', 'ollama/models.json') { return $null }
 

@@ -52,9 +52,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
 
   # Writable symlink to the Dynamic Profiles directory, created against the LIVE
   # repo root so profile edits take effect without a rebuild. Runs before
-  # protect-out-of-store-symlinks so the link gets hardened.
+  # protectOutOfStoreSymlinks so the link gets hardened.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-iterm2-dynamic-profiles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedIterm2DynamicProfiles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/Library/Application Support/iTerm2/DynamicProfiles" \
       "${overlay.toRepoRelPath iterm2DynamicProfilesDir}" \

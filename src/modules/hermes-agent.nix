@@ -150,7 +150,7 @@ in
   # lists BEFORE first: this runs before hermesAgentSetup and after
   # setupLaunchAgents (which copies the plist in before bootstrap) and sops-nix.
   # setupLaunchAgents is absent on Linux, where sops-nix runs synchronously.
-  home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecrets != [ ]) (
+  home.activation.waitForHermesSecrets = lib.mkIf (hermesSecrets != [ ]) (
     lib.hm.dag.entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
         ${lib.escapeShellArg hermesEnvTemplatePath}
@@ -192,7 +192,7 @@ in
   };
 
   # Writable symlink into the live repo tree, so the plugin edits without a rebuild.
-  home.activation.seed-hermes-harness-bridge-plugin = lib.mkIf config.programs.hermes-agent.enable (
+  home.activation.seedHermesHarnessBridgePlugin = lib.mkIf config.programs.hermes-agent.enable (
     lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "$HOME/.hermes/plugins/harness-bridge" \
@@ -203,7 +203,7 @@ in
 
   # WHY: the upstream plist hardcodes the log paths and offers no override, so
   # symlinks from the nucleus log directory make `nucleus-svc logs` find them.
-  home.activation.symlink-hermes-logs = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
+  home.activation.symlinkHermesLogs = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
     lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       _hermes_log_dir="${config.home.homeDirectory}/Library/Application Support/nucleus/logs/hermes-agent"
       mkdir -p "$_hermes_log_dir"

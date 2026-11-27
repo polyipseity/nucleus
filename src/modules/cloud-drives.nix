@@ -347,33 +347,31 @@ in
       #   setupLaunchAgents entry (its systemd unit creates the mount point), so
 
       {
-        home.activation.cloud-drives-setup =
-          lib.hm.dag.entryAfter [ "writeBoundary" "setupLaunchAgents" ]
-            ''
-              "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
-                "${pkgs.jq}/bin/jq" \
-                '${
-                  builtins.toJSON (
-                    map (m: {
-                      inherit (m) localPath;
-                      serviceLabel = mountUnitName m;
-                    }) enabledMounts
-                  )
-                }' \
-                '${
-                  builtins.toJSON (
-                    map (r: {
-                      localPath = r.localPath;
-                      name = if r.name != null then r.name else r.id;
-                      isSpecialICloud =
-                        pkgs.stdenv.hostPlatform.isDarwin
-                        && r.provider == "iCloud"
-                        && r.id == "iCloud"
-                        && r.localPath == "clouds/iCloudReplica";
-                    }) enabledReplicas
-                  )
-                }'
-            '';
+        home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" "setupLaunchAgents" ] ''
+          "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
+            "${pkgs.jq}/bin/jq" \
+            '${
+              builtins.toJSON (
+                map (m: {
+                  inherit (m) localPath;
+                  serviceLabel = mountUnitName m;
+                }) enabledMounts
+              )
+            }' \
+            '${
+              builtins.toJSON (
+                map (r: {
+                  localPath = r.localPath;
+                  name = if r.name != null then r.name else r.id;
+                  isSpecialICloud =
+                    pkgs.stdenv.hostPlatform.isDarwin
+                    && r.provider == "iCloud"
+                    && r.id == "iCloud"
+                    && r.localPath == "clouds/iCloudReplica";
+                }) enabledReplicas
+              )
+            }'
+        '';
       }
 
       # WHY: nucleus-apply provisions the system.  A blocked marker from a
@@ -385,7 +383,7 @@ in
       #   macOS-only names are safe on NixOS.
 
       {
-        home.activation.reset-service-health =
+        home.activation.resetServiceHealth =
           lib.hm.dag.entryBetween [ "setupLaunchAgents" ] [ "linkGeneration" ]
             ''
               "${activationBundle}/src/scripts/services/reset-service-health.sh"

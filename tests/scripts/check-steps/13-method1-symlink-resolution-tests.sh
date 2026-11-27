@@ -168,7 +168,7 @@ test_manifest_roots_cover_the_deployed_trees() {
   local -a markers=(
     method1ManifestPaths
     method1-symlink-manifest.txt
-    write-method1-symlink-manifest
+    writeMethod1SymlinkManifest
     '"${resolvedHomeDirectory}/.agents"'
     '"${resolvedHomeDirectory}/.cursor"'
     '"${resolvedHomeDirectory}/.config/opencode"'

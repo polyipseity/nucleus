@@ -95,7 +95,7 @@ in
   # exposes the standard power_supply charge-control attributes.  Hardware
   # without the attributes is reported rather than failed, so the switch still
   # succeeds there.  macOS converges the same ceiling through the `battery` CLI.
-  system.activationScripts.nixos-configure-charge-limit.text = lib.mkAfter ''
+  system.activationScripts.nixosConfigureChargeLimit.text = lib.mkAfter ''
     "${activationBundle}/src/platforms/NixOS/scripts/nixos-configure-charge-limit.sh" \
       "/sys/class/power_supply"
   '';
@@ -145,13 +145,13 @@ in
   # Registry-driven GUI app auto-start: converges every app to its declared
   # XDG-autostart state, neutralizing any app-shipped .desktop (e.g.
   # steam.desktop) so only our mechanism remains.
-  system.activationScripts.nixos-configure-app-autostart.text = lib.mkAfter ''
+  system.activationScripts.nixosConfigureAppAutostart.text = lib.mkAfter ''
     "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
   '';
 
   # Registry-driven menu-bar and tray icon convergence, mirroring the macOS
   # mechanism.  Most entries are omitted on NixOS, so this no-ops by default.
-  system.activationScripts.nixos-configure-menu-bar.text = lib.mkAfter ''
+  system.activationScripts.nixosConfigureMenuBar.text = lib.mkAfter ''
     "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-menu-bar.sh"
   '';
 

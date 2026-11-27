@@ -29,7 +29,7 @@ in
   # selected repo file against the LIVE repo root. HM's backupFileExtension
   # renames a pre-existing regular file to ~/.gitconfig.bak on first activation.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-git-gitconfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedGitGitconfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.gitconfig" \
       "${overlay.toRepoRelPath (selectUserGitFile "gitconfig")}" \
@@ -40,14 +40,14 @@ in
   # core.excludesFile in the user gitconfig points here. Git has no globally
   # scoped ignore file, so ignore content lives at user scope.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-git-gitignore = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedGitGitignore = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/git/ignore" \
       "${overlay.toRepoRelPath (selectUserGitFile "gitignore")}" \
       "${hostName}"
   '';
 
-  home.activation.assemble-git-empty-template = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.assembleGitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     # An empty init.templateDir suppresses the 15+ sample hooks and description
     # file Git would otherwise copy into every new .git directory.
     mkdir -p "$HOME/.config/git/empty_template"

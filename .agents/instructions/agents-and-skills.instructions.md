@@ -14,23 +14,23 @@ applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/modules/hermes-age
 
 ## Cursor bridge (`~/.cursor/`)
 
-`symlink-cursor-config` / `Sync-CursorConfig` symlink shared content into `~/.cursor/`. Edit shared rules, agents, prompts, and skills under `src/users/default/agents/`; Cursor-native JSON under `src/users/default/cursor/`. GUI settings belong in the app's own user settings.
+`symlinkCursorConfig` / `Sync-CursorConfig` symlink shared content into `~/.cursor/`. Edit shared rules, agents, prompts, and skills under `src/users/default/agents/`; Cursor-native JSON under `src/users/default/cursor/`. GUI settings belong in the app's own user settings.
 
 Instruction files reach `~/.cursor/rules/` with a `.mdc` extension, which is what Copilot reads.
 
 ## Agent config bridges
 
-`symlink-pi-agent-config` / `Sync-PiAgentConfig` and `symlink-agent-config` / `Sync-OpenCodeConfig` deploy the shared assets into `~/.pi/agent/` and `~/.config/opencode/`. opencode uses `~/.config/opencode/` on every platform, including `%USERPROFILE%\.config\opencode\` on Windows. Windows resolves the sources through the `Resolve-UserConfig*` overlay helpers.
+`symlinkPiAgentConfig` / `Sync-PiAgentConfig` and `symlinkAgentConfig` / `Sync-OpenCodeConfig` deploy the shared assets into `~/.pi/agent/` and `~/.config/opencode/`. opencode uses `~/.config/opencode/` on every platform, including `%USERPROFILE%\.config\opencode\` on Windows. Windows resolves the sources through the `Resolve-UserConfig*` overlay helpers.
 
 Pi's extension set comes from the `pi` list in `src/modules/packages/desired.json`, pinned by the lockfile `pi` section, and pi records what it installed in `~/.pi/agent/settings.json`. Read that registry, never a listing of `~/.pi/agent/npm/`, which holds `node_modules`.
 
 ## Bundled vs fetched skills
 
-Bundled (AGPL-compatible: MIT, BSD, Apache-2.0, AGPL): commit to `src/users/default/agents/skills/<name>/`, and `install-agent-skills` symlinks it into the store.
+Bundled (AGPL-compatible: MIT, BSD, Apache-2.0, AGPL): commit to `src/users/default/agents/skills/<name>/`, and `installAgentSkills` symlinks it into the store.
 
-Fetched (proprietary, CC-NC, GPL-only): never commit. List the slug in `src/users/default/agents/clawhub-skills.json`; `sync-clawhub-skills` downloads it at apply time. `.clawhub/origin.json` marks a fetched download and stale cleanup removes only directories carrying it. A slug that matches a bundled symlink warns and skips; resolve it by hand.
+Fetched (proprietary, CC-NC, GPL-only): never commit. List the slug in `src/users/default/agents/clawhub-skills.json`; `syncClawhubSkills` downloads it at apply time. `.clawhub/origin.json` marks a fetched download and stale cleanup removes only directories carrying it. A slug that matches a bundled symlink warns and skips; resolve it by hand.
 
-Layered: `install-agent-skills` / `Sync-AgentsSkillManifest` take an extra source directory, used to layer the superpowers plugin's `skills/` in alongside the committed skills. The primary source is the `skills` entry of the agents overlay, resolved through the overlay helpers, never a hardcoded `src/modules/configs/agents/skills` path.
+Layered: `installAgentSkills` / `Sync-AgentsSkillManifest` take an extra source directory, used to layer the superpowers plugin's `skills/` in alongside the committed skills. The primary source is the `skills` entry of the agents overlay, resolved through the overlay helpers, never a hardcoded `src/modules/configs/agents/skills` path.
 
 ## Permission locking
 
@@ -38,11 +38,11 @@ Installed files are locked read-only and unlocked before update. POSIX: `chmod -
 
 ## ClawHub provisioning
 
-ClawHub is a JS CLI absent from nixpkgs, cargo-binstall, WinGet, and Scoop, so it installs through bun only. POSIX: the `install-bun-packages` HM activation in `src/modules/agents.nix` prepends `~/.bun/bin`, keeps the desired list, installs and removes as needed, and persists `~/.bun/install/global/package.json`. Windows: `Invoke-BunSetup` installs the `bun` desired list from `src/modules/packages/desired.json` into `~\.bun\install\global\package.json`, after the WinGet DSC and before the skill syncs.
+ClawHub is a JS CLI absent from nixpkgs, cargo-binstall, WinGet, and Scoop, so it installs through bun only. POSIX: the `installBunPackages` HM activation in `src/modules/agents.nix` prepends `~/.bun/bin`, keeps the desired list, installs and removes as needed, and persists `~/.bun/install/global/package.json`. Windows: `Invoke-BunSetup` installs the `bun` desired list from `src/modules/packages/desired.json` into `~\.bun\install\global\package.json`, after the WinGet DSC and before the skill syncs.
 
 ## Harness bridge
 
-The harness bridge lives under `src/scripts/notify/harness/`, each script with a PowerShell twin: `send-notification`, `request-approval`, `decide-call`, and `continue-turn`. They are invoked through `nucleus-utils harness <verb> ...` (`send-notification`, `request-approval`, `decide-call`, `continue-turn`) and `nucleus-utils harness check-deletion` for the safe-delete filter hook path, via `scripts/utils.sh`/`scripts/utils.ps1`. `nucleus-utils harness decide-call <harness>` is the one tool-call entry point in the three shared hook files and renders that harness's own decision document; `nucleus-utils harness continue-turn <harness>` is the Stop entry point in the VS Code and Cursor files. The shared hook definitions (`src/users/default/agents/hooks/harness-notify.json` for VS Code, `src/users/default/claude/settings.json` for Claude Code, `src/users/default/cursor/hooks.json` for Cursor) resolve `nucleus-utils` through PATH on every host. POSIX provides `nucleus-utils` as a nucleus app (no per-harness `~/.local/bin` symlinks); Windows deploys `nucleus-*.cmd` shims from `nucleus-apps.json` via `Sync-NucleusAppShim.ps1`. Harness-specific glue stays with its harness: pi extensions under `src/users/<user>/pi/extensions/`, the opencode plugin at `src/users/<user>/opencode/plugins/`, wired by `seed-opencode-notify-plugin`.
+The harness bridge lives under `src/scripts/notify/harness/`, each script with a PowerShell twin: `send-notification`, `request-approval`, `decide-call`, and `continue-turn`. They are invoked through `nucleus-utils harness <verb> ...` (`send-notification`, `request-approval`, `decide-call`, `continue-turn`) and `nucleus-utils harness check-deletion` for the safe-delete filter hook path, via `scripts/utils.sh`/`scripts/utils.ps1`. `nucleus-utils harness decide-call <harness>` is the one tool-call entry point in the three shared hook files and renders that harness's own decision document; `nucleus-utils harness continue-turn <harness>` is the Stop entry point in the VS Code and Cursor files. The shared hook definitions (`src/users/default/agents/hooks/harness-notify.json` for VS Code, `src/users/default/claude/settings.json` for Claude Code, `src/users/default/cursor/hooks.json` for Cursor) resolve `nucleus-utils` through PATH on every host. POSIX provides `nucleus-utils` as a nucleus app (no per-harness `~/.local/bin` symlinks); Windows deploys `nucleus-*.cmd` shims from `nucleus-apps.json` via `Sync-NucleusAppShim.ps1`. Harness-specific glue stays with its harness: pi extensions under `src/users/<user>/pi/extensions/`, the opencode plugin at `src/users/<user>/opencode/plugins/`, wired by `seedOpencodeNotifyPlugin`.
 
 Filters are the registry `src/modules/configs/harness-filters.json`, one bun process per enabled entry from `src/scripts/notify/filters/<id>.ts` on every host, each printing one `decision<TAB>rule<TAB>reason` line and exiting 0. A missing bun, a missing filter, a non-zero exit, or any other output is recorded as `ask` with rule `filter-error`, because the filter could not state a verdict. Decisions aggregate deny over ask over allow regardless of registry order, and a call no filter decides goes to the approval sources and then answers `ask` rather than `allow`: the runner never allows by omission. `safe-delete` is the first registered filter: `settings.unproven` defaults to `ask`, also accepts `deny` and `allow`, and governs a plain deletion the filter cannot prove reaches the safe alternative. Its rule names are the audit contract: `native-path`, `cmd-shell`, `find-primitive`, `proven-redirect`, `unproven-redirect`, `no-match`, `filter-error`. A bare deletion word is proven by the home-manager wrapper on POSIX; on Windows by a shim that `<USER root>/state/safe-delete/shims.json` lists with a SHA256 matching its recorded `ripHash`, or by the managed PowerShell profile for the words it overrides, unless the command carries `-NoProfile`/`-nop` or `settings.powershell` is `none`. A stale manifest leaves the word unproven, never allowed. `cmd` is a denial only in command position, a heredoc body is data, `find -exec` is analyzed as a command, and a backslash-escaped word resolves through PATH.
 
@@ -74,7 +74,7 @@ The nixpkgs package ships no `apply-seccomp` helper: `vendor/seccomp/` holds onl
 
 ## Authoring rules
 
-- Sync functions must not install ClawHub; provisioning is `install-bun-packages` / `Invoke-BunSetup`.
+- Sync functions must not install ClawHub; provisioning is `installBunPackages` / `Invoke-BunSetup`.
 - Stale cleanup removes only directories carrying `.clawhub/origin.json`.
 - Skill sync is best-effort: warn on failure, continue.
 - Package lists are sorted alphabetically.

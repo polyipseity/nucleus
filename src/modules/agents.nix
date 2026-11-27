@@ -1,5 +1,5 @@
 # Declarative ~/.agents directory layout with per-entry symlinks into
-# src/users/<username>/agents/ (skills/ managed by install-agent-skills).
+# src/users/<username>/agents/ (skills/ managed by installAgentSkills).
 # The repo root is baked at build time from $NUCLEUS_REPO_ROOT for out-of-store
 # symlink sources and lib runtime-sourcing paths.
 #
@@ -74,12 +74,12 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
   };
 
-  home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/agents"
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
-  home.activation.protect-opencode-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/agents"
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
@@ -93,7 +93,7 @@ in
     # v2 loads a plugin directory with a `server.js` entrypoint (and optional
     # `tui.js`); seed the directory into both global plugin locations so config
     # and auto-discovery can find it.
-    seed-opencode-notify-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedOpencodeNotifyPlugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "$HOME/.opencode/plugins/harness-notify" \
         "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/harness-notify")}" \
@@ -106,7 +106,7 @@ in
     '';
 
     # Method-1 writable symlink for the prompt-tools v2 TUI plugin directory.
-    seed-opencode-prompt-tools-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedOpencodePromptToolsPlugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "$HOME/.opencode/plugins/prompt-tools" \
         "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/prompt-tools")}" \
@@ -118,24 +118,24 @@ in
         "${hostName}"
     '';
 
-    # skills/ is excluded because install-agent-skills manages it, so fetched
+    # skills/ is excluded because installAgentSkills manages it, so fetched
     # ClawHub downloads land in a real, untracked directory.
-    symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlinkAgentConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/agents/symlink-agent-config.sh" "${repoRoot}" "${effectiveUsername}"
     '';
 
     # The skills/ tree is a real directory, so bundled per-skill symlinks can
     # coexist with fetched real dirs and ClawHub writes never land in the tracked
     # repo tree. A name collision with a fetched skill fails fast.
-    install-agent-skills = lib.hm.dag.entryAfter [ "symlink-agent-config" ] ''
+    installAgentSkills = lib.hm.dag.entryAfter [ "symlinkAgentConfig" ] ''
       "${activationBundle}/src/scripts/agents/install-agent-skills.sh" "${repoRoot}" "${effectiveUsername}"
     '';
 
     # Pi discovers skills natively from ~/.agents/skills/, so none is symlinked.
     #
-    # Why after install-agent-skills: the extensions/ and pi-settings.json
+    # Why after installAgentSkills: the extensions/ and pi-settings.json
     # entries come from symlink-agent-config.sh, which runs earlier.
-    symlink-pi-agent-config = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
+    symlinkPiAgentConfig = lib.hm.dag.entryAfter [ "installAgentSkills" ] ''
       "${activationBundle}/src/scripts/agents/symlink-pi-agent-config.sh" "${repoRoot}" "${effectiveUsername}"
     '';
 
@@ -147,7 +147,7 @@ in
     # cannot use the shipped prebuild. The activation PATH carries neither a
     # Python interpreter nor make, so gyp's find-python step would abort the
     # whole activation.
-    install-bun-packages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
+    installBunPackages = lib.hm.dag.entryAfter [ "installAgentSkills" ] ''
       "${activationBundle}/src/scripts/packages/install-bun-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.bun}/bin/bun" \
@@ -158,10 +158,10 @@ in
         '${builtins.toJSON (desiredFor "bun")}'
     '';
 
-    # Why after install-bun-packages: pi spawns the bare command "bun" for every
+    # Why after installBunPackages: pi spawns the bare command "bun" for every
     # npm: install (npmCommand in src/users/default/pi/settings.json), so bun's
     # directory must be on the child PATH, not only callable by path.
-    install-pi-packages = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
+    installPiPackages = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       "${activationBundle}/src/scripts/packages/install-pi-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.pi-coding-agent}/bin/pi" \
@@ -173,7 +173,7 @@ in
 
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
     # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
-    install-uv-tools = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
+    installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       "${activationBundle}/src/scripts/packages/install-uv-tools.sh" \
         "${pkgs.uv}/bin/uv" \
         "${pkgs.gawk}/bin/awk" \
@@ -183,8 +183,8 @@ in
     '';
 
     # rustup default is none so rust-toolchain.toml stays authoritative.
-    # Why after linkGeneration: must run before install-cargo-binstall-packages.
-    init-rustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    # Why after linkGeneration: must run before installCargoBinstallPackages.
+    initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/packages/init-rustup.sh" \
         "${pkgs.rustup}/bin/rustup" \
         "${pkgs.jq}/bin/jq"
@@ -193,10 +193,10 @@ in
     # Uses the nixpkgs cargo store path for list/uninstall; probing
     # ~/.cargo/bin at runtime is prohibited.
     #
-    # Why after init-rustup: the stable toolchain backs cargo-binstall's
+    # Why after initRustup: the stable toolchain backs cargo-binstall's
     # compilation fallback. Unified with Windows Invoke-RustupSetup and
     # Invoke-CargoBinstallSetup.
-    install-cargo-binstall-packages = lib.hm.dag.entryAfter [ "init-rustup" ] ''
+    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
       "${activationBundle}/src/scripts/packages/install-cargo-binstall-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
@@ -206,9 +206,9 @@ in
         "${pkgs.sccache}/bin/sccache"
     '';
 
-    # Why after install-bun-packages: ClawHub arrives with it. Skill sync is
+    # Why after installBunPackages: ClawHub arrives with it. Skill sync is
     # additive, so a missing skill is not a failed system state.
-    sync-clawhub-skills = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
+    syncClawhubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       "${activationBundle}/src/scripts/agents/sync-clawhub-skills.sh" \
         "${pkgs.jq}/bin/jq" \
         "${managedPaths.toShellPrependGuard}" \
@@ -220,15 +220,15 @@ in
     # builtins.fetchGit checks the pinned rev out into the store at build time;
     # activation only creates the symlink. A missing plugin is not a failed
     # system state.
-    symlink-superpowers-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlinkSuperpowersPlugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/agents/symlink-superpowers-plugin.sh" \
         "${superpowersSrc}"
     '';
 
     # Layered after the bundled skills, and after the plugin symlink so its
     # skills directory resolves.
-    symlink-superpowers-skills =
-      lib.hm.dag.entryAfter [ "install-agent-skills" "symlink-superpowers-plugin" ]
+    symlinkSuperpowersSkills =
+      lib.hm.dag.entryAfter [ "installAgentSkills" "symlinkSuperpowersPlugin" ]
         ''
           "${activationBundle}/src/scripts/agents/install-agent-skills.sh" \
             "${repoRoot}" "${effectiveUsername}" \
@@ -236,21 +236,21 @@ in
         '';
 
     # OpenCode is not installed on every host, so this step is best-effort.
-    symlink-superpowers-for-opencode =
-      lib.hm.dag.entryAfter [ "linkGeneration" "symlink-superpowers-plugin" ]
+    symlinkSuperpowersForOpencode =
+      lib.hm.dag.entryAfter [ "linkGeneration" "symlinkSuperpowersPlugin" ]
         ''
           "${activationBundle}/src/scripts/agents/symlink-superpowers-for-opencode.sh"
         '';
 
     # WHY: a harness whose install is disabled has no config directory, so the
     # bundle script reports and skips it instead of creating an empty stub.
-    provision-harness-models =
+    provisionHarnessModels =
       lib.hm.dag.entryAfter
         [
-          "symlink-agent-config"
-          "symlink-pi-agent-config"
-          "symlink-vscode-config"
-          "seed-claude-settings"
+          "symlinkAgentConfig"
+          "symlinkPiAgentConfig"
+          "symlinkVscodeConfig"
+          "seedClaudeSettings"
         ]
         ''
           "${activationBundle}/src/scripts/agents/provision-harness-models.sh" \

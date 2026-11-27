@@ -207,7 +207,7 @@ test_no_consumer_exits_outside_a_heredoc() {
 # ---- safe-rm fixture environment ----
 
 # The cases must not depend on a provisioned host: safe-rm is installed by the
-# install-bun-packages activation, it is absent from the test app's
+# installBunPackages activation, it is absent from the test app's
 # runtimeInputs, and CI runs bootstrap --no-apply before the test pipeline, so a
 # case that needs the real binary would be red on every CI runner. A fake with
 # the tool's contract (read SAFE_RM_CONFIG, move each target into SAFE_RM_TRASH,

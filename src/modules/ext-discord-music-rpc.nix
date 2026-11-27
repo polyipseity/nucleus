@@ -97,9 +97,9 @@ in
 
       # Writable symlink against the LIVE repo root so the app writes config
       # back into the repo. The writable/immutable decision belongs to
-      # managedSymlinkPaths; this runs before protect-out-of-store-symlinks.
+      # managedSymlinkPaths; this runs before protectOutOfStoreSymlinks.
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-      home.activation.seed-discord-music-rpc-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      home.activation.seedDiscordMusicRpcConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
           "${config.home.homeDirectory}/.config/discord-music-rpc/config.yaml" \
           "${overlay.toRepoRelPath discordMusicRpcConfigFile}" \

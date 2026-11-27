@@ -32,7 +32,7 @@ in
 {
   # WHY after linkGeneration: the wrapper is linked by then, so the check runs
   # the same `vagrant` the user gets.
-  home.activation.install-vagrant-plugins = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.installVagrantPlugins = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/packages/install-vagrant-plugins.sh" \
       "${plugins.package}/bin/vagrant" \
       "${pkgs.jq}/bin/jq" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for the POSIX provision-harness-models activation entrypoint.
+# Tests for the POSIX provisionHarnessModels activation entrypoint.
 # Task B5: harness selection, host-split paths, and hard errors.
 set -euo pipefail
 

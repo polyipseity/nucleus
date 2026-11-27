@@ -238,7 +238,7 @@ in
 
     # darwin-rebuild inherits the Nix build directory as CWD, and activation can
     # delete it, so move to a safe path first.
-    home.activation.ensure-safe-cwd = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+    home.activation.ensureSafeCwd = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
       cd /
     '';
 
@@ -249,7 +249,7 @@ in
     # key (978C2F10BDD68D5A7E2B12FA5E029A4348667405) is the canonical signing
     # key with ultimate ownertrust.  The PQC subkey (F4509882...) is for SOPS
     # encryption only and cannot be used by pass.
-    home.activation.init-pass-store = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.initPassStore = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ ! -f "${passwordStoreDir}/.gpg-id" ]; then
         "${pkgs.pass}/bin/pass" init "978C2F10BDD68D5A7E2B12FA5E029A4348667405" \
           --path "${passwordStoreDir}" 2>/dev/null \
@@ -264,7 +264,7 @@ in
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
-    home.activation.merge-qtpass-ini = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.mergeQtpassIni = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-qtpass-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg qtpassModule.qtPassDarwinCommands} \
@@ -278,7 +278,7 @@ in
     # LibreOffice owns registrymodifications.xcu and overwrites it on exit.
     # Merge applies managed metadata-stripping defaults while preserving
     # any user-configured settings outside managed keys.
-    home.activation.merge-libreoffice-xcu = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.mergeLibreofficeXcu = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-libreoffice-xcu.sh" \
         "${pkgs.python3}/bin/python3" \
         "${
@@ -295,7 +295,7 @@ in
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
-    home.activation.merge-picard-ini = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.mergePicardIni = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-picard-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg picardDefaultsIniText} \
@@ -307,7 +307,7 @@ in
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
-    home.activation.merge-obsidian-json = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.mergeObsidianJson = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-obsidian-json.sh" \
         "${pkgs.python3}/bin/python3" \
         ${lib.escapeShellArg obsidianManagedSettingsJson}
@@ -318,14 +318,14 @@ in
     # A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong
     # in the repo.  Merge preserves both managed and app-owned keys.
-    home.activation.merge-rimsort-json = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.mergeRimsortJson = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-rimsort-json.sh" \
         "${pkgs.python3}/bin/python3" \
         ${lib.escapeShellArg rimsortManagedSettingsJson}
     '';
 
     # macOS links the store binary, NixOS the steam-run wrapper.
-    home.activation.provision-steamcmd = lib.hm.dag.entryAfter [ "merge-rimsort-json" ] ''
+    home.activation.provisionSteamcmd = lib.hm.dag.entryAfter [ "mergeRimsortJson" ] ''
       "${activationBundle}/src/scripts/configs/provision-steamcmd.sh" \
         "${pkgs.python3}/bin/python3" \
         "${pkgs.steamcmd}" \
@@ -334,18 +334,18 @@ in
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
-    home.activation.unprotect-out-of-store-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "unprotect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.protect-out-of-store-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
-    # Runs before protect-out-of-store-symlinks so a writable link is hardened
+    # Runs before protectOutOfStoreSymlinks so a writable link is hardened
     # if the entry is not marked writable.
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    home.activation.seed-camilladsp-configs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.seedCamilladspConfigs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.config/camilladsp/configs" \
         "src/modules/configs/camilladsp/configs/${hostName}" \
@@ -353,7 +353,7 @@ in
     '';
 
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    home.activation.seed-camillagui-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.seedCamillaguiConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.config/camillagui-backend/config.yml" \
         "src/modules/configs/camillagui-backend/config-${hostName}.yml" \
@@ -361,32 +361,32 @@ in
     '';
 
     # check-suppress:config-method: method 1 (writable symlink) -- srt settings are user-overridable via the standard overlay pattern.
-    home.activation.seed-srt-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.seedSrtSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.srt-settings.json" \
         "${overlay.toRepoRelPath (overlay.selectFile "srt" "settings.json")}"
     '';
 
     # check-suppress:config-method: method 1 (writable symlink) -- safe-rm config is user-overridable via the standard overlay pattern.
-    home.activation.seed-safe-rm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.seedSafeRmConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.safe-rm/config" \
         "${overlay.toRepoRelPath (overlay.selectFile "safe-rm" "config")}"
     '';
 
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    home.activation.seed-litellm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.seedLitellmConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/litellm-config.yml" \
         "src/modules/configs/litellm/config.yml"
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/cline_handler.py" \
         "src/modules/configs/litellm/cline_handler.py"
-      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging config; part of seed-litellm-config activation block.
+      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging config; part of seedLitellmConfig activation block.
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/logging_config.json" \
         "src/modules/configs/litellm/logging_config.json"
-      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging formatter; part of seed-litellm-config activation block.
+      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging formatter; part of seedLitellmConfig activation block.
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/logging_formatter.py" \
         "src/modules/configs/litellm/logging_formatter.py"
@@ -395,16 +395,16 @@ in
     # Runs after every seeder: a missing path means the owning seeder did not
     # converge and the app would read a nonexistent config. Unprotect tolerates
     # absence because it runs before the seeders.
-    home.activation.verify-managed-symlink-paths =
+    home.activation.verifyManagedSymlinkPaths =
       lib.hm.dag.entryAfter
         [
-          "seed-camilladsp-configs"
-          "seed-camillagui-config"
-          "seed-discord-music-rpc-config"
-          "seed-iterm2-dynamic-profiles"
-          "seed-litellm-config"
-          "seed-safe-rm-config"
-          "seed-srt-settings"
+          "seedCamilladspConfigs"
+          "seedCamillaguiConfig"
+          "seedDiscordMusicRpcConfig"
+          "seedIterm2DynamicProfiles"
+          "seedLitellmConfig"
+          "seedSafeRmConfig"
+          "seedSrtSettings"
         ]
         ''
           "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "verify" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
@@ -412,7 +412,7 @@ in
 
     # An activation artifact rather than a home.file entry, so the audited nucleus
     # root holds a plain file instead of a store symlink.
-    home.activation.write-method1-symlink-manifest = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.writeMethod1SymlinkManifest = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/write-method1-symlink-manifest.sh" \
         "${nucleusUserRoot}/method1-symlink-manifest.txt" \
         '${builtins.toJSON method1ManifestPaths}' \
@@ -420,14 +420,14 @@ in
     '';
 
     # Runs after linkGeneration so symlinks.json entries are not clobbered.
-    home.activation.provision-data-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.provisionDataDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/provision-data-directory.sh" \
         "${config.home.homeDirectory}" \
         ${lib.escapeShellArg (builtins.toJSON config.nucleus.dataDirectory.manifest)} \
         "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.ensure-rip-graveyard = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.ensureRipGraveyard = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/ensure-rip-graveyard.sh"
     '';
 

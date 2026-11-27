@@ -49,7 +49,7 @@ in
     };
 
   config = mkIf cfg.enable {
-    home.activation.fetch-deepfilternet-models = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.fetchDeepfilternetModels = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/ai/fetch-deepfilternet-models.sh" \
         "${nucleusUserRoot}/models" \
         "${pkgs.coreutils}/bin/sha256sum" \

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Configure iCloud exclusion markers on matching directories.
-# Replaces the macos-configure-icloud-exclusions inline activation block.
+# Replaces the macosConfigureIcloudExclusions inline activation block.
 #
 # Usage: configure-icloud-exclusions <jq-bin> <find-bin> <excluded-dirs-json> <managed-roots-json>
 set -euo pipefail

@@ -144,7 +144,7 @@ finder_reconcile_best_effort() {
   finder_remove_default_extras "$mysides_bin"
 }
 
-# Full activation orchestration, called from the macos-configure-finder-sidebar
+# Full activation orchestration, called from the macosConfigureFinderSidebar
 # activation block.
 finder_configure_sidebar() {
   local favorites_json="$1"

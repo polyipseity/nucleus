@@ -64,20 +64,20 @@ in
   # Deterministic symlink at /etc/nucleus/bin/nvim for vscode-neovim, which does
   # not expand ${userHome} or ~.  The target comes from the home-manager profile
   # directory, so no username is hardcoded (matching useUserPackages = true).
-  system.activationScripts.nixos-launch-nvim = lib.mkAfter ''
+  system.activationScripts.nixosLaunchNvim = lib.mkAfter ''
     "${activationBundle}/src/scripts/editors/launch-nvim.sh" "${
       config.home-manager.users.${username}.home.profileDirectory
     }/bin/nvim"
   '';
 
-  # nixos-nucleus-root-symlinks
+  # nixosNucleusRootSymlinks
   # Create the physical conventional dirs plus root->conventional symlinks
   # BEFORE log-dirs-init, so `mkdir -p <root>/logs` resolves through the symlink
   # into the physical target (e.g. /var/log/nucleus).  Also creates the ~/.nucleus
   # hub for the managed user.  Only activation creates these; services reference
   # root paths only.  All nucleus config lives in the USER root
   # (~/.local/share/nucleus), with no legacy config location.
-  system.activationScripts.nixos-nucleus-root-symlinks = lib.mkBefore ''
+  system.activationScripts.nixosNucleusRootSymlinks = lib.mkBefore ''
     ${nucleusRoots.mkNucleusRootSymlinks {
       inherit userHome;
       userName = username;
@@ -88,7 +88,7 @@ in
     }}
   '';
 
-  # nixos-ensure-log-dirs
+  # nixosEnsureLogDirs
   # Create the system and user log directories for every nucleus systemd service
   # before it starts, chowning user dirs to the service user.
   # WHY: imperative, because it must run AFTER the root symlinks resolve and Nix
@@ -96,7 +96,7 @@ in
   # LogsDirectory creates under /var/log/ (wrong path; nucleus logs live in
   # /var/lib/nucleus/logs/) and StateDirectory creates under /var/lib/ but cannot
   # make nested paths like nucleus/logs/<subdir>.
-  system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
+  system.activationScripts.nixosEnsureLogDirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString linuxSystemLogDirs}" \
@@ -225,11 +225,11 @@ in
     wantedBy = [ "timers.target" ];
   };
 
-  # nixos-verify-nucleus-services
+  # nixosVerifyNucleusServices
   # Warn-only check that every managed service runs after activation: a service
   # that fails to start should not block activation, but the warning surfaces it
   # for post-apply investigation.
-  system.activationScripts.nixos-verify-nucleus-services = lib.mkAfter ''
+  system.activationScripts.nixosVerifyNucleusServices = lib.mkAfter ''
     if command -v nucleus-svc >/dev/null 2>&1; then
       if ! nucleus-svc verify; then
         echo "svc: warning: some services are inactive (non-fatal; check journalctl for details)" >&2

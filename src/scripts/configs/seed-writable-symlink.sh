@@ -7,7 +7,7 @@
 #
 # WHY no writable flag here: the writable-vs-immutable decision belongs to
 # `managedSymlinkPaths` (src/modules/home.nix), applied by the
-# `protect-out-of-store-symlinks` entry. Only the migration unlink below touches
+# `protectOutOfStoreSymlinks` entry. Only the migration unlink below touches
 # protection.
 #
 # Usage: seed-writable-symlink.sh <target-path> <repo-rel-path> [hostName]

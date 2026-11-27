@@ -6,7 +6,7 @@
 #
 # It lives at the SYSTEM root bin, so a root-context system activation script
 # writes it. nix-darwin only honors hardcoded fragment names, hence
-# postActivation there; NixOS takes a custom kebab-case name.
+# postActivation there; NixOS takes a custom lowerCamelCase name.
 {
   lib,
   pkgs,
@@ -54,7 +54,7 @@ in
     })
     (mkIf (!pkgs.stdenv.hostPlatform.isDarwin) {
       # Fragment from src/modules/posix/agent-host-shell.nix
-      system.activationScripts.agent-host-shell.text = mkAfter ''
+      system.activationScripts.agentHostShell.text = mkAfter ''
         "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
           "${wrapperPath}" \
           "${realShellExe}"

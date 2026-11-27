@@ -214,7 +214,7 @@ in
     ++ lib.optionals (!isDarwin && pkgs ? vscode-insiders) [ pkgs.vscode-insiders ];
 
   programs.vscode = {
-    # Extensions are managed only by symlink-vscode-extensions; adding them here
+    # Extensions are managed only by symlinkVscodeExtensions; adding them here
     # would give HM and the bridge two writers for ~/.vscode/extensions.
     enable = !isDarwin;
     package = pkgs.vscode;
@@ -236,7 +236,7 @@ in
     #   - Wrong symlink → remove, create correct symlink.
     #   - Real file or directory at target path → fail; fix manually and re-apply.
     #   - Absent → create symlink (parent dirs created as needed).
-    symlink-vscode-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlinkVscodeConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
         "${effectiveUsername}" \
@@ -249,12 +249,12 @@ in
 
     # VS Code writes extensions.json at startup, so the directory stays real and
     # writable; a whole-directory store symlink would give EACCES.
-    symlink-vscode-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlinkVscodeExtensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/bridge-vscode-extensions.sh" "${extensionStore}"
     '';
 
     # Same store and directory policy as the VS Code bridge.
-    symlink-cursor-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlinkCursorExtensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/bridge-cursor-extensions.sh" "${extensionStore}"
     '';
 
@@ -262,13 +262,13 @@ in
     # Trust state lives in the SQLite DB, not settings.json: the settings keys
     # only control the trust UI and cannot pre-trust a folder. A missing or
     # locked DB warns instead of failing, so a first run does not break.
-    trust-vscode-workspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    trustVscodeWorkspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
 
-    # Shares trust-paths.json with trust-vscode-workspace so both trust the
+    # Shares trust-paths.json with trustVscodeWorkspace so both trust the
     # same directories.
-    trust-pi-project = lib.hm.dag.entryAfter [ "trust-vscode-workspace" ] ''
+    trustPiProject = lib.hm.dag.entryAfter [ "trustVscodeWorkspace" ] ''
       "${activationBundle}/src/scripts/editors/trust-pi-project.sh" "${pkgs.python3}/bin/python3"
     '';
   };

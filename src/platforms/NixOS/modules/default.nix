@@ -150,9 +150,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   };
 
   home.activation = {
-    # build-nix-index: refresh the pinned prebuilt nix-index database on first
+    # buildNixIndex: refresh the pinned prebuilt nix-index database on first
     # provision so the database is ready before the daily timer fires.
-    build-nix-index = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/packages/update-nix-index.sh" \
         "$HOME/.cache/nix-index" \
         "${pkgs.coreutils}/bin/sha256sum" \
@@ -160,9 +160,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         "${config.home.homeDirectory}/.config/nucleus/src/lockfiles/lockfile.json"
     '';
 
-    # ensure-dev-directory: create ~/dev when absent, mirroring macOS, since
+    # ensureDevDirectory: create ~/dev when absent, mirroring macOS, since
     # VS Code workspace trust and the editor tooling expect it on every host.
-    ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    ensureDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev"
     '';
 

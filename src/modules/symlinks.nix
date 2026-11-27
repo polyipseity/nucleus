@@ -124,7 +124,7 @@ in
       }) selectedSymlinksResolved
     );
 
-    home.activation.ensure-symlink-targets = lib.hm.dag.entryBefore [ "prepare-symlinks" ] ''
+    home.activation.ensureSymlinkTargets = lib.hm.dag.entryBefore [ "prepareSymlinks" ] ''
       "${activationBundle}/src/scripts/configs/ensure-symlink-targets.sh" \
         "${managedSymlinkManifestPath}" \
         '${
@@ -137,14 +137,14 @@ in
         "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.prepare-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.prepareSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \
         '${managedSymlinkManifestJson}'
     '';
 
-    home.activation.finalize-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.finalizeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/finalize-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \

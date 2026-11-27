@@ -24,17 +24,17 @@ in
 {
   home.activation = {
     # -------------------------------------------------------------------------
-    # symlink-cursor-config
+    # symlinkCursorConfig
     # Verify ~/.cursor/ is a real directory, then:
     #   - folder symlink skills/ -> ~/.agents/skills/
     #   - per-file extension-mapped symlinks for rules/, agents/, commands/
     #   - per-entry symlinks from src/users/<user>/cursor/ (hooks.json, mcp.json, …)
     # -------------------------------------------------------------------------
-    symlink-cursor-config =
+    symlinkCursorConfig =
       lib.hm.dag.entryAfter
         [
-          "symlink-agent-config"
-          "install-agent-skills"
+          "symlinkAgentConfig"
+          "installAgentSkills"
         ]
         ''
           "${activationBundle}/src/scripts/configs/symlink-cursor-config.sh" "${repoRoot}" "${effectiveUsername}"

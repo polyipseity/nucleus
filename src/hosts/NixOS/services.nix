@@ -112,17 +112,17 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
 
   # Writable symlinks to the live repo, created against the LIVE repo root so repo
   # edits take effect without a rebuild. These run before
-  # protect-out-of-store-symlinks so the links get hardened.
+  # protectOutOfStoreSymlinks so the links get hardened.
   home.activation = {
     # Shared script that Nautilus and Dolphin both invoke.
-    seed-open-manual = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedOpenManual = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.local/lib/nucleus/open-manual" \
         "src/scripts/integrations/open-host-manual.sh" \
     '';
 
     # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
-    seed-nucleus-manual-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedNucleusManualDesktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-manual.desktop" \
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-manual.desktop")}" \
@@ -130,7 +130,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions).
     # check-suppress:config-method: method 1 (writable symlink) -- the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
-    seed-nucleus-optimize-pdf-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedNucleusOptimizePdfDesktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-optimize-pdf.desktop" \
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop")}" \
@@ -138,7 +138,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
 
     # Dolphin: right-click → strip metadata (all metadata-supportable formats).
     # check-suppress:config-method: method 1 (writable symlink) -- the desktop file can be updated in-place; no rebuild needed.
-    seed-nucleus-strip-metadata-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seedNucleusStripMetadataDesktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-strip-metadata.desktop" \
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-strip-metadata.desktop")}" \

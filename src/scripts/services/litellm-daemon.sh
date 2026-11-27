@@ -84,7 +84,7 @@ if [ "${_redis_ticks}" -gt 0 ]; then
   fi
 fi
 
-# The logging config comes from the user-scope seeder (home.activation.seed-litellm-config)
+# The logging config comes from the user-scope seeder (home.activation.seedLitellmConfig)
 # and this daemon starts at boot, so wait for it as the Redis block above does.
 _log_config_deadline="${LITELLM_LOG_CONFIG_WAIT_SECONDS:-60}"
 if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ ! -f "$LITELLM_LOG_CONFIG" ]; then
@@ -101,7 +101,7 @@ fi
 # expansion splits it into a truncated value plus a stray positional argument.
 if [ -n "${LITELLM_LOG_CONFIG:-}" ]; then
   if [ ! -f "$LITELLM_LOG_CONFIG" ]; then
-    die -l litellm-daemon "LITELLM_LOG_CONFIG=$LITELLM_LOG_CONFIG does not exist after ${_log_config_deadline}s; home.activation.seed-litellm-config did not converge"
+    die -l litellm-daemon "LITELLM_LOG_CONFIG=$LITELLM_LOG_CONFIG does not exist after ${_log_config_deadline}s; home.activation.seedLitellmConfig did not converge"
   fi
   exec litellm \
     --config "$config" \

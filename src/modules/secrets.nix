@@ -71,7 +71,7 @@ in
 
   # Decrypts src/secrets/users/<username>.yml through decrypt-sops.sh, which
   # writes the per-user payloads where sops-nix secret paths cannot.
-  home.activation.materialize-user-secrets = lib.mkIf hasUserSecretFile (
+  home.activation.materializeUserSecrets = lib.mkIf hasUserSecretFile (
     lib.hm.dag.entryAfter [ "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/materialize-user-secrets.sh" \
         "${repoRoot}" \
@@ -88,11 +88,11 @@ in
   );
 
   # Checks every registered SOPS file against every backend, after
-  # materialize-user-secrets: materialization sanity (a passphrase-protected
+  # materializeUserSecrets: materialization sanity (a passphrase-protected
   # SSH key is valid; see verify-secret-decryption.sh for what the probe
   # cannot prove), GPG key presence, GPG SOPS recipients, personal SSH age
   # recipients, then the machine host key (warning-only).
-  home.activation.verify-secret-decryption =
+  home.activation.verifySecretDecryption =
     let
       overlayLib = import ./lib/users-overlay.nix { inherit lib; };
       wallpaperPaths = import ./lib/wallpaper-paths.nix {
@@ -121,7 +121,7 @@ in
         ++ wallpaperSopsFiles;
     in
     lib.mkIf hasUserSecretFile (
-      lib.hm.dag.entryAfter [ "materialize-user-secrets" ] ''
+      lib.hm.dag.entryAfter [ "materializeUserSecrets" ] ''
         "${activationBundle}/src/scripts/secrets/verify-secret-decryption.sh" \
           "${pkgs.jq}/bin/jq" \
           "${pkgs.gnupg}/bin/gpg" \

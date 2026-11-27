@@ -5,8 +5,8 @@ function Initialize-DevDirectory {
 
 .DESCRIPTION
   Create the managed dev root directory under the current user's home.
-  Mirrors the MacBook ensure-dev-directory (macos.nix) and NixOS
-  ensure-dev-directory (linux.nix) activations, which both create ~/dev
+  Mirrors the MacBook ensureDevDirectory (macos.nix) and NixOS
+  ensureDevDirectory (linux.nix) activations, which both create ~/dev
   unconditionally during activation.
 
   The function is idempotent: it is a no-op when the directory already exists.

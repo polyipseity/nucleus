@@ -61,7 +61,7 @@ let
       [ "Library/Mobile Documents/com~apple~CloudDocs" ];
 
   # Payloads evaluated at derivation time, so the store script needs no
-  # runtime user context. Both mirror macos-configure-icloud-exclusions to keep
+  # runtime user context. Both mirror macosConfigureIcloudExclusions to keep
   # the activation hook and the daily agent in sync.
   icloudExcludedDirsJson = builtins.toJSON (
     let

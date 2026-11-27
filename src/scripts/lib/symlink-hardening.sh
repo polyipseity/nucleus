@@ -41,7 +41,7 @@ _nucleus_protect_symlink() {
     # binary present the call would fail EPERM, and a genuine flag failure is
     # fatal here, so every NixOS apply would abort. The contract is enforced by
     # detection instead: check step 13 fails when a managed symlink does not
-    # resolve into the live repo, and home.activation.verify-managed-symlink-paths
+    # resolve into the live repo, and home.activation.verifyManagedSymlinkPaths
     # fails when a seeded path is missing. macOS keeps prevention via uchg.
     ;;
   esac

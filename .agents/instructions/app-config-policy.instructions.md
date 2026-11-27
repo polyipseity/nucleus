@@ -14,7 +14,7 @@ Symlink the app config path into the repo tree. POSIX: `seed-writable-symlink.sh
 
 Never use `mkOutOfStoreSymlink` with a `repoRoot`-derived path: `repoRoot = ../.` copies into read-only `/nix/store/*-source`, so writes fail `EACCES`. See `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
 
-Writable-vs-immutable is owned by `managedSymlinkPaths` in `src/modules/home.nix`: `writable = true` stays unhardened, everything else is re-hardened by `protect-out-of-store-symlinks`. The helper takes no writable flag and never calls protect/unprotect.
+Writable-vs-immutable is owned by `managedSymlinkPaths` in `src/modules/home.nix`: `writable = true` stays unhardened, everything else is re-hardened by `protectOutOfStoreSymlinks`. The helper takes no writable flag and never calls protect/unprotect.
 
 Applies when the app tolerates a symlink without overwriting it with generated state. An app that auto-writes needs the key committed, auto-write disabled, or Method 2/3.
 

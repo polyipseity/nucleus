@@ -32,7 +32,7 @@ in
   # against the LIVE repo root, so repo changes apply at the next shell start
   # without reactivation. Windows uses Deploy-WritableSymlink, same method.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-starship-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedStarshipConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/starship.toml" \
       "${overlay.toRepoRelPath starshipConfigFile}"

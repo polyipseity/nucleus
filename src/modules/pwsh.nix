@@ -113,10 +113,10 @@ in
   # scripts/check-PSScriptAnalyzerSettings.psd1 and
   # scripts/test-PSScriptAnalyzerSettings.psd1 (Method 3).
   # Written against the live repo root so repo changes take effect without a
-  # rebuild. Must run before protect-out-of-store-symlinks so the link gets
+  # rebuild. Must run before protectOutOfStoreSymlinks so the link gets
   # hardened; the writable/immutable decision is owned by managedSymlinkPaths.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  home.activation.seed-pwsh-psscriptanalyzer-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.seedPwshPsscriptanalyzerSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.config/powershell/PSScriptAnalyzerSettings.psd1" \
       "${overlay.toRepoRelPath (overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1")}" \
@@ -124,7 +124,7 @@ in
 
   # Stays imperative: the suite resets module state between runs for isolation
   # and a store path is read-only.
-  home.activation.install-pwsh-pester = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.installPwshPester = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "Pester" \
@@ -133,7 +133,7 @@ in
   '';
 
   # Needed by Invoke-ScriptAnalyzer in src/scripts/checks/check-pwsh.ps1.
-  home.activation.install-pwsh-script-analyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "PSScriptAnalyzer" \
@@ -142,7 +142,7 @@ in
   '';
 
   # Needed by the locked DSC validation phase in scripts/check.ps1.
-  home.activation.install-pwsh-yaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "powershell-yaml" \

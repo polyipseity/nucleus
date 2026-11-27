@@ -218,7 +218,7 @@ in
   # environment.etc always nests under /etc, so a system activation script writes
   # to the SYSTEM root (mode 0444, readable by all).
   # Source: https://mynixos.com/nixpkgs/option/system.activationScripts
-  system.activationScripts.nixos-vms-xml = lib.mkBefore ''
+  system.activationScripts.nixosVmsXml = lib.mkBefore ''
     install -d -m 0755 /var/lib/nucleus/vms
     ${lib.concatStringsSep "\n" (
       builtins.map (

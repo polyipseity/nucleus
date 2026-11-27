@@ -750,7 +750,7 @@ if ($EnableCloudDrivesParity) {
 # history survives an apply. A block otherwise clears only on reboot, when the
 # record's boot id stops matching, so a blocked service would stay blocked even
 # though apply just restarted it. Mirrors the POSIX
-# home.activation.reset-service-health step in src/modules/cloud-drives.nix.
+# home.activation.resetServiceHealth step in src/modules/cloud-drives.nix.
 Clear-HealthRecordAll
 # Ensure the log subdirectories exist before services start.
 Invoke-EnsureLogDir -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\modules\services.json")

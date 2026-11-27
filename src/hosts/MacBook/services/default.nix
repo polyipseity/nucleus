@@ -31,8 +31,8 @@ in
 
   # Runs after both sub-modules deploy, including the forced pbs rescan that
   # makes renamed or pruned workflows visible without a logout.
-  home.activation.macos-flush-services-cache =
-    lib.hm.dag.entryAfter [ "macos-deploy-automator-workflows" "macos-deploy-app-bundles" ]
+  home.activation.macosFlushServicesCache =
+    lib.hm.dag.entryAfter [ "macosDeployAutomatorWorkflows" "macosDeployAppBundles" ]
       ''
         "${activationBundle}/src/scripts/services/refresh-services-menu.sh" \
           "/System/Library/CoreServices/pbs" \
