@@ -470,18 +470,16 @@ function Save-FileListCache {
 
 # WHY: the body owns the pipeline's top-level try/catch. Its outcomes are
 # reported through -ExitCode, and this wrapper sets the process exit after the
-# catch can no longer intercept control flow. This wrapper uses the plain exit
-# keyword because it is an early return to the caller; Format-StepSummary uses
-# [Environment]::Exit for its final boundary, where a caller's try/catch is the
-# failure mode under test. Both wrappers clean up explicitly: the summary exit
-# bypasses the PowerShell.Exiting event, and a second pass after a normal exit
-# is a no-op because both helpers guard on path existence.
+# catch can no longer intercept control flow. [Environment]::Exit is the
+# process-level boundary here: a plain exit inside a dot-sourced function does
+# not reliably set the child process code on the Windows CI runtime. Both this
+# wrapper and Format-StepSummary clean up explicitly before exiting.
 function Invoke-StepPipeline {
   $pipelineExitCode = 0
   Invoke-StepPipelineBody -ExitCode ([ref]$pipelineExitCode)
   if ($pipelineExitCode -ne 0) {
     Remove-WaveTempDir
-    exit $pipelineExitCode
+    [Environment]::Exit($pipelineExitCode)
   }
 }
 
