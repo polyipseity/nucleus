@@ -24,6 +24,7 @@ Describe 'Sync-HarnessModel' {
         $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:repoRoot -ChildPath 'src\modules\configs') -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:repoRoot -ChildPath 'src\scripts\agents') -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:homeDir -ChildPath '.pi\agent') -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:homeDir -ChildPath '.codex') -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:homeDir -ChildPath 'AppData\Roaming\Code\User') -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path $script:emptyHome -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
 
@@ -54,6 +55,17 @@ Describe 'Sync-HarnessModel' {
                     format  = 'json'
                     slot    = @{ kind = 'dotted-key'; path = 'providers.litellm' }
                     payload = 'src/users/default/copilot/litellm-providers.json'
+                }
+                @{
+                    harness = 'codex'
+                    path    = '~/.codex/config.toml'
+                    format  = 'toml'
+                    slot    = @{
+                        kind         = 'toml-provider-table'
+                        topLevelKey  = 'model_provider'
+                        table        = 'model_providers.litellm'
+                    }
+                    payload = 'src/users/default/codex/litellm-config.toml'
                 }
             )
         }
@@ -93,6 +105,7 @@ if ($env:HARNESS_PY_EXIT) {
         $argsText = Get-Content -LiteralPath $script:argsLog -Raw
         $argsText | Should -Match -- '--harness\s+pi'
         $argsText | Should -Match -- '--harness\s+vscode'
+        $argsText | Should -Match -- '--harness\s+codex'
         $argsText | Should -Not -Match -- '--harness\s+copilot'
         $argsText | Should -Match -- '--host\s+Windows'
         $argsText | Should -Match -- "--home\s+$([regex]::Escape($script:homeDir))"
@@ -181,7 +194,7 @@ public static class $typeName
             $env:NUCLEUS_TEST_MANAGED_PY_MARKER = $savedMarker
             $env:HARNESS_PY_ARGS_LOG = $savedArgsLog
         }
-        ($lines -join "`n") | Should -Match 'merged model slots for 2 harness'
+        ($lines -join "`n") | Should -Match 'merged model slots for 3 harness'
         (Get-Content -LiteralPath $markerPath -Raw) | Should -Match 'managed-python'
         (Test-Path -LiteralPath $unusedArgsLog) | Should -BeFalse
     }

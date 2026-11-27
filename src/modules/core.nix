@@ -157,6 +157,22 @@ let
       category = "cli";
       winget = "chrisant996.Clink";
     };
+    codex = {
+      # WHY: config-only. Every install carrier is disabled; the LiteLLM slot in
+      # ~/.codex/config.toml is provisioned by provision-harness-models instead.
+      enable = {
+        MacBook = false;
+        NixOS = false;
+        Windows = false;
+      };
+      category = "cli";
+      homebrew = {
+        kind = "cask";
+        name = "codex";
+      };
+      nixpkgs = "codex";
+      winget = "OpenAI.Codex";
+    };
     cursor = {
       # Single source of truth for Cursor enable/disable. Every host is listed
       # and disabled, since an omitted host would default to enabled.

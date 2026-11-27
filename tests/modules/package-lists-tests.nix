@@ -223,6 +223,19 @@ let
   );
   stirlingDesktopResolved = stirlingNixPnames == [ "stirling-pdf-desktop" ];
 
+  codexHostNames = [
+    "MacBook"
+    "NixOS"
+    "Windows"
+  ];
+  codexEvaluations = builtins.map (host: {
+    inherit host;
+    enabled = (evalCoreForHost host).config.nucleus.packages.enabled;
+  }) codexHostNames;
+  codexRegistryPresent = builtins.all (e: e.enabled ? "codex") codexEvaluations;
+  codexEnabledHosts = builtins.filter (e: (e.enabled ? "codex") && e.enabled.codex) codexEvaluations;
+  codexWinGetAbsent = !(builtins.elem "OpenAI.Codex" resolvedWindowsPackages);
+
   committedDoc = builtins.fromJSON (readRepo "src/hosts/Windows/system/winget-packages.json");
   committedPackages = committedDoc.packages or [ ];
 
@@ -390,6 +403,9 @@ let
     && stirlingRegistryPresent
     && stirlingDisabledHosts == [ ]
     && stirlingDesktopResolved
+    && codexRegistryPresent
+    && codexEnabledHosts == [ ]
+    && codexWinGetAbsent
     && spIsValid
     && wpDscCoversEnableList
     && wpDscExceptionsFresh
@@ -431,6 +447,13 @@ in
       if stirlingNixPnames == [ ] then [ "<none>" ] else stirlingNixPnames
     )
   }";
+  test_codex_registry_present = assert' codexRegistryPresent "the codex entry must exist in managedPackages";
+  test_codex_installs_disabled =
+    assert' (codexEnabledHosts == [ ])
+      "codex installs must be disabled on every host; enabled on: ${
+        builtins.concatStringsSep ", " (builtins.map (e: e.host) codexEnabledHosts)
+      }";
+  test_codex_winget_absent = assert' codexWinGetAbsent "OpenAI.Codex must not enter the generated Windows enable set";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source, 40-char hex rev, and a sha256 SRI hash";
 
   # Windows DSC overlap parity tests.

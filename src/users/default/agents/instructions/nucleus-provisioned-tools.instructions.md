@@ -30,6 +30,8 @@ Inside a nucleus repository, prefer the `nucleus-*` wrapper over `./scripts/*.sh
 | `nucleus-utils` | Run nucleus utility subcommands. |
 | `nucleus-vm` | Provision and manage virtual machines. |
 
+`codex` is registry-managed with installs disabled. Only its `~/.codex/config.toml` LiteLLM slot is provisioned.
+
 ## Provisioned tools
 
 Each tool below is installed on this machine. Links go to official documentation; this file does not teach usage.

@@ -62,6 +62,23 @@ for harness in copilot hermes codex; do
   fi
 done
 
+CODEX_HOME="$WORK/codex-home"
+mkdir -p "$CODEX_HOME/.codex"
+: >"$CODEX_HOME/.codex/config.toml"
+
+if "$ENTRYPOINT" "$PYTHON_BIN" "$JQ_BIN" "$REPO_ROOT" "$REGISTRY" "$HOST_KEY" "$CODEX_HOME" >"$OUT" 2>"$ERR"; then
+  if grep -q "skipped codex: no config directory" "$OUT"; then
+    assert_fail 'config-only codex is merged without an install' "out=$(cat "$OUT")"
+  elif grep -q 'model_provider = "litellm"' "$CODEX_HOME/.codex/config.toml" &&
+    grep -q 'base_url = "http://127.0.0.1:4000/v1"' "$CODEX_HOME/.codex/config.toml"; then
+    assert_pass 'config-only codex is merged without an install'
+  else
+    assert_fail 'config-only codex is merged without an install' 'the Codex payload was not merged'
+  fi
+else
+  assert_fail 'config-only codex is merged without an install' "rc=$? out=$(cat "$OUT") err=$(cat "$ERR")"
+fi
+
 if "$PYTHON_BIN" - "$HOME_DIR" <<'PY'
 import json
 import sys
