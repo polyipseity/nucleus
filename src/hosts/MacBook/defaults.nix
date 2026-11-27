@@ -66,7 +66,7 @@ in
       NSTableViewDefaultSizeMode = 3; # medium row height in table views
       PMPrintingExpandedStateForPrint = true; # open print dialogs in expanded mode
       PMPrintingExpandedStateForPrint2 = true;
-      "com.apple.keyboard.fnState" = true; # Fn keys act as standard F1–F12 by default
+      "com.apple.keyboard.fnState" = false; # media keys are default; Fn produces F1-F12
       "com.apple.mouse.tapBehavior" = 1; # tap-to-click on trackpad/mouse
       "com.apple.springing.delay" = 0.0; # spring-loaded folders open instantly
       "com.apple.swipescrolldirection" = true; # natural (reversed) scroll direction
