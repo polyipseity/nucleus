@@ -31,12 +31,13 @@ SSOT: `src/modules/host-platform-registry.json` for host to platform and platfor
 
 | Surface | Convention | Example |
 | ------- | ---------- | ------- |
-| Nix/POSIX activation entries (`home.activation.*`, `system.activationScripts.*`, `nucleus.terminalActivations.*`) | kebab-case, verb-first (`activation-scripts.instructions.md`) | `write-terminal-activations` |
+| Nix/POSIX activation entries (`home.activation.*`, `system.activationScripts.*`, `nucleus.terminalActivations.*`) | lowerCamelCase, verb-first (`activation-scripts.instructions.md`) | `writeTerminalActivations` |
+| Nix script filenames | kebab-case, following the repository filename convention | `host-platform.nix` |
 | DSC file IDs | `<scope>/<kebab-name>.dsc.yml` | `user/shell.dsc.yml` |
 | PowerShell functions/modules | PascalCase with approved verbs (`Sync-*`, `Deploy-*`, `Invoke-*`, `Get-*`, `Set-*`) | `Sync-TerminalActivation` |
 | POSIX apply step functions (`src/scripts/apply.sh`) | snake_case `run_*` | `run_terminal_activations` |
 | Stage labels (`src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`) | `<label>:` kebab-case | `terminal-activations:` |
 
-One step, four spellings: `write-terminal-activations`, `Sync-TerminalActivation`, `terminal-activations:`, `run_terminal_activations`. The singular/plural asymmetry is deliberate (PowerShell singular, activation and stage plural), so do not "fix" it.
+One step, four spellings: `writeTerminalActivations`, `Sync-TerminalActivation`, `terminal-activations:`, `run_terminal_activations`. The casing change applies to activation keys only: script filenames stay kebab-case, PowerShell functions stay PascalCase, and apply stage labels stay kebab-case. The singular/plural asymmetry is deliberate (PowerShell singular, activation and stage plural), so do not "fix" it.
 
-Kept as is: `Disable-SteamAutoStartup` keeps the approved `Disable` verb, and the `config-utils.nix` generated names (`unprotectSymlink_${name}` and friends) stay exempt from kebab-case, mirrored on Windows by the `Deploy-*` names in `ConfigHelpers.ps1`.
+Kept as is: `Disable-SteamAutoStartup` keeps the approved `Disable` verb, and the `config-utils.nix` generated names (`unprotectSymlink_${name}` and friends) stay exempt from the activation key casing rule, mirrored on Windows by the `Deploy-*` names in `ConfigHelpers.ps1`.

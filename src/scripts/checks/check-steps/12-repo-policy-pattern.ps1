@@ -157,15 +157,16 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # WHY: group 1 captures the entry name (mirrors the .sh sed s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\1/); group 2 is the optional .sub suffix and must not be used for the name
   $entryRegex = '^\s*([a-zA-Z0-9_-]+)(\.[a-zA-Z0-9_-]+)?\s*=\s*(lib\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\.dag\.entry(A|Before|Order|After))|\s*$)'
   $dottedRegex = '([^a-zA-Z0-9_.]|^)(home\.activation|system\.activationScripts|nucleus\.terminalActivations)\.[a-zA-Z0-9_-]+'
-  # -cmatch: the kebab regex is anchored on [a-z] and must stay case-sensitive.
-  $kebabRegex = '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+  # -cmatch: the casing rule is case-sensitive. A repo-owned key starts lowercase
+  # and continues with alphanumeric characters; uppercase marks later words.
+  $lowerCamelRegex = '^[a-z][a-zA-Z0-9]*$'
   $macosDirRegex = '^(src[\\/]platforms[\\/]macOS[\\/]|src[\\/]hosts[\\/]MacBook[\\/])'
   $namingErrors = 0
   # WHY: List rather than += on an array: += copies the whole array per append, and a repo this size defines thousands of entries
   $definitions = [System.Collections.Generic.List[string]]::new()
 
   # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
-  # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos- prefix rule
+  # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos prefix rule
   $nixFiles = @(if ($HasArgs) {
     if ($Context.NixFiles) { $Context.NixFiles } else { @($PositionalArgs | Where-Object { $_ -like 'src/*.nix' }) }
   } else {
@@ -204,8 +205,13 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   }
   $definitions = @($definitions | Sort-Object -Unique)
 
-  # Names defined outside macOS-scoped paths are cross-platform and need no macos- prefix.
+  # Names defined outside macOS paths are cross-platform and need no macos prefix.
   $sharedNames = @($definitions | Where-Object { $_ -notmatch $macosDirRegex } | ForEach-Object { ($_ -split ':')[-1] } | Sort-Object -Unique)
+
+  # Exempt classes: Home Manager built-ins, upstream-owned and sops-owned names,
+  # and config-utils generated names (see activation-scripts.instructions.md).
+  # The list is exact: a wildcard would exempt nucleus-owned keys.
+  $exemptNames = @('linkGeneration', 'writeBoundary', 'checkLinkTargets', 'setupLaunchAgents', 'installPackages', 'preActivation', 'extraActivation', 'postActivation', 'checkFilesChanged', 'onFilesChange', 'hermesAgentSetup', 'sops-nix')
 
   foreach ($def in $definitions) {
     $parts = $def -split ':'
@@ -213,22 +219,22 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     $lineNum = $parts[1]
     $name = $parts[2]
 
-    # Exempt classes: framework-generated and hardcoded names (see
-    # activation-scripts.instructions.md: Exempt classes).
-    if ($name -in @('linkGeneration', 'writeBoundary', 'checkLinkTargets', 'setupLaunchAgents', 'installPackages', 'preActivation', 'extraActivation', 'postActivation')) { continue }
-    if ($name -like 'unprotectSymlink_*' -or $name -like 'protectSymlink_*' -or $name -like 'mergeConfig_*') { continue }
-    if ($name -like '*sops*') { continue }
+    # -cin/-clike keep the exemptions case-sensitive, like the .sh twin's case patterns.
+    if ($name -cin $exemptNames) { continue }
+    if ($name -clike 'unprotectSymlink_*' -or $name -clike 'protectSymlink_*' -or $name -clike 'mergeConfig_*') { continue }
 
-    if ($name -cnotmatch $kebabRegex) {
-      Write-ErrorMessage "activation name '$name' at $file`:$lineNum is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+    if ($name -cnotmatch $lowerCamelRegex) {
+      Write-ErrorMessage "activation name '$name' at $file`:$lineNum is not lowerCamelCase; kebab-case names are reserved for external and upstream entries (see .agents/instructions/activation-scripts.instructions.md)"
       $namingErrors++
     }
     if ($name -like 'nucleus-*') {
       Write-ErrorMessage "activation name '$name' at $file`:$lineNum uses the forbidden nucleus- prefix (see .agents/instructions/activation-scripts.instructions.md)"
       $namingErrors++
     }
-    if ($file -match $macosDirRegex -and $name -notlike 'macos-*' -and $sharedNames -notcontains $name) {
-      Write-ErrorMessage "macOS-only activation name '$name' at $file`:$lineNum lacks the macos- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+    # macOS-scoped keys carry the macos prefix in lowerCamelCase, so the
+    # check matches macosX rather than macos-x.
+    if ($file -match $macosDirRegex -and $name -cnotmatch '^macos[A-Z]' -and $sharedNames -notcontains $name) {
+      Write-ErrorMessage "macOS-only activation name '$name' at $file`:$lineNum lacks the lowerCamelCase macos prefix (see .agents/instructions/activation-scripts.instructions.md)"
       $namingErrors++
     }
   }

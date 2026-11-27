@@ -21,23 +21,23 @@ test_step12_naming_behavioral_positive() {
   _out=$(mktemp)
   mkdir -p "$_tmp/src/modules" "$_tmp/src/platforms/NixOS" "$_tmp/src/platforms/macOS" "$_tmp/src/hosts/MacBook"
   cat >"$_tmp/src/modules/good.nix" <<'EOF'
-home.activation.provision-thing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.provisionThing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
 system.activationScripts.gitconfig.text = lib.mkAfter "";
 EOF
   cat >"$_tmp/src/platforms/NixOS/default.nix" <<'EOF'
-home.activation.shared-thing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.sharedThing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
 EOF
   cat >"$_tmp/src/platforms/macOS/default.nix" <<'EOF'
-home.activation.shared-thing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
-home.activation.macos-setup-thing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.sharedThing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.macosSetupThing = lib.hm.dag.entryAfter ["writeBoundary"] "x";
 EOF
   cat >"$_tmp/src/hosts/MacBook/default.nix" <<'EOF'
-system.activationScripts.macos-deploy-thing.text = lib.mkAfter "";
+system.activationScripts.macosDeployThing.text = lib.mkAfter "";
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
   if [ "$_ret" -ne 0 ]; then
-    echo "FAIL: valid kebab-case activation names should pass (incl. macos- prefix and cross-platform carve-out)"
+    echo "FAIL: repo-owned lowerCamelCase names should pass (incl. macos prefix and cross-platform carve-out)"
     cat "$_out"
   fi
   rm -rf "$_tmp"
@@ -45,18 +45,18 @@ EOF
   [ "$_ret" -eq 0 ]
 }
 
-test_step12_naming_behavioral_negative() {
+test_step12_naming_behavioral_kebab_fails() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
   mkdir -p "$_tmp/src/modules"
   cat >"$_tmp/src/modules/bad.nix" <<'EOF'
-home.activation.provisionDevRepos = lib.hm.dag.entryAfter ["writeBoundary"] "x";
+home.activation.provision-dev-repos = lib.hm.dag.entryAfter ["writeBoundary"] "x";
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  if [ "$_ret" -eq 0 ] || ! grep -q 'is not kebab-case' "$_out"; then
-    echo "FAIL: camelCase activation name should fail the kebab-case check"
+  if [ "$_ret" -eq 0 ] || ! grep -q 'kebab-case' "$_out" || ! grep -q 'lowerCamelCase' "$_out"; then
+    echo "FAIL: kebab-case activation name should fail with a kebab-case diagnostic"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
@@ -99,12 +99,150 @@ test_step12_naming_behavioral_prefix() {
   _out=$(mktemp)
   mkdir -p "$_tmp/src/hosts/MacBook"
   cat >"$_tmp/src/hosts/MacBook/services.nix" <<'EOF'
-system.activationScripts.flush-services-cache.text = lib.mkAfter "";
+system.activationScripts.flushServicesCache.text = lib.mkAfter "";
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  if [ "$_ret" -eq 0 ] || ! grep -q 'lacks the macos- prefix' "$_out"; then
-    echo "FAIL: macOS-only activation name without macos- prefix should fail"
+  if [ "$_ret" -eq 0 ] || ! grep -q 'lacks the lowerCamelCase macos prefix' "$_out"; then
+    echo "FAIL: macOS-only activation name without the lowerCamelCase macos prefix should fail"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Build a fixture tree holding one Nix file. $1 is its src-relative path; the
+# remaining arguments become that file's lines.
+naming_fixture() {
+  local _nf_root _nf_rel="$1"
+  shift
+  _nf_root=$(mktemp -d)
+  mkdir -p "$_nf_root/$(dirname "$_nf_rel")"
+  printf '%s\n' "$@" >"$_nf_root/$_nf_rel"
+  printf '%s\n' "$_nf_root"
+}
+
+test_step12_naming_lower_camel_key_passes() {
+  local _tmp _out _ret
+  _tmp=$(naming_fixture src/modules/camel.nix 'home.activation.provisionDevRepos = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || grep -q 'activation name' "$_out"; then
+    echo "FAIL: a lowerCamelCase repo-owned activation key must pass"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Both names are lowerCamelCase, so the casing rule alone would pass them. The
+# macOS-scoped file makes the exemption observable: a repo-owned name there
+# needs the macos prefix, and the control name gets that finding.
+test_step12_naming_external_builtin_exemptions_pass() {
+  local _tmp _out _ret
+  _tmp=$(naming_fixture src/hosts/MacBook/external.nix \
+    'home.activation.checkFilesChanged = lib.mkIf true { };' \
+    'home.activation.onFilesChange = lib.mkIf true { };' \
+    'home.activation.controlThing = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] ||
+    ! grep -q "activation name 'controlThing' at src/hosts/MacBook/external.nix:3 lacks the lowerCamelCase macos prefix" "$_out" ||
+    grep -q 'checkFilesChanged' "$_out" || grep -q 'onFilesChange' "$_out"; then
+    echo "FAIL: external built-ins must be exempt from the macOS prefix rule while a repo-owned name is not"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step12_naming_upstream_exemption_passes() {
+  local _tmp _out _ret
+  _tmp=$(naming_fixture src/hosts/MacBook/upstream.nix \
+    'home.activation.hermesAgentSetup = lib.mkIf true { };' \
+    'home.activation.controlThing = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] ||
+    ! grep -q "activation name 'controlThing' at src/hosts/MacBook/upstream.nix:2 lacks the lowerCamelCase macos prefix" "$_out" ||
+    grep -q 'hermesAgentSetup' "$_out"; then
+    echo "FAIL: the upstream-owned hermesAgentSetup key must be exempt from the macOS prefix rule"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step12_naming_sops_exemption_passes() {
+  local _tmp _out _ret
+  _tmp=$(naming_fixture src/modules/sops.nix 'home.activation.sops-nix = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || grep -q 'activation name' "$_out"; then
+    echo "FAIL: the sops-nix key must pass as a sops exemption despite its hyphen"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step12_naming_generated_exemption_passes() {
+  local _tmp _out _ret
+  _tmp=$(naming_fixture src/modules/generated.nix 'home.activation.mergeConfig_test = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || grep -q 'activation name' "$_out"; then
+    echo "FAIL: a generated mergeConfig_* key must pass despite its underscore"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Exemption names are exact. A case-variant of an exempt name is a new,
+# nucleus-owned key and must be checked like any other key.
+test_step12_naming_exemptions_are_case_sensitive() {
+  local _tmp _out _ret _count
+  _tmp=$(naming_fixture src/modules/case-variant.nix \
+    'home.activation.Sops-nix = lib.mkIf true { };' \
+    'home.activation.MergeConfig_test = lib.mkIf true { };')
+  _out=$(mktemp)
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  _count=$(grep -cF 'is not lowerCamelCase' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ] ||
+    ! grep -Fq "activation name 'Sops-nix' at src/modules/case-variant.nix:1 is not lowerCamelCase" "$_out" ||
+    ! grep -Fq "activation name 'MergeConfig_test' at src/modules/case-variant.nix:2 is not lowerCamelCase" "$_out"; then
+    echo "FAIL: case-variant exemption names must still fail the key policy"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
@@ -131,20 +269,20 @@ test_step12_naming_region_scopes_attrset_block() {
   cat >"$_tmp/src/modules/region.nix" <<'EOF'
 { lib, ... }:
 {
-  badBefore = lib.mkAfter "";
+  bad-before = lib.mkAfter "";
 
   home.activation = {
-    badInside = lib.mkAfter "";
-    badDotted.text = lib.mkAfter "";
-    valid-inside = lib.mkAfter "";
+    bad-inside = lib.mkAfter "";
+    bad-dotted.text = lib.mkAfter "";
+    validInside = lib.mkAfter "";
   };
 
-  badAfter = lib.mkAfter "";
+  bad-after = lib.mkAfter "";
 }
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  _count=$(grep -cF 'is not kebab-case' "$_out")
+  _count=$(grep -cF 'kebab-case' "$_out")
   if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
     echo "FAIL: expected the two in-block entries reported, got $_count (exit $_ret)"
     cat "$_out"
@@ -152,7 +290,7 @@ EOF
     rm -f "$_out"
     return 1
   fi
-  if ! grep -Fq "activation name 'badInside' at src/modules/region.nix:6 is not kebab-case" "$_out"; then
+  if ! grep -Fq "activation name 'bad-inside' at src/modules/region.nix:6 is not lowerCamelCase" "$_out"; then
     echo "FAIL: the entry inside the block is not reported at its own line"
     cat "$_out"
     rm -rf "$_tmp"
@@ -161,14 +299,14 @@ EOF
   fi
   # A dotted key inside the block is the entry named by its first segment, not by
   # the trailing attribute.
-  if ! grep -Fq "activation name 'badDotted' at src/modules/region.nix:7 is not kebab-case" "$_out"; then
+  if ! grep -Fq "activation name 'bad-dotted' at src/modules/region.nix:7 is not lowerCamelCase" "$_out"; then
     echo "FAIL: a dotted key inside the block is not reported by its first segment"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if grep -Fq 'badBefore' "$_out" || grep -Fq 'badAfter' "$_out"; then
+  if grep -Fq 'bad-before' "$_out" || grep -Fq 'bad-after' "$_out"; then
     echo "FAIL: an entry line outside the block was reported"
     cat "$_out"
     rm -rf "$_tmp"
@@ -192,19 +330,19 @@ test_step12_naming_region_ends_at_closing_brace() {
 { lib, ... }:
 {
   home.activation = {
-    badFirst = lib.mkAfter "";
+    bad-first = lib.mkAfter "";
   };
 
-  badBetween = lib.mkAfter "";
+  bad-between = lib.mkAfter "";
 
   system.activationScripts = {
-    badSecond = lib.mkAfter "";
+    bad-second = lib.mkAfter "";
   };
 }
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  _count=$(grep -cF 'is not kebab-case' "$_out")
+  _count=$(grep -cF 'kebab-case' "$_out")
   if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
     echo "FAIL: expected one entry reported per block, got $_count (exit $_ret)"
     cat "$_out"
@@ -212,15 +350,15 @@ EOF
     rm -f "$_out"
     return 1
   fi
-  if ! grep -Fq "'badFirst' at src/modules/blocks.nix:4 is not kebab-case" "$_out" ||
-    ! grep -Fq "'badSecond' at src/modules/blocks.nix:10 is not kebab-case" "$_out"; then
+  if ! grep -Fq "'bad-first' at src/modules/blocks.nix:4 is not lowerCamelCase" "$_out" ||
+    ! grep -Fq "'bad-second' at src/modules/blocks.nix:10 is not lowerCamelCase" "$_out"; then
     echo "FAIL: a block entry is not reported at its own line"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if grep -Fq 'badBetween' "$_out"; then
+  if grep -Fq 'bad-between' "$_out"; then
     echo "FAIL: a line between two blocks was reported as an entry"
     cat "$_out"
     rm -rf "$_tmp"
@@ -245,18 +383,18 @@ test_step12_naming_nested_attrset_keeps_scanning() {
 { lib, ... }:
 {
   home.activation = {
-    badEntry = lib.mkAfter "";
-    badWrapper = {
+    bad-entry = lib.mkAfter "";
+    bad-wrapper = {
       command = "x";
       order = 50;
     };
-    badAfterClose = lib.mkAfter "";
+    bad-after-close = lib.mkAfter "";
   };
 }
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  _count=$(grep -cF 'is not kebab-case' "$_out")
+  _count=$(grep -cF 'kebab-case' "$_out")
   if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
     echo "FAIL: expected the entries before and after the nested attrset reported, got $_count (exit $_ret)"
     cat "$_out"
@@ -264,21 +402,21 @@ EOF
     rm -f "$_out"
     return 1
   fi
-  if ! grep -Fq "'badEntry' at src/modules/nested.nix:4 is not kebab-case" "$_out"; then
+  if ! grep -Fq "'bad-entry' at src/modules/nested.nix:4 is not lowerCamelCase" "$_out"; then
     echo "FAIL: the entry before the nested attrset was not reported"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if ! grep -Fq "'badAfterClose' at src/modules/nested.nix:9 is not kebab-case" "$_out"; then
+  if ! grep -Fq "'bad-after-close' at src/modules/nested.nix:9 is not lowerCamelCase" "$_out"; then
     echo "FAIL: the entry after the nested close was not reported"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if grep -Fq 'badWrapper' "$_out"; then
+  if grep -Fq 'bad-wrapper' "$_out"; then
     echo "FAIL: the attrset-valued wrapper was reported as an entry"
     cat "$_out"
     rm -rf "$_tmp"
@@ -302,20 +440,20 @@ test_step12_naming_region_state_does_not_cross_files() {
   cat >"$_tmp/src/modules/a-open.nix" <<'EOF'
 { lib, ... }:
 {
-  badLeadingA = lib.mkAfter "";
+  bad-leading-a = lib.mkAfter "";
   home.activation = {
-    valid-a = lib.mkAfter "";
+    validA = lib.mkAfter "";
 EOF
   cat >"$_tmp/src/modules/b-open.nix" <<'EOF'
 { lib, ... }:
 {
-  badLeadingB = lib.mkAfter "";
+  bad-leading-b = lib.mkAfter "";
   home.activation = {
-    valid-b = lib.mkAfter "";
+    validB = lib.mkAfter "";
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  if [ "$_ret" -ne 0 ] || grep -Fq 'is not kebab-case' "$_out"; then
+  if [ "$_ret" -ne 0 ] || grep -Fq 'is not lowerCamelCase' "$_out"; then
     echo "FAIL: an unclosed block leaked into the next file (exit $_ret)"
     cat "$_out"
     rm -rf "$_tmp"
@@ -1398,9 +1536,15 @@ for test in \
   test_step12_config_method_scoped_run_checks_whole_repo \
   test_step12_policy_scan_target_nested_basename \
   test_step12_naming_behavioral_positive \
-  test_step12_naming_behavioral_negative \
+  test_step12_naming_behavioral_kebab_fails \
   test_step12_naming_behavioral_exemption \
   test_step12_naming_behavioral_prefix \
+  test_step12_naming_lower_camel_key_passes \
+  test_step12_naming_external_builtin_exemptions_pass \
+  test_step12_naming_upstream_exemption_passes \
+  test_step12_naming_sops_exemption_passes \
+  test_step12_naming_generated_exemption_passes \
+  test_step12_naming_exemptions_are_case_sensitive \
   test_step12_naming_region_scopes_attrset_block \
   test_step12_naming_region_ends_at_closing_brace \
   test_step12_naming_nested_attrset_keeps_scanning \

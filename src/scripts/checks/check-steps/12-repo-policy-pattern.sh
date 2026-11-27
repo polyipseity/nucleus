@@ -199,13 +199,13 @@ run_config_method_compliance() {
   return 0
 }
 
-# Exempt classes: framework-generated and hardcoded names (see
-# activation-scripts.instructions.md: Exempt classes).
+# Exempt classes: Home Manager built-ins, upstream-owned and sops-owned names,
+# and config-utils generated names (see activation-scripts.instructions.md).
+# The list is exact on purpose: a wildcard would exempt nucleus-owned keys.
 _activation_name_exempt() {
   case "$1" in
-  linkGeneration | writeBoundary | checkLinkTargets | setupLaunchAgents | installPackages | preActivation | extraActivation | postActivation) return 0 ;;
+  linkGeneration | writeBoundary | checkLinkTargets | setupLaunchAgents | installPackages | preActivation | extraActivation | postActivation | checkFilesChanged | onFilesChange | hermesAgentSetup | sops-nix) return 0 ;;
   unprotectSymlink_* | protectSymlink_* | mergeConfig_*) return 0 ;;
-  *sops*) return 0 ;;
   esac
   return 1
 }
@@ -231,6 +231,10 @@ run_activation_naming_policy() {
   # Dotted definitions as "file:line:name", anywhere in a file: the three
   # namespaces written out as `home.activation.<name>`.
   local _ns_re='(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
+  # Repo-owned keys start lowercase and continue with alphanumeric characters;
+  # uppercase letters start later words. Generated and external names are exempt
+  # in _activation_name_exempt, so their underscores and hyphens never reach it.
+  local _lower_camel_re='^[a-z][a-zA-Z0-9]*$'
 
   local _nix_files=()
   if $_has_args; then
@@ -264,7 +268,7 @@ run_activation_naming_policy() {
     mv "$_normalized" "$_names_file"
   fi
 
-  # Names defined outside macOS-scoped paths are cross-platform and need no macos- prefix.
+  # Names defined outside macOS paths are cross-platform and need no macos prefix.
   grep -v -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" |
     cut -d: -f3 |
     sort -u >"$_shared_file"
@@ -279,9 +283,9 @@ run_activation_naming_policy() {
   local _name _ln
   while IFS=: read -r _f _ln _name; do
     _activation_name_exempt "$_name" && continue
-    if [[ ! "$_name" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]]; then
+    if [[ ! "$_name" =~ $_lower_camel_re ]]; then
       _errors=$((_errors + 1))
-      error "activation name '$_name' at $_f:$_ln is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+      error "activation name '$_name' at $_f:$_ln is not lowerCamelCase; kebab-case names are reserved for external and upstream entries (see .agents/instructions/activation-scripts.instructions.md)"
     fi
     case "$_name" in
     nucleus-*)
@@ -291,14 +295,15 @@ run_activation_naming_policy() {
     esac
   done <"$_names_file"
 
-  # macOS-scoped entries must carry the macos- prefix unless cross-platform.
+  # macOS-scoped keys carry the macos prefix in lowerCamelCase unless
+  # cross-platform, so the prefix check matches macosX rather than macos-x.
   while IFS=: read -r _f _ln _name; do
     _activation_name_exempt "$_name" && continue
     if ! grep -Fxq "$_name" "$_shared_file"; then
       _errors=$((_errors + 1))
-      error "macOS-only activation name '$_name' at $_f:$_ln lacks the macos- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+      error "macOS-only activation name '$_name' at $_f:$_ln lacks the lowerCamelCase macos prefix (see .agents/instructions/activation-scripts.instructions.md)"
     fi
-  done < <(grep -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" | grep -v ':macos-')
+  done < <(grep -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" | grep -vE ':macos[A-Z]')
 
   rm -f "$_names_file" "$_shared_file"
 

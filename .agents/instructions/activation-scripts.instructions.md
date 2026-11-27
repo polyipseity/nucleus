@@ -8,11 +8,11 @@ applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix,
 
 ## Naming conventions
 
-Entry names for `home.activation.*`, `system.activationScripts.*`, and `nucleus.terminalActivations.*` are kebab-case and verb-first: `provision-dev-repos`, `merge-obsidian-json`. Add the host prefix when the entry is OS-specific (`macos-configure-finder-sidebar`, `nixos-launch-nvim`), no prefix when it is cross-platform (`cloud-drives-setup`, `wait-for-sops-secrets`). Never use a `nucleus-` prefix. `protect`/`unprotect` for symlink hardening follows the same rules, so `home.activation.macos-protect-icloud-downloads-symlink` needs the `macos-` prefix.
+Entry names for `home.activation.*`, `system.activationScripts.*`, and `nucleus.terminalActivations.*` are lowerCamelCase and verb-first: `provisionDevRepos`, `mergeObsidianJson`. Add the host prefix when the entry is OS-specific (`macosConfigureFinderSidebar`, `nixosLaunchNvim`), no prefix when it is cross-platform (`cloudDrivesSetup`, `waitForSopsSecrets`). Never use a `nucleus-` prefix. `protect`/`unprotect` for symlink hardening follows the same rules, so `home.activation.macosProtectIcloudDownloadsSymlink` needs the `macos` prefix. Script filenames stay kebab-case because Nix filenames follow the repository filename convention; that casing is separate from the activation key.
 
-Exempt names: generated `config-utils.nix` names (`unprotectSymlink_*`, `protectSymlink_*`, `mergeConfig_*`), built-in Home Manager phases (`linkGeneration`, `writeBoundary`, `checkLinkTargets`, `setupLaunchAgents`, `installPackages`), and `sops-nix` entries.
+Exempt names: generated `config-utils.nix` names (`unprotectSymlink_*`, `protectSymlink_*`, `mergeConfig_*`), Home Manager built-ins (`linkGeneration`, `writeBoundary`, `checkLinkTargets`, `setupLaunchAgents`, `installPackages`, `preActivation`, `extraActivation`, `postActivation`, `checkFilesChanged`, `onFilesChange`), upstream-owned `hermesAgentSetup`, and the sops-nix entry `sops-nix`. These are the only exceptions; do not exempt a nucleus-owned key.
 
-`entryAfter [...]` and `entryBefore [...]` take the exact kebab-case name, or the framework-provided name for built-in phases. Shared DAG dependency names are in `src/modules/lib/activation-dag.nix`. The cross-boundary mapping to PowerShell names and stage labels is in `cross-host-feature-parity.instructions.md`.
+`entryAfter [...]` and `entryBefore [...]` take the exact key, including its lowerCamelCase spelling, or the framework-provided name for built-in phases. Shared DAG dependency names are in `src/modules/lib/activation-dag.nix`. The cross-boundary mapping to PowerShell names and stage labels is in `cross-host-feature-parity.instructions.md`.
 
 Rename references everywhere: docs, comments, echo messages, script headers.
 
@@ -34,7 +34,7 @@ system.activationScripts.postActivation.text = lib.mkAfter ''
 Every bundle script sets `SCRIPT_DIR` from `$0`, sources libs via `"$SCRIPT_DIR/../lib/<name>.sh"`, takes per-user values as CLI positional args, and runs as a standalone subprocess. That keeps `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+` concatenation out of activation bodies.
 
 ```nix
-home.activation.some-step = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+home.activation.someStep = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
   "${activationBundle}/src/scripts/configs/script-name.sh" \
     "${pkgs.tool}/bin/tool" \
     '${builtins.toJSON nixValue}'

@@ -343,18 +343,117 @@ try {
   $anRoot = Join-Path -Path $fixtureDir -ChildPath 'an-root'
   New-Item -ItemType Directory -Path (Join-Path -Path $anRoot -ChildPath 'src/modules/configs') -Force > $null
   $anEntryPath = Join-Path -Path $anRoot -ChildPath 'src/modules/an-case.nix'
-  Set-Content -Path $anEntryPath -Value 'home.activation.badName = lib.mkIf true { }'
+  Set-Content -Path $anEntryPath -Value 'home.activation.bad-name = lib.mkIf true { }'
   # WHY the push: Select-GitIgnored passes every path through only outside a git
   # worktree (deny-list.ps1), and the action inherits this location, so the
   # fixture-root scan never queries git about temp paths.
   $anViolation = Invoke-CapturedStepAction -ContextValues @{
     HasArgs = $true; RepoRoot = $anRoot; PositionalArgs = @('src/modules/an-case.nix'); NixFiles = @()
   } -PushLocationPath $anRoot
-  $anFinding = "activation name 'badName' at src/modules/an-case.nix:1 is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+  $anFinding = "activation name 'bad-name' at src/modules/an-case.nix:1 is not lowerCamelCase; kebab-case names are reserved for external and upstream entries (see .agents/instructions/activation-scripts.instructions.md)"
   if ($anViolation.Output -notmatch [regex]::Escape($anFinding) -or $anViolation.Output -notlike '*activation naming policy check failed*') {
-    Assert-Fail 'step 12: an activation entry name that is not kebab-case' "exit $($anViolation.Status); $($anViolation.Output.Trim())"
+    Assert-Fail 'step 12: a kebab-case activation entry name' "exit $($anViolation.Status); $($anViolation.Output.Trim())"
   } else {
-    Assert-Pass 'step 12: an activation entry name that is not kebab-case is reported'
+    Assert-Pass 'step 12: a kebab-case activation entry name is reported'
+  }
+
+  # Each naming case builds its own fixture root. The configs skeleton keeps the
+  # config-method scan out of the way; the scoped positional list feeds the
+  # activation naming scan the single file under test.
+  function New-NamingRoot {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([string]$Name)
+    $rootPath = Join-Path -Path $fixtureDir -ChildPath $Name
+    if ($PSCmdlet.ShouldProcess($rootPath, 'Create naming fixture root')) {
+      New-Item -ItemType Directory -Path (Join-Path $rootPath 'src/modules/configs') -Force > $null
+    }
+    return $rootPath
+  }
+
+  function Invoke-NamingScan {
+    param([string]$RootPath, [string]$RelativeNixPath)
+    return Invoke-CapturedStepAction -ContextValues @{
+      HasArgs = $true; RepoRoot = $RootPath; PositionalArgs = @($RelativeNixPath); NixFiles = @()
+    } -PushLocationPath $RootPath -ClearNucleusRepoRoot
+  }
+
+  # 10a. A lowerCamelCase repo-owned key passes.
+  $camelRoot = New-NamingRoot -Name 'camel-root'
+  Set-Content -Path (Join-Path $camelRoot 'src/modules/camel.nix') -Value 'home.activation.provisionDevRepos = lib.mkIf true { }'
+  $camelCase = Invoke-NamingScan -RootPath $camelRoot -RelativeNixPath 'src/modules/camel.nix'
+  if ($camelCase.Output -match "activation name '" -or $camelCase.Output -notmatch 'activation naming policy passed\.') {
+    Assert-Fail 'step 12: a lowerCamelCase repo-owned activation key' "exit $($camelCase.Status); $($camelCase.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a lowerCamelCase repo-owned activation key passes'
+  }
+
+  # 10b. checkFilesChanged and onFilesChange are external built-ins. They are
+  # lowerCamelCase, so the casing rule alone would pass them. Placing them in a
+  # macOS-scoped file makes the exemption observable: the control name there
+  # gets the prefix finding, while the two external names get none.
+  $externalRoot = New-NamingRoot -Name 'external-root'
+  New-Item -ItemType Directory -Path (Join-Path $externalRoot 'src/hosts/MacBook') -Force > $null
+  Set-Content -Path (Join-Path $externalRoot 'src/hosts/MacBook/external.nix') -Value @(
+    'home.activation.checkFilesChanged = lib.mkIf true { }'
+    'home.activation.onFilesChange = lib.mkIf true { }'
+    'home.activation.controlThing = lib.mkIf true { }'
+  )
+  $external = Invoke-NamingScan -RootPath $externalRoot -RelativeNixPath 'src/hosts/MacBook/external.nix'
+  $externalControl = "activation name 'controlThing' at src/hosts/MacBook/external.nix:3 lacks the lowerCamelCase macos prefix (see .agents/instructions/activation-scripts.instructions.md)"
+  if ($external.Output -notmatch [regex]::Escape($externalControl) -or $external.Output -match 'checkFilesChanged' -or $external.Output -match 'onFilesChange') {
+    Assert-Fail 'step 12: external built-in activation exemptions' "exit $($external.Status); $($external.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: external built-in activation keys are exempt while a repo-owned key is not'
+  }
+
+  # 10c. hermesAgentSetup belongs to an upstream module, not this repo.
+  $upstreamRoot = New-NamingRoot -Name 'upstream-root'
+  New-Item -ItemType Directory -Path (Join-Path $upstreamRoot 'src/hosts/MacBook') -Force > $null
+  Set-Content -Path (Join-Path $upstreamRoot 'src/hosts/MacBook/upstream.nix') -Value @(
+    'home.activation.hermesAgentSetup = lib.mkIf true { }'
+    'home.activation.controlThing = lib.mkIf true { }'
+  )
+  $upstream = Invoke-NamingScan -RootPath $upstreamRoot -RelativeNixPath 'src/hosts/MacBook/upstream.nix'
+  $upstreamControl = "activation name 'controlThing' at src/hosts/MacBook/upstream.nix:2 lacks the lowerCamelCase macos prefix (see .agents/instructions/activation-scripts.instructions.md)"
+  if ($upstream.Output -notmatch [regex]::Escape($upstreamControl) -or $upstream.Output -match 'hermesAgentSetup') {
+    Assert-Fail 'step 12: the upstream-owned activation exemption' "exit $($upstream.Status); $($upstream.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: the upstream-owned hermesAgentSetup key is exempt'
+  }
+
+  # 10d. sops-nix keeps its hyphen as a sops exemption.
+  $sopsRoot = New-NamingRoot -Name 'sops-root'
+  Set-Content -Path (Join-Path $sopsRoot 'src/modules/sops.nix') -Value 'home.activation.sops-nix = lib.mkIf true { }'
+  $sops = Invoke-NamingScan -RootPath $sopsRoot -RelativeNixPath 'src/modules/sops.nix'
+  if ($sops.Output -match "activation name '" -or $sops.Output -notmatch 'activation naming policy passed\.') {
+    Assert-Fail 'step 12: the sops-nix activation exemption' "exit $($sops.Status); $($sops.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: the sops-nix key passes as a sops exemption'
+  }
+
+  # 10e. mergeConfig_* keeps its underscore as a generated config-utils exemption.
+  $generatedRoot = New-NamingRoot -Name 'generated-root'
+  Set-Content -Path (Join-Path $generatedRoot 'src/modules/generated.nix') -Value 'home.activation.mergeConfig_test = lib.mkIf true { }'
+  $generated = Invoke-NamingScan -RootPath $generatedRoot -RelativeNixPath 'src/modules/generated.nix'
+  if ($generated.Output -match "activation name '" -or $generated.Output -notmatch 'activation naming policy passed\.') {
+    Assert-Fail 'step 12: the generated config-utils activation exemption' "exit $($generated.Status); $($generated.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a generated mergeConfig_* key passes'
+  }
+
+  # 10f. Exemption names are exact: a case variant is a nucleus-owned key.
+  $caseRoot = New-NamingRoot -Name 'case-root'
+  Set-Content -Path (Join-Path $caseRoot 'src/modules/case-variant.nix') -Value @(
+    'home.activation.Sops-nix = lib.mkIf true { }'
+    'home.activation.MergeConfig_test = lib.mkIf true { }'
+  )
+  $caseVariant = Invoke-NamingScan -RootPath $caseRoot -RelativeNixPath 'src/modules/case-variant.nix'
+  $caseFirst = "activation name 'Sops-nix' at src/modules/case-variant.nix:1 is not lowerCamelCase; kebab-case names are reserved for external and upstream entries (see .agents/instructions/activation-scripts.instructions.md)"
+  $caseSecond = "activation name 'MergeConfig_test' at src/modules/case-variant.nix:2 is not lowerCamelCase; kebab-case names are reserved for external and upstream entries (see .agents/instructions/activation-scripts.instructions.md)"
+  if ($caseVariant.Output -notmatch [regex]::Escape($caseFirst) -or $caseVariant.Output -notmatch [regex]::Escape($caseSecond)) {
+    Assert-Fail 'step 12: case-variant exemption names' "exit $($caseVariant.Status); $($caseVariant.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: case-variant exemption names still fail the key policy'
   }
 
   # 11. config method compliance: a config missing its method annotation is reported.
