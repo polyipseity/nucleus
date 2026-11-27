@@ -6,41 +6,10 @@ applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/*.ps1, src/host
 
 # Environment variable scope
 
-Every env var is all-process by default. Narrower scope needs an inline `# WHY:` comment.
+Every env var is all-process by default; narrower scope needs inline `# WHY:`. The `catalog` in `src/modules/lib/env-secrets.nix` holds per-host `values`, `why`, and optional `userSpecific`; PATH lives in `src/modules/lib/managed-paths.nix` with separate `prepend` and `append` lists. Windows applies non-user-specific entries at Machine scope and user-specific ones at User scope; elevation failure is a hard error.
 
-## Registry
+Host-keyed entries resolve to null elsewhere; consumers guard instead of substituting defaults. Delivery must cover POSIX shells, macOS GUI processes through `gui-env`, and PowerShell through `init.ps1` or `Sync-ShellProfile.ps1`. Toolchain values use stable SYSTEM root symlinks, never raw `/nix/store` paths. `RIP_GRAVEYARD` is userSpecific and its directory is created by activation, not by the variable alone.
 
-The `catalog` in `src/modules/lib/env-secrets.nix` holds per-host `values`, a `why`, and an optional `userSpecific` flag. Helpers: `allVars`, `systemVars`, `macBookAllVars`, `toJsonManifest`. PATH lives separately in `src/modules/lib/managed-paths.nix`, where `pathComponents.prepend` and `pathComponents.append` are separate lists and both need handling.
+Valid narrow scopes are incorrect behavior for unintended consumers, platform-specific values, and build-time infeasibility. `"CLI-only"` is invalid on NixOS and Windows. Parity tests are `tests/integration/env-parity-tests.nix` and `tests/platforms/Windows/modules/EnvVarParity.Tests.ps1`; a new variable needs both.
 
-On Windows, `nucleus-apply` self-elevates and the DSC mirror keeps the same split: non-user-specific entries go to `system/env.dsc.yml` at Machine scope, user-specific ones to `user/env.dsc.yml` at User scope. Elevation failure is a hard error.
-
-An entry keyed to a single host resolves to null elsewhere, and consumers guard on that rather than substituting a default, so a host that manages no such value keeps whatever its session environment provides.
-
-## Delivery
-
-The catalog is the single source of truth for anything that must reach more than one surface: POSIX shells read `allVars` through Home Manager session variables, macOS GUI processes read `macBookAllVars` through the `gui-env` agent (`launchctl setenv`), and PowerShell reads the value substituted into its profile by `src/modules/pwsh.nix` (`init.ps1`) or `Sync-ShellProfile.ps1`.
-
-A framework export that reaches one shell family is not enough. nix-darwin, for example, exports the GPG agent environment for zsh, bash, and fish from the snippet it sources in `/etc/zshenv`, so a PowerShell started outside a zsh parent has no `SSH_AUTH_SOCK` and falls back to an `IdentityFile` it cannot read. A value a provisioned shell or GUI process needs belongs in the catalog, or the uncovered surface carries a `# WHY:`.
-
-POSIX toolchain values (`CC`, `DEVELOPER_DIR`, and friends) never name a raw `/nix/store` path: they route through stable symlinks under the host SYSTEM root (`<root>/toolchains/<name>`) that activation repoints each apply (`src/modules/lib/toolchain-links.nix`), so `nix-collect-garbage` cannot leave an inherited value dangling.
-
-`RIP_GRAVEYARD` is `userSpecific = true`, so Windows writes it at User scope from `user/env.dsc.yml` and each value names that user's own nucleus root. The directory is created by POSIX activation (`ensureRipGraveyard`) and by `Sync-SafeDelete.ps1` on Windows rather than by the variable alone, because an activation, cron, or elevated session does not necessarily carry user scope; `nucleus-gc graveyard` falls back to `<USER root>/state/rip/graveyard` for the same reason.
-
-## Cross-host exceptions
-
-| Var | macOS | NixOS | Windows | Rationale |
-| --- | --- | --- | --- | --- |
-| `NUCLEUS_REPO_ROOT` | `/Library/Application Support/nucleus/repo-root` + session/GUI env | `/var/lib/nucleus/repo-root` + `environment.variables` | Machine registry via `apply.ps1` | All-process root for out-of-store symlinks + cwd-independent commands. POSIX matches Windows Machine scope. |
-| `NIX_SSL_CERT_FILE` | daemon env | none | none | No system CA bundle on macOS. |
-| `NUCLEUS_HOST` | daemon env | daemon env | none | Not meaningful on Windows. |
-| `OLLAMA_HOST` | gui-env agent | none | none | CLI routes via LiteLLM proxy. |
-
-Everything else is the same value at the same scope on every host.
-
-## Valid narrower scopes
-
-Incorrect behavior for unintended consumers (`CC`/`CXX`/`LD` on macOS), platform-specific values (`DEVELOPER_DIR` off macOS), and values infeasible at build time (`NUCLEUS_REPO_ROOT` on NixOS). "CLI-only" is not valid on NixOS or Windows. On macOS the `launchd` domains are separate and bridged by `macosGuiEnvPath`.
-
-## Tests
-
-`tests/integration/env-parity-tests.nix` checks the catalog against the DSC scope split, and `tests/platforms/Windows/modules/EnvVarParity.Tests.ps1` checks the Windows-only wiring. A new variable needs coverage in both.
+Exception table and path details: `.agents/skills/nucleus-platform-reference/references/env-variable-scope.md`.

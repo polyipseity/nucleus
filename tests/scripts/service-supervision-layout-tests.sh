@@ -68,7 +68,7 @@ root=sys.argv[1]
 with open(os.path.join(root,'src/modules/services.json'),encoding='utf-8') as f:
     data=json.load(f)
 services=[k for k in data.keys() if not k.startswith('$')]
-with open(os.path.join(root,'.agents/instructions/service-firing-policy.reference.md'),encoding='utf-8') as f:
+with open(os.path.join(root,'.agents/skills/nucleus-service-reference/references/service-firing-policy.md'),encoding='utf-8') as f:
     policy=f.read()
 missing=[]
 for s in services:
@@ -76,7 +76,7 @@ for s in services:
     if f'`{s}`' not in policy and f'| {s} |' not in policy and f'| `{s}` |' not in policy:
         missing.append(s)
 if missing:
-    print('missing from service-firing-policy.reference.md: ' + ', '.join(sorted(missing)))
+    print('missing from the service firing policy reference: ' + ', '.join(sorted(missing)))
     sys.exit(1)
 # matrix script entries: every concrete script path in the supervision matrix must exist.
 script_paths=set(re.findall(r'`(src/[^`*\s]+|scripts/[^`*\s]+)`', policy))

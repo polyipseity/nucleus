@@ -6,75 +6,10 @@ applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/modules/hermes-age
 
 # Agents and skills
 
-## Repo tree vs user overlay
+`.agents/` holds project assets; `src/users/default/agents/` overlays to writable `~/.agents/` with per-subdir symlinks. Cursor and Pi/opencode bridges link shared rules, agents, prompts, and skills; edit source trees, never deployed directories. Pi extensions come from `desired.json` and the lockfile, never from `~/.pi/agent/npm/`.
 
-`.agents/` holds project-tied instructions, prompts, and skills. `src/users/default/agents/` is the user overlay that deploys to `~/.agents/`, with per-user overrides under `src/users/<user>/agents/`. Edit the source tree, never `~/.agents/`: every file there is a symlink into it.
+Commit MIT, BSD, Apache-2.0, or AGPL skills; never commit proprietary, CC-NC, or GPL-only skills. Those slugs go in `clawhub-skills.json` and are fetched at apply time, marked by `.clawhub/origin.json`. Layered skills use an overlay source directory, never a hardcoded `src/modules/configs/agents/skills` path. Installed files are read-only and unlocked before update; ClawHub installs only through bun.
 
-`~/.agents/` is a writable directory holding per-subdir symlinks, not one whole-directory symlink.
+The harness bridge runs scripts from `src/scripts/notify/harness/` through `nucleus-utils`, filters from `harness-filters.json`, and denies over ask over allow with no allow by omission. Hooks exit 0, wait timeouts are ceilings, commands stay bare names, and queued prompts are consumed before printing. `harness-notify.enable` is master, approval sources race, and drive gates only prompt injection. Sandbox socket spellings and File Provider identity rules are in the reference.
 
-## Cursor bridge (`~/.cursor/`)
-
-`symlinkCursorConfig` / `Sync-CursorConfig` symlink shared content into `~/.cursor/`. Edit shared rules, agents, prompts, and skills under `src/users/default/agents/`; Cursor-native JSON under `src/users/default/cursor/`. GUI settings belong in the app's own user settings.
-
-Instruction files reach `~/.cursor/rules/` with a `.mdc` extension, which is what Copilot reads.
-
-## Agent config bridges
-
-`symlinkPiAgentConfig` / `Sync-PiAgentConfig` and `symlinkAgentConfig` / `Sync-OpenCodeConfig` deploy the shared assets into `~/.pi/agent/` and `~/.config/opencode/`. opencode uses `~/.config/opencode/` on every platform, including `%USERPROFILE%\.config\opencode\` on Windows. Windows resolves the sources through the `Resolve-UserConfig*` overlay helpers.
-
-Pi's extension set comes from the `pi` list in `src/modules/packages/desired.json`, pinned by the lockfile `pi` section, and pi records what it installed in `~/.pi/agent/settings.json`. Read that registry, never a listing of `~/.pi/agent/npm/`, which holds `node_modules`.
-
-## Bundled vs fetched skills
-
-Bundled (AGPL-compatible: MIT, BSD, Apache-2.0, AGPL): commit to `src/users/default/agents/skills/<name>/`, and `installAgentSkills` symlinks it into the store.
-
-Fetched (proprietary, CC-NC, GPL-only): never commit. List the slug in `src/users/default/agents/clawhub-skills.json`; `syncClawhubSkills` downloads it at apply time. `.clawhub/origin.json` marks a fetched download and stale cleanup removes only directories carrying it. A slug that matches a bundled symlink warns and skips; resolve it by hand.
-
-Layered: `installAgentSkills` / `Sync-AgentsSkillManifest` take an extra source directory, used to layer the superpowers plugin's `skills/` in alongside the committed skills. The primary source is the `skills` entry of the agents overlay, resolved through the overlay helpers, never a hardcoded `src/modules/configs/agents/skills` path.
-
-## Permission locking
-
-Installed files are locked read-only and unlocked before update. POSIX: `chmod -R a-w` / `u+w`. Windows: `FileAttributes.ReadOnly` via `Get-ChildItem -Recurse`. `Sync-SecretFile` adds `$restrictAcl` (`icacls /inheritance:r /grant:r`).
-
-## ClawHub provisioning
-
-ClawHub is a JS CLI absent from nixpkgs, cargo-binstall, WinGet, and Scoop, so it installs through bun only. POSIX: the `installBunPackages` HM activation in `src/modules/agents.nix` prepends `~/.bun/bin`, keeps the desired list, installs and removes as needed, and persists `~/.bun/install/global/package.json`. Windows: `Invoke-BunSetup` installs the `bun` desired list from `src/modules/packages/desired.json` into `~\.bun\install\global\package.json`, after the WinGet DSC and before the skill syncs.
-
-## Harness bridge
-
-The harness bridge lives under `src/scripts/notify/harness/`, each script with a PowerShell twin: `send-notification`, `request-approval`, `decide-call`, and `continue-turn`. They are invoked through `nucleus-utils harness <verb> ...` (`send-notification`, `request-approval`, `decide-call`, `continue-turn`) and `nucleus-utils harness check-deletion` for the safe-delete filter hook path, via `scripts/utils.sh`/`scripts/utils.ps1`. `nucleus-utils harness decide-call <harness>` is the one tool-call entry point in the three shared hook files and renders that harness's own decision document; `nucleus-utils harness continue-turn <harness>` is the Stop entry point in the VS Code and Cursor files. The shared hook definitions (`src/users/default/agents/hooks/harness-notify.json` for VS Code, `src/users/default/claude/settings.json` for Claude Code, `src/users/default/cursor/hooks.json` for Cursor) resolve `nucleus-utils` through PATH on every host. POSIX provides `nucleus-utils` as a nucleus app (no per-harness `~/.local/bin` symlinks); Windows deploys `nucleus-*.cmd` shims from `nucleus-apps.json` via `Sync-NucleusAppShim.ps1`. Harness-specific glue stays with its harness: pi extensions under `src/users/<user>/pi/extensions/`, the opencode plugin at `src/users/<user>/opencode/plugins/`, wired by `seedOpencodeNotifyPlugin`.
-
-Filters are the registry `src/modules/configs/harness-filters.json`, one bun process per enabled entry from `src/scripts/notify/filters/<id>.ts` on every host, each printing one `decision<TAB>rule<TAB>reason` line and exiting 0. A missing bun, a missing filter, a non-zero exit, or any other output is recorded as `ask` with rule `filter-error`, because the filter could not state a verdict. Decisions aggregate deny over ask over allow regardless of registry order, and a call no filter decides goes to the approval sources and then answers `ask` rather than `allow`: the runner never allows by omission. `safe-delete` is the first registered filter: `settings.unproven` defaults to `ask`, also accepts `deny` and `allow`, and governs a plain deletion the filter cannot prove reaches the safe alternative. Its rule names are the audit contract: `native-path`, `cmd-shell`, `find-primitive`, `proven-redirect`, `unproven-redirect`, `no-match`, `filter-error`. A bare deletion word is proven by the home-manager wrapper on POSIX; on Windows by a shim that `<USER root>/state/safe-delete/shims.json` lists with a SHA256 matching its recorded `ripHash`, or by the managed PowerShell profile for the words it overrides, unless the command carries `-NoProfile`/`-nop` or `settings.powershell` is `none`. A stale manifest leaves the word unproven, never allowed. `cmd` is a denial only in command position, a heredoc body is data, `find -exec` is analyzed as a command, and a backslash-escaped word resolves through PATH.
-
-The harness log's append path is `src/scripts/lib/logs.sh`, and everything else the log CLI does (rotation, the `show`/`stats`/`tail` readers, and labels) lives in `scripts/logs.sh`, which `nucleus-logs` runs. A notify script sources `../lib/logs.sh` inside the bundled script tree, because the app's `$out/src` symlink resolves to that tree and a source path landing in the bundle's `scripts/` does not exist there, which stops the runner before it can print a verdict or append an event.
-
-Rules: hooks always exit 0 and fail open, so an unanswered approval becomes a local prompt and never a denial; a hook `timeout` is the ceiling over the approval wait, not a floor (decide-call hook entries declare 3600 s, because a source left at its `0` default waits until answered); a hook command stays a bare name with no home expansion or absolute path, since one JSON file drives every host; the queued-prompt file is consumed before it is printed, the only loop guard.
-
-`harness-notify.enable` is the master switch, and the approval and drive gates are independent of each other. `harness-approval.sources` (default `["prompt"]`) lists the enabled approval sources, `prompt` for the terminal and `hermes` for the bridge; they race and the first answer wins, and an empty list disables the gate. `harness-approval.timeout-seconds.<source>` bounds each wait, `0` meaning until answered. `harness-drive.enable` (on by default) gates only prompt injection: with it off a finished turn is still announced and a queued prompt is dropped. The filter runner does not read `harness-notify.enable`, so a filter's deny still stands. Cursor ignores `followup_message` on Windows, so Cursor is driveable from macOS and NixOS only.
-
-Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/` (`/harness status|approve|deny|send|sessions`), enabled by `services.hermes-agent.settings.plugins.enabled` and, on Windows, by `Sync-HermesConfig`. Requests and queued prompts live under `<USER root>/state/harness-bridge/`; each bridge decision is one JSONL event in the shared `harness` log, written by the waiting hook when it consumes the answer and appended through `nucleus-logs`, so an approval whose hook already died leaves no event; read it back with `nucleus-logs show harness --json`, and `nucleus-logs label <id> <verdict>` (correct, false-allow, false-deny) records an accuracy verdict against an event id.
-
-## Sandbox sockets and filesystem grants
-
-`srt` is `@anthropic-ai/sandbox-runtime`, and pi runs inside it. On macOS it builds a Seatbelt profile and emits each `network.allowUnixSockets` entry literally, with no `realpath`. Seatbelt matches the kernel's canonical path, so an entry spelled through a symlink matches nothing and the failure is silent.
-
-`/private/var/run/nix-daemon.socket` is the spelling that must be present, because `/var/run` is a symlink to `/private/var/run`. Keep the other spellings (`/nix/var/nix/daemon-socket/socket`, `/var/run/nix-daemon.socket`): they cost nothing and cover a socket that is not behind a symlink. Do not prune them as duplicates.
-
-Symptom when the resolved spelling is missing: `EPERM` on the daemon socket from any nix command, which blocks `nix run ./src#check` and `./src#test`. `EPERM` is the tell, since a socket with no listener gives `ECONNREFUSED`. `nix eval` is not a usable probe, because it passes without touching the store.
-
-Linux ignores `network.allowUnixSockets` entirely: only `network.allowAllUnixSockets` has any effect there, because seccomp-bpf cannot read a socket path out of user memory (`@anthropic-ai/sandbox-runtime` 0.0.77, `dist/sandbox/linux-sandbox-utils.js:2370-2371`). With `allowAllUnixSockets: false` srt prefixes the sandboxed command with `apply-seccomp`, whose baked-in BPF filter rejects `socket(AF_UNIX, ...)` creation outright, so there is no path allowlist to extend (`:2421-2435`).
-
-The File Provider gate is a separate identity problem. A sandboxed read under iCloud Drive reaches `kTCCServiceFileProviderDomain` through `sandboxd`, and tccd must compute a designated requirement from the **responsible** process before it can prompt. `/bin/zsh` yields `identifier "com.apple.zsh" and anchor apple`, so a command launched from it can be prompted; a Nix store `bash` yields no computable requirement and the read is refused silently with `unable to compute designated requirement`. The selector codes in `src/scripts/services/camilladsp-heartbeat.py` are the CamillaDSP bug; this gate never applied to that daemon at all, because an unsandboxed launchd agent does not enter it.
-
-The nixpkgs package ships no `apply-seccomp` helper: `vendor/seccomp/` holds only `build.ts` and the derivation builds nothing from it, so srt warns `seccomp not available - unix socket access not restricted` (`:819-822`) and Linux runs with Unix sockets unrestricted. The managed list therefore restricts nothing on Linux and carries weight only on macOS.
-
-`xvfb-run` does not restore the restricted case: the X client inside the sandbox is the process that must create the AF_UNIX socket, so where the server lives changes nothing. Where the helper does ship, run the GUI tool outside the sandbox (`pi-unrestricted` or a plain terminal) or set `allowAllUnixSockets: true`, which drops the filter.
-
-`filesystem.allowWrite` renders `(allow file-write*)` over the entry's whole subtree and re-allows `file-write-unlink` and `file-write-create` there, which is why `~/.Trash` is granted: safe-rm takes the `mv` route inside the sandbox because the managed config sets `SAFE_RM_USE_APPLESCRIPT=no` when `SANDBOX_RUNTIME` is present, and the AppleScript route needs `appleevent-send`, which the sandbox denies. That marker is srt's own export into every sandboxed child, so the config introduces no extra variable. The grant is broader than the delete it serves, because a nested `denyWrite` is a specific deny that beats the allow and would also block the rename, so a drop-only Trash is not expressible. `allowAppleEvents` stays off: it would grant `appleevent-send` and `lsopen` to every sandboxed command, and srt's README says launched applications then run outside the sandbox entirely.
-
-## Authoring rules
-
-- Sync functions must not install ClawHub; provisioning is `installBunPackages` / `Invoke-BunSetup`.
-- Stale cleanup removes only directories carrying `.clawhub/origin.json`.
-- Skill sync is best-effort: warn on failure, continue.
-- Package lists are sorted alphabetically.
+Details: `.agents/skills/nucleus-harness-reference/references/agents-and-skills.md` and the three harness reference files.

@@ -1,58 +1,15 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, declared applicability (platform, mode, requires), the --only-steps selector, run-state rendering, work-queue dispatch, and step 7 $schema enforcement."
+description: "Use when implementing or modifying the check and test step-runner framework."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**, src/scripts/checks/check-steps/**, src/scripts/tests/test-steps/**"
 ---
 
-# Step-runner framework interface specification
+# Step-runner framework
 
-`step-runner.sh` and `step-runner.ps1` are one interface with two implementations. A rule stated here applies to both unless it names a platform.
+`step-runner.sh` and `step-runner.ps1` share one interface. `register_step(id,name,func)` defaults `any`/`any`/`none`; the 6-argument form declares applicability, the 4-argument form is for tests. Ids are unique, kebab-case, digit-free, numbered from `NN-`; tokens are platform `any|posix|windows`, mode `any|full|scoped`, requires `none|nix|network|sops-machine-key|deployed-host`. Bad tokens or numbers hard-error. Skips report `not-selected`, platform, mode, or requires reasons in that order and never affect exit code.
 
-## Registration
+`--only-steps=id1,id2` requires `=`, trims and collapses ids, treats empty as no-op, last flag wins, and unknown ids hard-error. Work queue uses `PARALLEL_JOBS`, `NUCLEUS_STEP_PROGRESS_INTERVAL` (15 s default, 0 disables), and `NUCLEUS_STEP_TIMEOUT` (600 s default, 0 disables, expiry exit 124). POSIX polls on 0.25 s; PowerShell uses one runspace per step, not `RunspacePool` or `Start-Job`. `--fail-fast` drains in-flight steps then fails.
 
-`register_step(id, name, func)` defaults to `any`/`any`/`none`; the 6-argument form declares applicability; the 4-argument form takes an explicit number and exists only for unit tests. Ids are unique, kebab-case, digit-free, and take their number from the `NN-` filename prefix. Tokens are `platform`: `any|posix|windows` (`posix` covers macOS and NixOS), `mode`: `any|full|scoped`, and `requires`: `none|nix|network|sops-machine-key|deployed-host`. An unknown token, a duplicate number, or an underivable number is a registration-time hard error. PowerShell spells it `Register-Step -Id -Name -Action [-Number] [-Platform] [-Mode] [-Requires]`.
+Step 7 requires inline co-located `$schema` for nucleus JSON/YAML, with A8 exceptions. Step numbers come from `NN-` filenames; renumber and sweep references in one commit. A step reads only its context parameter and locals; documented env inputs are the exception. Color lives in shared helpers; raw ANSI, `tput`, and `echo -e` are banned outside them.
 
-## Run state
-
-The runner, never the step, decides whether a step runs, and it reports every skip in the header:
-
-- id excluded by `--only-steps` → `not-selected`, checked first so it is never reported as not applicable
-- `posix` on Windows or `windows` on POSIX → `not applicable (platform: <token>)`
-- `scoped` without positional args, `full` with them → `not applicable (mode: <token>)`
-- missing prerequisite → `not applicable (requires: <token>)`
-
-A step that does not run never affects the exit code (0 pass, 1 fail) and never prints "passed" or "no issues found".
-
-`--only-steps=id1,id2` is mandatory-`=` and comma-separated; whitespace is trimmed, duplicates collapse, an empty value is a no-op, and the last flag wins. An unregistered id is a hard error listing the known ids, because a typo would otherwise narrow the run to nothing and report success. Selection is applied before the platform, mode, and requires checks, and it does not affect `--fail-fast`.
-
-Step 01 runs `treefmt` in place, so a pipeline can reformat files silently: run `git status --short` afterwards and commit the result as a `style(...)` change. Test step 04 declares `requires sops-machine-key` and Windows has no counterpart for it.
-
-## Dispatch
-
-Both runners schedule steps through a work queue capped at `PARALLEL_JOBS` (CPU count by default): a free slot launches the next pending step immediately, and a slot releases the moment its step finishes, so a slow step never holds back a later step that could start. The `[k/N] step ... started` lines are numbered by launch order. Each step prints `step <n> finished (<dur>)` when it is reaped, and the runner prints `step <n> still running (<dur>)` every `NUCLEUS_STEP_PROGRESS_INTERVAL` seconds while a step is active (`15` by default, `0` disables the heartbeat, non-numeric or negative is a hard error before launch).
-
-`NUCLEUS_STEP_TIMEOUT` bounds each step in whole seconds; it defaults to `600`, `0` disables the bound, a non-numeric value is a hard error before launch, and an expired step writes exit code `124`, appends `step <n> exceeded NUCLEUS_STEP_TIMEOUT=<seconds>s` to its captured output, and is reported as failed.
-
-POSIX polls active step wrappers on a 0.25 s tick so heartbeat and timeout checks can wake the queue while steps run. That polling keeps the bash 5.1 floor intact. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles with a bounded heartbeat/timeout wait. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
-
-Under `--fail-fast` the first failure stops new launches; the queue drains the steps already in flight, then reports the failed set in launch order and exits 1. The queue changes only when steps launch: per-step output and timing files, the `=== [NN] name ===` headers, the `sum of steps` and `wall clock` lines, and the not-run states are unaffected.
-
-A PowerShell runspace that throws is recorded against its step: the runner writes exit code 1 and the exception into that step's replay file, so the summary reports the step as failed with the reason and the pipeline never reports it as finished. On the `--fail-fast` abort the same failure prints one message before the exit, since that path leaves no summary.
-
-## Step 7 `$schema` enforcement
-
-Nucleus-owned JSON and YAML requires an inline `$schema` pointing at a co-located schema file. External formats use their published `$schema` when one exists and never a hand-rolled one. The exception list is the A8 row in `allow-and-deny-lists.instructions.md`; a missing, non-string, or dangling `$schema` is a per-file error, and the step fails if any file errored. POSIX and Windows behave identically.
-
-## Adding or renumbering steps
-
-Step numbers come from the `NN-` prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`. A number must describe what the step does, so opening a new group means renumbering. Renaming means moving the step and its test together and sweeping every reference: `TEST_FILE`/`$testFile`, `# shellcheck source=`, `repository-policy.awk`, prose "step N", and generator or installer comments. Do the rename in one commit before creating the new pair. Test-pipeline steps follow the same rules; shell validation lives in test step 5, not in the check pipeline.
-
-## No ambient shared state
-
-A step reads its context parameter and its own locals, nothing else. The context is the first parameter: `$Context.<Field>` in PowerShell, `${ctx[...]}` in Bash via `local -n ctx="$1"`. Private accumulators stay out of shared scope. Documented env inputs are the exception (`REPO_ROOT`, `NUCLEUS_REPO_ROOT`, `PARALLEL_JOBS`, `NUCLEUS_STEP_PROGRESS_INTERVAL`, `NUCLEUS_STEP_TIMEOUT`), each needing a `# WHY:` when it is not self-evident.
-
-PowerShell runspaces cannot inherit `$script:` state, so a read either fails or races; Bash subshells copy globals silently, so a write leaks into the parent. The context object is the only channel.
-
-## Output color
-
-F2 and F4 palette via `_nuc_color_init` (`src/scripts/lib/lib.sh`) and `$PSStyle` (`Format-NucleusOutput.psm1`): `notice` bold blue, `[step NN]` dim, green check, red cross, yellow en dash for not applicable or not selected, dim labels. Captured files stay plain. Raw ANSI, `tput`, and `echo -e` are banned outside the shared helpers (check step 12). Gating: `output-handling.instructions.md`.
+Details: `.agents/skills/nucleus-platform-reference/references/step-runner.md`.

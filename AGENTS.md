@@ -1,77 +1,66 @@
-# Project Guidelines
+# Project guidelines
 
-Inspect the on-disk tree before assuming source files, tests, or commands exist. Keep this file short: file-type and workflow rules go in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, skills in `.agents/skills/<skill>/`. There is no `docs/` directory, and `.github/copilot-instructions.md` must never be added.
+Inspect the tree before assuming files, tests, or commands. Keep this file short: file rules in `.agents/instructions/*.instructions.md`, workflows in `.agents/prompts/*.prompt.md`, skills in `.agents/skills/<skill>/`. No `docs/`; never add `.github/copilot-instructions.md`.
 
 ## Repository shape
 
-- `src/`: `flake.nix` with `flake.lock` adjacent (Nix requirement), `hosts/<Host>/`, `platforms/<Platform>/`, `modules/`, `scripts/`, `users/`.
-- `src/hosts/<Host>/` is host-specific deployment: flake system config (`MacBook/`, `NixOS/`), Windows `apply.ps1` + DSC YAML, `<Host>/scripts/`. Hostnames are `MacBook`, `NixOS`, `Windows`; platform keys are `macOS`, `NixOS`, `Windows` (`host-platform-registry.json`).
-- `src/platforms/<Platform>/` is logic shared by every host on that OS: Home Manager modules, activation scripts, Windows PowerShell modules.
-- `src/modules/` is cross-host shared Nix, single-file modules preferred, `src/modules/env/` is the one directory module. Layout exceptions: `src/modules/configs/` (machine-wide singletons with host-keyed variants) and `src/users/` (per-user overlays). See `user-config-placement.instructions.md` and `app-config-policy.instructions.md`.
-- `src/users/` overlays: registry domain JSON (`<username>/<domain>.json` with `default/` fallback, co-located schemas), per-user app trees, runtime assembly (`users-registry.nix`, `load-user-registry.sh`, `Load-UserRegistry.ps1`). Domain deep-merge via `lib.recursiveUpdate`; arrays replaced wholesale.
-- `scripts/` is the user-facing `nucleus-*` CLI set, each command paired `.sh`/`.ps1`. `src/scripts/` is Nix-internal tooling in domain subdirectories. Placement: `script-authoring.instructions.md`; command surface: `nucleus-apps.instructions.md`.
-- `tests/` mirrors `src/`, uses `tests/fixtures/`, and must not couple to real users. See `testing.instructions.md`.
-- Agent customization is file-driven: `opencode.jsonc` registers `.agents/instructions/**/*.md` and `.agents/skills/`; `.opencode/commands/` mirrors `.agents/prompts/`. Repository automation lives in `.github/`; formatting config in `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`, `.agents/.markdownlint.jsonc`.
+- `src/`: `flake.nix` beside `flake.lock`, `hosts/<Host>/`, `platforms/<Platform>/`, `modules/`, `scripts/`, `users/`.
+- `src/hosts/<Host>/`: host deployment (MacBook and NixOS flake configs, Windows `apply.ps1` plus DSC YAML, `<Host>/scripts/`). Hosts: `MacBook`, `NixOS`, `Windows`. Platform keys: `macOS`, `NixOS`, `Windows` (`host-platform-registry.json`).
+- `src/platforms/<Platform>/`: shared Home Manager modules, activation scripts, Windows PowerShell modules.
+- `src/modules/`: cross-host Nix, single-file modules preferred; `src/modules/env/` is the one directory module. Exceptions: `src/modules/configs/` (machine-wide singletons with host variants), `src/users/` (per-user overlays). See `user-config-placement.instructions.md`, `app-config-policy.instructions.md`.
+- `src/users/`: registry JSON (`<username>/<domain>.json` with `default/` and co-located schemas), per-user app trees, assembly via `users-registry.nix`, `load-user-registry.sh`, `Load-UserRegistry.ps1`. Deep merge with `lib.recursiveUpdate`; arrays replace wholesale.
+- `scripts/`: user-facing `nucleus-*` commands, each `.sh`/`.ps1`. `src/scripts/`: Nix-internal tooling by domain. See `script-authoring.instructions.md`, `nucleus-apps.instructions.md`.
+- `tests/` mirrors `src/`, uses `tests/fixtures/`, never couples to real users (`testing.instructions.md`).
+- `opencode.jsonc` registers `.agents/instructions/**/*.md` and `.agents/skills/`; `.opencode/commands/` mirrors `.agents/prompts/`. Automation in `.github/`; formatting in `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`, `.agents/.markdownlint.jsonc`.
 
 ## Build and validation
 
-- Discover commands from the repo, never assume a default stack. Taxonomy: `tooling-and-validation.instructions.md`.
-- Every external tool used by `scripts/check.sh` or `scripts/check.ps1` must be declared in the pre-flight block; a missing tool hard-fails.
-- Every JSON and YAML data file MUST carry an inline `$schema` pointing at its co-located schema file. JSONC files that already embed one need nothing else.
-- `cargo-nextest` is the managed Rust test runner; known limits in `src/users/default/nextest/config.toml`.
-- Single registration surface: declare each `nucleus-*` command once in `mkNucleusApps` (`src/flake.nix`). PATH, `nix run`, and `packages` all flow from it, so never hand-register in two places.
-- `nucleus-bootstrap` installs Nix and base deps only and never depends on apply. It may invoke apply via `--apply`/`-Apply` once deps exist.
-- Never filter or truncate `nucleus-apply` output: capture full stdout+stderr, ignore the direnv dump at the end, and on a non-zero exit read the last activation step instead of re-running.
-- Nix is unavailable on Windows: keep Nix changes small and isolated and lean on CI.
-- Temporary nixpkgs package overrides (no pin bump): use the `nixpkgs-next` mechanism in `src/modules/packages/nixpkgs-overrides.nix` and follow `.agents/instructions/nixpkgs-overrides.instructions.md`.
+- Discover commands in the repo. See `tooling-and-validation.instructions.md`.
+- Every external tool used by `check.sh` or `check.ps1` is declared in preflight; missing tools hard-fail.
+- Every JSON and YAML data file needs inline `$schema` pointing at its co-located schema. JSONC with an embedded one is exempt.
+- `cargo-nextest` is the managed Rust runner; limits in `src/users/default/nextest/config.toml`.
+- Declare each `nucleus-*` command once in `mkNucleusApps` (`src/flake.nix`); PATH, `nix run`, and `packages` derive from it. No second registration.
+- `nucleus-bootstrap` installs Nix and base deps only and never depends on apply; it may call apply via `--apply`/`-Apply` after deps exist.
+- Never filter or truncate `nucleus-apply` output: capture stdout and stderr, ignore the direnv dump at the end, and on non-zero exit read the last activation step instead of rerunning.
+- Nix is unavailable on Windows: keep Nix changes small and isolated, lean on CI.
+- Temporary nixpkgs overrides use `nixpkgs-next` in `src/modules/packages/nixpkgs-overrides.nix`; see `nixpkgs-overrides.instructions.md`.
 
 ## Core conventions
 
-- Prefer declarative state over imperative scripts.
-- Config deployment priority: writable symlink (default) > read-only > merge > runtime direct read (`app-config-policy.instructions.md`). Deviations require a code comment.
-- Git scope: "global" means machine-wide (`git --system`), "user" means per-user (`git --global`). Never use "global" for `--global`. See `git-scope-terminology.instructions.md`.
-- Keep shared POSIX behavior in shared modules instead of duplicating it per host. Parity comes first across MacBook, NixOS, and Windows: Windows is PowerShell, POSIX is bash, never bash on Windows (`cross-host-feature-parity.instructions.md`).
-- Centralize daemon and service restarts per OS, and restart each daemon at most once per activation. See `cross-host-feature-parity.instructions.md` for the library per platform.
-- Services are persistent daemons by default. See `service-firing-policy.reference.md`.
-- Lockfiles must not duplicate sources: `lockfile.json` cannot carry data already authoritative in `flake.lock`. `suggestions.vscode` is the sole exception because Windows PowerShell cannot evaluate Nix. See `lockfile-enforcement.instructions.md`.
-- Sort unordered lists alphabetically; preserve semantic or load order where it matters. Service entry lists are maintained by hand in declared order (alphabetical by name, PDF presets grouped quality-descending) and never auto-re-sorted.
-- Sentence case for user-facing UI labels (`documentation.instructions.md`). `.yml` for YAML files, except required `.sops.yaml`.
-- Prefer preview/beta/canary channels when viable; when stable is required, add a short `# WHY:` comment.
-- Do not hide meaningful errors (`2>/dev/null`, `|| true`, `-ErrorAction SilentlyContinue`) unless the failure is expected, justified, and still checked.
-- Respect resource boundaries: pause when free space is below 1% or an out-of-space error occurs, and keep filesystem searches inside the task's target directory (`resource-boundaries.instructions.md`).
-- Output format and severity: `output-handling.instructions.md`. Comment annotations: `comment-annotations.instructions.md`. Privilege gating (hard error in `src/`, escalate in `scripts/`): `script-authoring.instructions.md`. Package installation: `package-installation-scope.instructions.md`. Host filesystem scope: `host-filesystem-scope.instructions.md`. Testing: `testing.instructions.md`. Step-runner framework: `step-runner.instructions.md`.
-- Shared state flows through the step-runner context object, never ambient scope.
+- Prefer declarative state.
+- Config deployment priority: writable symlink > read-only > merge > runtime direct read (`app-config-policy.instructions.md`). Deviations need a code comment.
+- Git scope: "global" is `git --system`, "user" is `git --global`; never use "global" for `--global` (`git-scope-terminology.instructions.md`).
+- Share POSIX behavior in shared modules. Windows uses PowerShell, POSIX uses bash, never bash on Windows; parity across all three hosts comes first (`cross-host-feature-parity.instructions.md`).
+- Centralize daemon and service restarts per OS; restart each daemon at most once per activation.
+- Services are persistent daemons by default; firing policy is in `.agents/skills/nucleus-service-reference/references/service-firing-policy.md`.
+- `lockfile.json` must not duplicate `flake.lock`; `suggestions.vscode` is the sole exception. See `lockfile-enforcement.instructions.md`.
+- Sort unordered lists alphabetically; preserve semantic or load order. Service lists stay hand-written in declared order (alphabetical by name, PDF presets quality-descending), never auto-sorted.
+- Sentence case for user-facing labels (`documentation.instructions.md`). YAML uses `.yml`, except required `.sops.yaml`.
+- Prefer preview, beta, or canary; stable needs `# WHY:`.
+- Do not hide meaningful errors (`2>/dev/null`, `|| true`, `-ErrorAction SilentlyContinue`) unless expected, justified, and still checked.
+- Pause below 1% free space or on out-of-space error; search only inside the task target (`resource-boundaries.instructions.md`).
+- Output: `output-handling.instructions.md`. Annotations: `comment-annotations.instructions.md`. Privileges: hard error in `src/`, escalation in `scripts/` (`script-authoring.instructions.md`). Packages: `package-installation-scope.instructions.md`. Host scope: `host-filesystem-scope.instructions.md`. Tests: `testing.instructions.md`. Runner: `step-runner.instructions.md`.
+- Shared state flows through the step-runner context, never ambient scope.
 
 ## Directory roots
 
-- At most two native roots per host, one USER and one SYSTEM. Every user gets `~/.nucleus` (Windows `%USERPROFILE%\.nucleus`) with `user` and `system` symlinks into them. User-intended dirs (`clouds`, `dev`, `Downloads`) stay as-is.
+- At most two native roots per host, one USER and one SYSTEM. Each user gets `~/.nucleus` (`%USERPROFILE%\.nucleus`) with `user`/`system` symlinks; `clouds`, `dev`, `Downloads` stay as-is.
 - macOS: USER `~/Library/Application Support/nucleus`, SYSTEM `/Library/Application Support/nucleus`. NixOS: USER `~/.local/share/nucleus`, SYSTEM `/var/lib/nucleus`. Windows: USER `%LOCALAPPDATA%\nucleus`, SYSTEM `%ProgramData%\nucleus`.
-- Nucleus code references only root paths. Services write to `<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`; physical conventional locations are reached only through root→conventional symlinks created by activation, never from service runtime code.
-- Symlink direction: `~/.nucleus` → roots, roots → conventional targets. Never reversed. `~/.nucleus` is never a data root and services never write to it.
-- Not nucleus roots: `/usr/local/*`, `/nix`, `%USERPROFILE%\.agents`, `/run/secrets`, `C:\ProgramData\ssh`, scheduled-task registry env vars, `/etc/nucleus/bin`.
+- Code references only roots. Services write `<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`; activation creates root-to-conventional links, never service code.
+- Symlinks: `~/.nucleus` → roots → conventional targets, never reversed. `~/.nucleus` is not a data root and services never write there.
+- Not roots: `/usr/local/*`, `/nix`, `%USERPROFILE%\.agents`, `/run/secrets`, `C:\ProgramData\ssh`, scheduled-task registry env vars, `/etc/nucleus/bin`.
 
-## Interaction boundaries
+## Boundaries and invariants
 
-When the user says "only plan", "only research", or "do not edit files", the agent MUST NOT create or edit files, run implementation commands, or invoke `/implement-plan`. Read and search only. Hard rule. The session-memory plan file is the one exception.
+"Only plan", "only research", "do not edit files" lock the turn: no edits, file creation, implementation commands, or `/implement-plan`; only the session-memory plan file is exempt. Owner triggers live in user-scope `standing-orders.instructions.md` from `src/users/default/agents/instructions/`; read it before the first tool call. A boundary locks until lifted, forbids repository writes, makes git opt-in per operation, and batches questions into the final report.
 
-The owner's trigger phrases and precedence rules live in `standing-orders.instructions.md` in the user-scope instruction directory `~/.agents/instructions/`, deployed from `src/users/default/agents/instructions/`. That makes them user scope, so they govern every repository, while rules that belong to nucleus alone stay in `.agents/instructions/`. A boundary phrase locks the whole turn until the owner lifts it, a repository write during that turn is forbidden, git is opt-in per operation, and questions raised while executing are batched into the final report. Read that file before the first tool call of a turn.
-
-## No backwards compatibility
-
-- No shims, deprecation layers, or migration glue. Rename, restructure, or remove in one commit: no aliases, no fallbacks, no compat wrappers. Fix broken downstream consumers in the same commit. If a change needs a compat layer, make it smaller and more local.
-- Never leave migration logic in permanent code. Migrations are one-time: update every reference in the same breaking commit, and run cleanup on every affected host before merging. One-off steps never get recorded in the repo.
-- `MANUAL.md` is ongoing operations only: recurring post-apply steps that cannot be automated, not migration runbooks.
-
-## Security and activation invariants
-
-- macOS lock hardening stays enabled: `askForPassword = true`, `askForPasswordDelay = 0`. Windows long-path support stays enabled in DSC (`LongPathsEnabled = 1`).
-- Manual host instructions stay as activation-tail output. Dev-repo provisioning runs after secrets and key materialization on both POSIX and Windows.
-- Wallpaper state comes from managed decrypted assets, never ad-hoc local files.
-- SOPS recipients stay real and shared; rewrap with `sops updatekeys` after a recipient changes. A missing Jellyfin admin token is a hard error, not a separate gating case.
-
-## Refactoring guardrails
-
-- Verify target paths and list the files to change before starting. When adding a fragment, verify wiring (`imports`, `readFile`, dot-sourcing).
+- No shims, deprecation layers, migration glue, aliases, fallbacks, or compat wrappers. Rename, restructure, or remove in one commit and fix downstream consumers then. If a compat layer is unavoidable, keep it smaller and local.
+- No migration logic in permanent code: update references in the breaking commit, run host cleanup before merging, and keep one-off steps out of the repo.
+- `MANUAL.md` is ongoing operations only, never migration runbooks.
+- macOS lock hardening stays on (`askForPassword = true`, `askForPasswordDelay = 0`); Windows DSC keeps `LongPathsEnabled = 1`.
+- Manual host instructions stay as activation-tail output; dev-repo provisioning follows secrets and key materialization on POSIX and Windows.
+- Wallpapers come from managed decrypted assets, never ad-hoc local files.
+- SOPS recipients stay real and shared; rewrap with `sops updatekeys` after recipient changes. A missing Jellyfin admin token is a hard error, not a gating case.
+- Verify target paths and list files before edits; check imports, `readFile`, and dot-sourcing when adding fragments. Map all cross-references before editing.
 - Keep reusable Windows PowerShell in `src/platforms/Windows/modules/` and `src/hosts/Windows/apply.ps1` orchestration-focused.
-- Before modifying a file with cross-references, map every reference first. Do not start edits until the map is complete.
-- The root `.gitignore` is a hard invariant: never edit it, stage its changes, or remove entries. Escalate to the user. User-scope git ignore files are symlinked into `~/.config/git/ignore` (`git-scope-terminology.instructions.md`); other `.gitignore` files need an explicit user request. Remove build pollution immediately, never silence it.
+- Root `.gitignore` is a hard invariant: never edit, stage, or remove it; escalate. User-scope ignore files symlink to `~/.config/git/ignore`; other `.gitignore` files need explicit request. Remove build pollution immediately.

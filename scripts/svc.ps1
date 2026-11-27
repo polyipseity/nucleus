@@ -599,7 +599,7 @@ function Get-ServiceActionWarning {
   # WHY: Windows rows live here rather than in svc.sh, because this is the only CLI that
   # serves windows-native and windows-schtask entries. Only a scheduled task is re-fired
   # after a stop: its triggers outlive the stopped instance and stopping leaves the task
-  # enabled (service-firing-policy.reference.md: Windows tasks fire on triggers; this
+  # enabled (.agents/skills/nucleus-service-reference/references/service-firing-policy.md: Windows tasks fire on triggers; this
   # script's enable probe reads the task's own Disabled state). A native service starts
   # from its StartType at boot or on request, so nothing revisits a stop.
   if ($Action -eq 'stop') {
