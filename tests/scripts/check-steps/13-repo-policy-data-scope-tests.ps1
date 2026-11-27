@@ -68,6 +68,80 @@ $context = [pscustomobject]@{
   PositionalArgs = @()
 }
 
+# The two-wrapper python3 fixture is set up before the first body invocation:
+# the harness-model drift check in the body needs a usable interpreter, and a
+# host without python3 would make tests 1-3 fail for an unrelated reason.
+$hostIsWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+  [System.Runtime.InteropServices.OSPlatform]::Windows
+)
+$originalPath = $env:PATH
+$originalLocalAppData = $env:LOCALAPPDATA
+$originalMarker = $env:NUCLEUS_STEP13_PYTHON3_MARKER
+$wrapperRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('nucleus-step13-python3-' + [guid]::NewGuid().ToString('N'))
+$firstDir = Join-Path -Path $wrapperRoot -ChildPath 'first'
+$secondDir = Join-Path -Path $wrapperRoot -ChildPath 'second'
+$markerPath = Join-Path -Path $wrapperRoot -ChildPath 'invoked.txt'
+$wrapperLeaf = if ($hostIsWindows) { 'python3.cmd' } else { 'python3' }
+$firstWrapper = Join-Path -Path $firstDir -ChildPath $wrapperLeaf
+$secondWrapper = Join-Path -Path $secondDir -ChildPath $wrapperLeaf
+$fixtureError = ''
+$discoveredCount = 0
+$firstDiscovered = ''
+
+try {
+  $null = New-Item -ItemType Directory -Path $firstDir, $secondDir -Force
+
+  foreach ($pair in @(@($firstWrapper, 'first'), @($secondWrapper, 'second'))) {
+    $wrapperPath = [string]$pair[0]
+    $markerValue = [string]$pair[1]
+    if ($hostIsWindows) {
+      $lines = @('@echo off', "echo $markerValue > ""%NUCLEUS_STEP13_PYTHON3_MARKER%""", 'exit /b 0')
+    }
+    else {
+      $lines = @(
+        '#!/bin/sh',
+        ('printf ''%s\n'' ' + $markerValue + ' > "$NUCLEUS_STEP13_PYTHON3_MARKER"'),
+        'exit 0'
+      )
+    }
+    Set-Content -LiteralPath $wrapperPath -Value $lines
+    if (-not $hostIsWindows) {
+      [System.IO.File]::SetUnixFileMode(
+        $wrapperPath,
+        [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute
+      )
+    }
+  }
+
+  # WHY: the managed resolver probes python.exe and python3.exe before PATH
+  #   fallbacks. Remove those application directories so the test reaches the
+  #   step's python3 fallback on Windows without changing the host.
+  $pathEntries = @(
+    foreach ($entry in ($originalPath -split [regex]::Escape([System.IO.Path]::PathSeparator))) {
+      if ([string]::IsNullOrWhiteSpace($entry)) { continue }
+      if ($hostIsWindows) {
+        $shadowsFallback = @(
+          @('python3.exe', 'python.exe') | Where-Object {
+            Test-Path -LiteralPath (Join-Path -Path $entry -ChildPath $_) -PathType Leaf
+          }
+        )
+        if ($shadowsFallback.Count -gt 0) { continue }
+      }
+      $entry
+    }
+  )
+
+  $env:PATH = (@($firstDir, $secondDir) + $pathEntries) -join [System.IO.Path]::PathSeparator
+  $env:LOCALAPPDATA = $wrapperRoot
+  $env:NUCLEUS_STEP13_PYTHON3_MARKER = $markerPath
+
+  $discovered = @(Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue)
+  $discoveredCount = $discovered.Count
+  if ($discoveredCount -gt 0) { $firstDiscovered = [string]$discovered[0].Source }
+} catch {
+  $fixtureError = $_.Exception.Message
+}
+
 # 1. The body runs to completion instead of throwing on an unset variable.
 $stepOutput = ''
 $threw = $false
@@ -77,6 +151,12 @@ try {
 } catch {
   $threw = $true
   $throwMessage = $_.Exception.Message
+}
+
+# WHY: test 6 measures only its own second invocation, so the marker left by
+#   this first invocation must be removed before that test runs.
+if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+  Remove-Item -LiteralPath $markerPath -Force
 }
 
 if ($threw) {
@@ -136,77 +216,15 @@ if ($selfShDerivation.Success -and $step12Derivation.Success -and
 
 # 6. Make the multi-match case deterministic. Two wrapper python3 applications
 #    sit at the front of PATH, each writing its own marker. The body must run
-#    the first one instead of treating every match as one command name.
-$hostIsWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-  [System.Runtime.InteropServices.OSPlatform]::Windows
-)
-$originalPath = $env:PATH
-$originalLocalAppData = $env:LOCALAPPDATA
-$originalMarker = $env:NUCLEUS_STEP13_PYTHON3_MARKER
-$wrapperRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ('nucleus-step13-python3-' + [guid]::NewGuid().ToString('N'))
-$firstDir = Join-Path -Path $wrapperRoot -ChildPath 'first'
-$secondDir = Join-Path -Path $wrapperRoot -ChildPath 'second'
-$markerPath = Join-Path -Path $wrapperRoot -ChildPath 'invoked.txt'
-$wrapperLeaf = if ($hostIsWindows) { 'python3.cmd' } else { 'python3' }
-$firstWrapper = Join-Path -Path $firstDir -ChildPath $wrapperLeaf
-$secondWrapper = Join-Path -Path $secondDir -ChildPath $wrapperLeaf
-$fixtureError = ''
-$discoveredCount = 0
-$firstDiscovered = ''
+#    the first one instead of treating every match as one command name. The
+#    fixture is already in place and the first invocation's marker was removed,
+#    so this measures only the second invocation.
 $multiThrew = $false
 $multiThrowMessage = ''
 $multiOutput = ''
 $markerText = ''
 
 try {
-  $null = New-Item -ItemType Directory -Path $firstDir, $secondDir -Force
-
-  foreach ($pair in @(@($firstWrapper, 'first'), @($secondWrapper, 'second'))) {
-    $wrapperPath = [string]$pair[0]
-    $markerValue = [string]$pair[1]
-    if ($hostIsWindows) {
-      $lines = @('@echo off', "echo $markerValue > ""%NUCLEUS_STEP13_PYTHON3_MARKER%""", 'exit /b 0')
-    }
-    else {
-      $lines = @(
-        '#!/bin/sh',
-        ('printf ''%s\n'' ' + $markerValue + ' > "$NUCLEUS_STEP13_PYTHON3_MARKER"'),
-        'exit 0'
-      )
-    }
-    Set-Content -LiteralPath $wrapperPath -Value $lines
-    if (-not $hostIsWindows) {
-      [System.IO.File]::SetUnixFileMode(
-        $wrapperPath,
-        [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute
-      )
-    }
-  }
-
-  # WHY: the managed resolver probes python.exe and python3.exe before PATH
-  #   fallbacks. Remove those application directories so the test reaches the
-  #   step's python3 fallback on Windows without changing the host.
-  $pathEntries = @(
-    foreach ($entry in ($originalPath -split [regex]::Escape([System.IO.Path]::PathSeparator))) {
-      if ([string]::IsNullOrWhiteSpace($entry)) { continue }
-      if ($hostIsWindows) {
-        $shadowsFallback = @('python3.exe', 'python.exe') | Where-Object {
-          Test-Path -LiteralPath (Join-Path -Path $entry -ChildPath $_) -PathType Leaf
-        }
-        if ($shadowsFallback.Count -gt 0) { continue }
-      }
-      $entry
-    }
-  )
-
-  $env:PATH = (@($firstDir, $secondDir) + $pathEntries) -join [System.IO.Path]::PathSeparator
-  $env:LOCALAPPDATA = $wrapperRoot
-  $env:NUCLEUS_STEP13_PYTHON3_MARKER = $markerPath
-
-  $discovered = @(Get-Command -Name 'python3' -CommandType Application -ErrorAction SilentlyContinue)
-  $discoveredCount = $discovered.Count
-  if ($discoveredCount -gt 0) { $firstDiscovered = [string]$discovered[0].Source }
-
   try {
     $multiOutput = & $script:StepActions[$stepIndex] $context 2>&1 | Out-String
   } catch {

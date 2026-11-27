@@ -159,23 +159,14 @@ if ($env:HARNESS_PY_EXIT) {
         $markerPath = Join-Path -Path $script:tempRoot -ChildPath 'managed-python.log'
         Set-Content -LiteralPath $markerPath -Value ''
         if ($IsWindows) {
-            $typeName = 'ManagedHarnessPythonStub' + [guid]::NewGuid().ToString('N')
-            $source = @"
-using System;
-using System.IO;
-public static class $typeName
-{
-  public static void Main()
-  {
-    string marker = Environment.GetEnvironmentVariable("NUCLEUS_TEST_MANAGED_PY_MARKER");
-    if (!string.IsNullOrEmpty(marker))
-    {
-      File.AppendAllText(marker, "managed-python\n");
-    }
-  }
+            Copy-Item -LiteralPath ([Environment]::ProcessPath) -Destination $managedPython -Force
+            $fixtureTool = Join-Path -Path $script:repoRoot -ChildPath 'src\scripts\agents\merge-harness-models.py'
+            Set-Content -LiteralPath $fixtureTool -Value @'
+if ($env:NUCLEUS_TEST_MANAGED_PY_MARKER) {
+  Add-Content -LiteralPath $env:NUCLEUS_TEST_MANAGED_PY_MARKER -Value 'managed-python'
 }
-"@
-            $null = Add-Type -TypeDefinition $source -OutputAssembly $managedPython -OutputType ConsoleApplication # check-suppress:suppression_doc: Add-Type returns the generated type, discarded in test setup
+exit 0
+'@
         } else {
             $body = "#!/bin/sh`nprintf 'managed-python\n' >> `"`$NUCLEUS_TEST_MANAGED_PY_MARKER`"`nexit 0`n"
             $null = Set-Content -LiteralPath $managedPython -Value $body -NoNewline # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup

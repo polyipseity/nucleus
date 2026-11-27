@@ -52,8 +52,11 @@ BeforeAll {
       $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
     }
 
-    foreach ($name in @('harness-bridge-common', 'harness-filter')) {
-      Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $notifyCopy -ChildPath "$name.ps1")
+    Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath 'harness-bridge-common.ps1') -Destination (Join-Path -Path $notifyCopy -ChildPath 'harness-bridge-common.ps1')
+    $harnessCopy = Join-Path -Path $notifyCopy -ChildPath 'harness'
+    $null = New-Item -ItemType Directory -Path $harnessCopy -Force # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    foreach ($name in @('decide-call.ps1', 'request-approval.ps1', 'send-notification.ps1')) {
+      Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "harness\$name") -Destination (Join-Path -Path $harnessCopy -ChildPath $name)
     }
     foreach ($filter in @(Get-ChildItem -LiteralPath $script:FiltersDir -File -Filter '*.ts')) {
       Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path (Join-Path -Path $notifyCopy 'filters') -ChildPath $filter.Name)
