@@ -27,6 +27,22 @@ BeforeAll {
     return ($vals.Count -eq 0 -or $vals -contains 'windows')
   }
 
+  function Add-NucleusExpectedSpecFlagList {
+    param(
+      [AllowNull()]
+      [object]$Command,
+      [Parameter(Mandatory)]
+      [System.Collections.Generic.List[string]]$Expected
+    )
+    if ($null -eq $Command) { return }
+    foreach ($f in @($Command.flags)) {
+      if ($f -and $f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $Expected.Add([string]$f.long) }
+    }
+    foreach ($sc in @($Command.subcommands)) {
+      Add-NucleusExpectedSpecFlagList -Command $sc -Expected $Expected
+    }
+  }
+
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
   $Script:RealProfilePath = Join-Path $PSScriptRoot '../../../../src/scripts/shell/profile.ps1'
@@ -79,7 +95,10 @@ BeforeAll {
   }
 
   function Invoke-GenCompletion {
-    param([string[]]$Arguments)
+    param(
+      [string[]]$Arguments,
+      [switch]$Strict
+    )
     # WHY: the fixture repo root is handed to the child through the child's own
     # environment. Setting $env:NUCLEUS_REPO_ROOT here would leak into every
     # suite running concurrently in this process: steps share one PowerShell
@@ -91,8 +110,24 @@ BeforeAll {
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
     $startInfo.Environment['NUCLEUS_REPO_ROOT'] = $Script:FixtureRoot
-    $childArguments = @('-NoProfile', '-File', $Script:ScriptPath)
-    if ($Arguments) { $childArguments += $Arguments }
+    if ($Strict) {
+      $escapedScriptPath = $Script:ScriptPath.Replace("'", "''")
+      $argumentList = ''
+      if ($Arguments) {
+        # WHY: quoted or splatted '-Check' binds as a positional argument, so the
+        # switch name must appear literally in the -Command text.
+        $argumentList = ' ' + ($Arguments -join ' ')
+      }
+      # WHY: the generator exits explicitly on -Check and ends normally on a write
+      # run. Reading $LASTEXITCODE after either path fails under strict mode in a
+      # fresh -NoProfile child, so the child's own exit status is the result.
+      $command = "Set-StrictMode -Version Latest; & '$escapedScriptPath'$argumentList"
+      $childArguments = @('-NoProfile', '-NonInteractive', '-Command', $command)
+    }
+    else {
+      $childArguments = @('-NoProfile', '-File', $Script:ScriptPath)
+      if ($Arguments) { $childArguments += $Arguments }
+    }
     foreach ($argument in $childArguments) {
       $startInfo.ArgumentList.Add($argument)
     }
@@ -182,6 +217,19 @@ Describe 'gen-completions.ps1 CLI surface' {
     $result = Invoke-GenCompletion -Arguments @('-Check')
     $result.ExitCode | Should -Be 0
     $result.Output | Should -Match 'up to date'
+  }
+
+  It '-Check succeeds under strict mode and keeps nested harness flags' {
+    $written = Invoke-GenCompletion -Strict
+    $written.ExitCode | Should -Be 0
+
+    $checked = Invoke-GenCompletion -Arguments @('-Check') -Strict
+    $checked.ExitCode | Should -Be 0
+    $checked.Output | Should -Match 'up to date'
+
+    $flags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusUtilsFlags' -ProfileText (Get-FixtureProfile))
+    $flags | Should -Contain '--hook'
+    $flags | Should -Contain '--session-id'
   }
 
   It '-Check exits 1 on drift and lists the diff' {
@@ -354,18 +402,18 @@ Describe 'gen-completions.ps1 generated inventory' {
     foreach ($appName in $appVars.Keys) {
       $varName = $appVars[$appName]
       $app = @($spec.apps | Where-Object { $_.name -eq $appName }) | Select-Object -First 1
-      $expected = @()
+      $expectedList = [System.Collections.Generic.List[string]]::new()
       if ($app) {
         foreach ($f in @($app.globalFlags)) {
-          if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
+          if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expectedList.Add([string]$f.long) }
         }
+        # WHY: the generator recurses through nested subcommands, so a one-level
+        # expectation drops flags such as utils -> harness -> --hook.
         foreach ($sc in @($app.subcommands)) {
-          foreach ($f in @($sc.flags)) {
-            if ($f.long -and (Test-NucleusFlagAppliesToWindows $f)) { $expected += $f.long }
-          }
+          Add-NucleusExpectedSpecFlagList -Command $sc -Expected $expectedList
         }
       }
-      $expected = @($expected | Sort-Object -Unique)
+      $expected = @($expectedList | Sort-Object -Unique)
       $actual = @(Get-NucleusFlagsFromProfile -VariableName $varName -ProfileText $profileText | Sort-Object -Unique)
       $actual | Should -Be $expected -Because "$appName flags must match spec"
     }

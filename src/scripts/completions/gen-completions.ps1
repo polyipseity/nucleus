@@ -105,9 +105,12 @@ function Add-NucleusSpecFlagSet {
       $null = $FlagSet.Add([string]$f.long) # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
     }
   }
-  foreach ($sc in @($Command.subcommands)) {
-    if ($null -eq $sc) { continue }
-    Add-NucleusSpecFlagSet -Command $sc -FlagSet $FlagSet -Platform $Platform
+  $subcommandsProp = $Command.PSObject.Properties['subcommands']
+  if ($null -ne $subcommandsProp) {
+    foreach ($sc in @($subcommandsProp.Value)) {
+      if ($null -eq $sc) { continue }
+      Add-NucleusSpecFlagSet -Command $sc -FlagSet $FlagSet -Platform $Platform
+    }
   }
 }
 
