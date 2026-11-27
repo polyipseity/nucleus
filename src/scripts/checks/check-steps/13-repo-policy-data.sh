@@ -525,7 +525,7 @@ run_upstream_workaround_staleness() {
   local _repo_root="${ctx[REPO_ROOT]}"
   shift
   cd "$_repo_root" || return 1
-  local _reg=".agents/instructions/upstream-workarounds.instructions.md"
+  local _reg=".agents/skills/nucleus-platform-reference/references/upstream-workarounds.md"
   if [ ! -f "$_reg" ]; then
     error "upstream workarounds registry not found: $_reg"
     return 1

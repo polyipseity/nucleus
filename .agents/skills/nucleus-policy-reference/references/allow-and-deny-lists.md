@@ -58,4 +58,4 @@ A new exclusion needs a category id, tier, and `# ref:`.
 
 | ID | Files | Entry | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
-| E1 | `.agents/instructions/upstream-workarounds.instructions.md` | All entries (W01-W24) | T3 | Workarounds for upstream limitations; temporary entries re-checked quarterly, permanent entries listed only | Error if a referenced path is missing (`run_upstream_workaround_staleness`, step 13) |
+| E1 | `.agents/skills/nucleus-platform-reference/references/upstream-workarounds.md` | All entries (W01-W24) | T3 | Workarounds for upstream limitations; temporary entries re-checked quarterly, permanent entries listed only | Error if a referenced path is missing (`run_upstream_workaround_staleness`, step 13) |

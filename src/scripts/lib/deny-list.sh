@@ -27,8 +27,9 @@ _NUCLEUS_DENY_LIST_SOURCED=1
 # On exit 0 the ignored paths are subtracted from the input; on exit 1 the full
 # input passes through.
 filter_gitignored() {
-  if [ ! -d .git ] && [ -z "${GIT_DIR:-}" ]; then
-    # Not a git repository, pass everything through
+  # check-suppress:suppression_doc: git exits non-zero outside a work tree; the checked branch below passes input through
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    # No work tree to query, including directories outside a repository.
     cat
     return
   fi

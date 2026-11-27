@@ -21,7 +21,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
 STEP_FILE="$REPO_ROOT/src/scripts/checks/check-steps/13-repo-policy-data.sh"
 readonly REPO_ROOT STEP_FILE
 
-REGISTRY_REL=".agents/instructions/upstream-workarounds.instructions.md"
+REGISTRY_REL=".agents/skills/nucleus-platform-reference/references/upstream-workarounds.md"
 readonly REGISTRY_REL
 
 # run_subcheck <fixture-repo> <out-file>: invoke the sub-check the way the runner
@@ -44,7 +44,7 @@ run_subcheck() { # <fixture-repo> <out-file>
 # reads, so nothing in the live tree can satisfy a path the fixture forgot.
 make_fixture() {
   FIXTURE_REPO="$(mktemp -d)"
-  mkdir -p "$FIXTURE_REPO/.agents/instructions" "$FIXTURE_REPO/src/modules"
+  mkdir -p "$FIXTURE_REPO/.agents/instructions" "$FIXTURE_REPO/.agents/skills/nucleus-platform-reference/references" "$FIXTURE_REPO/src/modules"
 }
 
 write_registry() {

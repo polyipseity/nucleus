@@ -102,6 +102,32 @@ test_filter_no_ignore_under_errexit() {
   fi
 }
 
+# Test 8: linked worktrees keep .git as a file, not a directory. The filter
+# has to ask git whether it is in a work tree instead of testing that path.
+test_filter_linked_worktree() {
+  local fixture_repo git_dir result
+  fixture_repo="$(mktemp -d)"
+  git_dir="$(mktemp -d)"
+  git init --separate-git-dir="$git_dir" "$fixture_repo" >/dev/null
+  printf 'result\n' >"$fixture_repo/.gitignore"
+  if [[ ! -f "$fixture_repo/.git" ]]; then
+    assert_fail "filter_gitignored: linked worktree fixture has a .git file" "fixture setup did not create one"
+    rm -rf "$fixture_repo" "$git_dir"
+    return
+  fi
+  assert_pass "filter_gitignored: linked worktree fixture has a .git file"
+  result=$(
+    cd "$fixture_repo"
+    printf 'result\n' | filter_gitignored
+  ) || true
+  if [[ -z "$result" ]]; then
+    assert_pass "filter_gitignored: linked worktree drops an ignored path"
+  else
+    assert_fail "filter_gitignored: linked worktree drops an ignored path" "Expected empty, got: $result"
+  fi
+  rm -rf "$fixture_repo" "$git_dir"
+}
+
 section 1 "Deny-list library tests"
 echo ""
 test_filter_ignored_path
@@ -111,5 +137,6 @@ test_filter_empty_input
 test_filter_glob_ignored
 test_filter_subdir_ignored
 test_filter_no_ignore_under_errexit
+test_filter_linked_worktree
 
 finish_tests

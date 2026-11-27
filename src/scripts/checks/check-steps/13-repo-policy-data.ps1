@@ -282,7 +282,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   if ($raErrors -gt 0) { $failed = $true }
 
   Write-Message "--- upstream workaround staleness ---"
-  $uwReg = Join-Path $r '.agents\instructions\upstream-workarounds.instructions.md'
+  $uwReg = Join-Path $r '.agents\skills\nucleus-platform-reference\references\upstream-workarounds.md'
   if (-not (Test-Path -LiteralPath $uwReg)) {
     Write-ErrorMessage "upstream workarounds registry not found at $uwReg"
     $failed = $true

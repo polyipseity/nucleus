@@ -41,7 +41,11 @@ function Invoke-LogCommandWithoutRepoRoot {
   )
 
   $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = (Get-Process -Id $PID).Path
+  $pwshApps = @(Get-Command pwsh -CommandType Application)
+  if ($pwshApps.Count -eq 0) {
+    throw 'pwsh application not found on PATH'
+  }
+  $startInfo.FileName = $pwshApps[0].Source
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardOutput = $true
   $startInfo.RedirectStandardError = $true
@@ -120,47 +124,9 @@ if (-not $IsWindows) {
 }
 
 Write-Output "`n=== [4a] svc.ps1 registry filter ==="
-# WHY: the Windows branch of svc.ps1 filters services.json before --list-services resolves
-# any service. A top-level metadata object has no hosts map, so the filter must skip it
-# instead of calling a method on the null result of that missing key.
-$svcAstTokens = $null
-$svcAstErrors = $null
-$svcSource = Get-Content (Join-Path $repoRoot 'scripts/svc.ps1') -Raw
-$svcAst = [System.Management.Automation.Language.Parser]::ParseInput($svcSource, [ref]$svcAstTokens, [ref]$svcAstErrors)
-$filterAsts = @($svcAst.FindAll({
-  param($node)
-  if ($node -isnot [System.Management.Automation.Language.ForEachStatementAst]) { return $false }
-  $collection = $node.Condition
-  if ($collection -is [System.Management.Automation.Language.PipelineAst]) {
-    $elements = @($collection.PipelineElements)
-    if ($elements.Count -ne 1) { return $false }
-    $collection = $elements[0]
-  }
-  if ($collection -is [System.Management.Automation.Language.CommandExpressionAst]) {
-    $collection = $collection.Expression
-  }
-  $member = $collection -as [System.Management.Automation.Language.MemberExpressionAst]
-  if ($null -eq $member -or $member.Member.Value -ne 'Keys') { return $false }
-  $variable = $member.Expression -as [System.Management.Automation.Language.VariableExpressionAst]
-  return ($null -ne $variable -and $variable.VariablePath.UserPath -eq 'RegistryRaw')
-}, $true))
-$filterCode = if ($svcAstErrors.Count -eq 0 -and $filterAsts.Count -eq 1) { $filterAsts[0].Extent.Text } else { '' }
-
-function Invoke-SvcRegistryFilter {
-  <#
-  .SYNOPSIS
-    Runs the production services.json filter against a fixture registry.
-  #>
-  param(
-    [Parameter(Mandatory)][hashtable]$Raw,
-    [Parameter(Mandatory)][string]$Code
-  )
-  Set-Variable -Name 'RegistryRaw' -Value $Raw
-  Set-Variable -Name 'NucleusHost' -Value 'Windows'
-  $Registry = @{}
-  . ([scriptblock]::Create($Code))
-  return $Registry
-}
+# WHY: Get-NucleusHostServiceEntries owns the registry filter now. Call that
+# function so the fixtures exercise the same code svc.ps1 uses on Windows.
+. (Join-Path $repoRoot 'src/platforms/Windows/modules/Enable-ManagedServiceSet.ps1')
 
 $fixtureWithService = @{
   '$schema'  = './services.schema.json'
@@ -171,16 +137,13 @@ $fixtureMetadataOnly = @{
   '$schema'  = './services.schema.json'
   '$logging' = @{ capture = 'all' }
 }
-$filterError = $null
-$filtered = $null
-try { $filtered = Invoke-SvcRegistryFilter -Raw $fixtureWithService -Code $filterCode } catch { $filterError = $_.Exception.Message }
-$filteredKeys = if ($null -ne $filtered) { @($filtered.Keys) -join '|' } else { 'none' }
-Assert-True -cond ($null -eq $filterError -and $null -ne $filtered -and $filtered.Count -eq 1 -and $filtered.ContainsKey('ollama')) -name 'svc.ps1 registry filter skips entries without a hosts map' -detail "error=$filterError keys=$filteredKeys"
+$filtered = Get-NucleusHostServiceEntries -RegistryRaw $fixtureWithService -HostKey 'Windows'
+$filteredKeys = @($filtered.Keys) -join '|'
+Assert-True -cond ($filtered.Count -eq 1 -and $filtered.ContainsKey('ollama')) -name 'svc.ps1 registry filter skips entries without a hosts map' -detail "keys=$filteredKeys"
 
-$emptyFilterError = $null
-$emptyFiltered = $null
-try { $emptyFiltered = Invoke-SvcRegistryFilter -Raw $fixtureMetadataOnly -Code $filterCode } catch { $emptyFilterError = $_.Exception.Message }
-Assert-True -cond ($null -eq $emptyFilterError -and $null -ne $emptyFiltered -and $emptyFiltered.Count -eq 0) -name 'svc.ps1 registry filter accepts a metadata-only registry' -detail "error=$emptyFilterError"
+$emptyFiltered = Get-NucleusHostServiceEntries -RegistryRaw $fixtureMetadataOnly -HostKey 'Windows'
+$emptyKeys = @($emptyFiltered.Keys) -join '|'
+Assert-True -cond ($emptyFiltered.Count -eq 0) -name 'svc.ps1 registry filter accepts a metadata-only registry' -detail "keys=$emptyKeys"
 
 Write-Output "`n=== [4b] svc.ps1 --list-services with metadata-only registry ==="
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-svc-registry-" + [Guid]::NewGuid().ToString('n'))
