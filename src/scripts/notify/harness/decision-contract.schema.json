@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nucleus.local/schemas/decision-contract.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "decision", "reason", "source", "timeouts", "timedOutSources"],
+  "properties": {
+    "version": { "const": 1 },
+    "decision": { "enum": ["allow", "deny", "ask"] },
+    "reason": { "type": "string" },
+    "source": { "enum": ["prompt", "hermes", "all-timeouts", "resolver-error", "none"] },
+    "timeouts": {
+      "type": "object",
+      "required": ["hermes", "prompt"],
+      "properties": { "hermes": { "const": 300 }, "prompt": { "const": 600 } }
+    },
+    "timedOutSources": { "type": "array", "items": { "enum": ["hermes", "prompt"] } }
+  }
+}

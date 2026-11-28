@@ -2,29 +2,28 @@
 # Requests an approval decision for a harness tool call from the enabled sources.
 #
 #   nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]
-#       Prints that harness's decision document, so one command serves a hook:
-#         cursor  -> {"permission":"allow"|"ask"|"deny"}
-#         copilot -> {"hookSpecificOutput":{...,"permissionDecision":"…"}}
-#         others  -> plain allow | deny | ask
-#   nucleus-utils harness request-approval --plain <harness> <tool> <summary> [timeout-seconds]
-#       Prints the decision word alone, for a caller that renders its own
-#       document. `nucleus-utils harness decide-call` consults the sources that way, so a call no
-#       filter decides is answered by the same gate every other call uses.
+#       Prints one JSON decision document:
+#         {"version":1,"decision":"allow"|"deny"|"ask","reason":"…",
+#          "source":"prompt"|"hermes"|"all-timeouts"|"resolver-error"|"none",
+#          "timeouts":{"hermes":300,"prompt":600},"timedOutSources":[…]}
+#       Harness adapters render that document in their own vocabulary; there is
+#       no plain-word mode and no per-harness shape.
 #
 # `ask` means "no source decided" and the harness falls back to its own local
-# prompt. Every path prints a decision and exits 0, because some harnesses treat
-# a failed hook as a denial, which would turn a broker outage into a blocked
-# session.
+# prompt. A resolver error or every source timing out is a typed deny that names
+# the reason. Every path prints a document and exits 0, because some harnesses
+# treat a failed hook as a denial.
 #
 # ~/.local/state/nucleus/config.json:
 #   harness-notify.enable                       boolean, default true; false
 #                                               disables the whole bridge and
 #                                               answers `ask` at once
 #   harness-approval.sources                    list of sources, default
-#                                               ["prompt"]; an empty list
-#                                               disables the gate and answers
+#                                               ["prompt","hermes"]; an empty
+#                                               list disables the gate and answers
 #                                               `ask` at once
-#   harness-approval.timeout-seconds.<source>   seconds per source, default 0
+#   harness-approval.timeout-seconds.<source>   seconds per source, default
+#                                               300 for hermes, 600 for prompt
 #
 # Sources are independent and race when more than one is enabled; the first
 # answer wins and the other is dropped.
@@ -38,7 +37,8 @@
 #
 # A timeout of 0 waits until an answer arrives, so the harness's own hook timeout
 # is the ceiling: the hook files declare 3600 s, which outlasts any human answer
-# and still ends a session that nobody is watching.
+# and still ends a session that nobody is watching. The document always reports
+# the contract bounds from the schema, not a caller's override of the wait.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -62,50 +62,49 @@ _ha_decided_by=""
 # Set once the Hermes request is published, so the audit line can be annotated by
 # id; an early exit has no request and the writer mints an id instead.
 _ha_id=""
+# Contract fields carried to the single document printed at the exit.
+_ha_reason=""
+_ha_source="none"
+_ha_timed_out='[]'
 
 _ha_usage() {
-  warn "usage: nucleus-utils harness request-approval [--plain] <harness> <tool> <summary> [timeout-seconds]"
+  warn "usage: nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]"
 }
-
-# WHY no flag parsing library: one modifier is the whole vocabulary, and a
-# caller that wants the word rather than a document is exactly the case that
-# cannot be expressed by the harness name.
-_ha_plain=0
-if [ "${1-}" = "--plain" ]; then
-  _ha_plain=1
-  shift
-fi
 
 _ha_harness="${1-}"
 _ha_tool="${2-}"
 _ha_summary="${3-}"
 _ha_timeout_arg="${4-}"
 
-# WHY: `ask` is a valid value in every shape, so the neutral answer is always
-# expressible.
+# WHY jq: the six fields and their order are the wire contract, and jq quotes
+# a reason that came from a remote response without a second escaping path.
 _ha_render() {
-  if [ "$_ha_plain" -eq 1 ]; then
-    printf '%s\n' "$1"
-    return 0
-  fi
-  case "$_ha_harness" in
-  cursor) printf '{"permission":"%s"}\n' "$1" ;;
-  copilot)
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"nucleus-utils harness request-approval"}}\n' "$1"
-    ;;
-  *) printf '%s\n' "$1" ;;
-  esac
+  jq -cnM \
+    --arg decision "$_ha_decision" \
+    --arg reason "$_ha_reason" \
+    --arg source "$_ha_source" \
+    --argjson timedOutSources "$_ha_timed_out" \
+    '{version: 1, decision: $decision, reason: $reason, source: $source,
+      timeouts: {hermes: 300, prompt: 600}, timedOutSources: $timedOutSources}'
+}
+
+_ha_mark_timeout() { # <source>
+  _ha_timed_out="$(jq -cnM --arg name "$1" --argjson list "$_ha_timed_out" \
+    '$list + [$name] | unique')"
 }
 
 _ha_root="$(derive_nucleus_user_root)"
 
 # Every path ends here: the decision is logged (hooks run invisibly, so what was
 # asked and how it was answered has to be recoverable) and the process exits 0.
-_ha_finish() {
+_ha_finish() { # <decision> <reason> <source>
   case "${1-}" in
   allow | deny) _ha_decision="$1" ;;
   *) _ha_decision="ask" ;;
   esac
+  _ha_reason="${2:-no approval source answered}"
+  _ha_source="${3:-none}"
+  _ha_decided_by="$_ha_source"
   # WHY a subshell: nucleus-logs refuses an unusable event by exiting, and a
   # hook that prints nothing reads as a denial in Copilot, so a failed append
   # must not swallow the answer. Best-effort in both directions.
@@ -119,50 +118,53 @@ _ha_finish() {
     # and the summary it was asked about are the raw input it can vouch for.
     _ha_audit_digest="$(printf '%s\t%s' "$_ha_tool" "$_ha_summary" | harness_audit_digest)" || exit 1
     harness_audit_log approval "$_ha_harness" "$_ha_decision" \
-      "${_ha_decided_by:-none}" '' '' \
+      "$_ha_source" '' '' \
       "$(($(harness_audit_now_ms) - _ha_start_ms))" \
       "$_ha_audit_summary" "$_ha_audit_digest" "$_ha_id"
   ); then
     warn "could not write the harness audit log"
   fi
-  _ha_render "$_ha_decision"
+  _ha_render
   exit 0
+}
+
+_ha_finish_error() { # <reason>
+  _ha_finish deny "$1" resolver-error
 }
 
 if [ -z "$_ha_harness" ]; then
   _ha_usage
-  printf 'ask\n'
-  exit 0
+  _ha_finish_error "harness-approval requires a harness name"
 fi
 
 # Every caller passes all three arguments, and an empty tool means the caller
 # got its own arguments wrong.
 if [ -z "$_ha_tool" ]; then
   _ha_usage
-  _ha_finish ask
+  _ha_finish_error "harness-approval requires a tool name"
 fi
 
-_ha_defaults='{"harness-notify":{"enable":true},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"hermes":0,"prompt":0}}}'
+_ha_defaults='{"harness-notify":{"enable":true},"harness-approval":{"sources":["prompt","hermes"],"timeout-seconds":{"hermes":300,"prompt":600}}}'
 _ha_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   # WHY: an unreadable config takes the unparsable exit with its message, since
   # a hook dying under `set -e` prints no decision and Copilot reads that as a
   # denial.
   if ! _ha_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
-    warn "could not parse nucleus config: asking locally"
-    _ha_finish ask
+    warn "could not read nucleus config"
+    _ha_finish_error "could not read nucleus config"
   fi
 fi
 if ! _ha_config="$(
   jq -c --argjson defaults "$_ha_defaults" --argjson user "$_ha_user_config" \
     '$defaults * { "harness-notify": ($user["harness-notify"] // {}), "harness-approval": ($user["harness-approval"] // {}) }' <<<'{}'
 )"; then
-  warn "could not parse nucleus config: asking locally"
-  _ha_finish ask
+  warn "could not parse nucleus config"
+  _ha_finish_error "could not parse nucleus config"
 fi
 
 if [ "$(jq -r '."harness-notify".enable' <<<"$_ha_config")" != "true" ]; then
-  _ha_finish ask
+  _ha_finish ask "harness notifications are disabled" none
 fi
 
 # WHY: the sources are the gate. None enabled keeps the hooks wired (one config
@@ -171,36 +173,36 @@ fi
 _ha_prompt=0
 _ha_hermes=0
 if ! _ha_sources="$(jq -r '."harness-approval".sources[]' <<<"$_ha_config")"; then
-  warn "harness-approval.sources is not a list of source names: asking locally"
-  _ha_finish ask
+  warn "harness-approval.sources is not a list of source names"
+  _ha_finish_error "harness-approval.sources is not a list"
 fi
 # WHY unquoted: jq printed one source per line and the loop wants the words, not
 # the newlines.
-for _ha_source in $_ha_sources; do
-  case "$_ha_source" in
+for _ha_source_name in $_ha_sources; do
+  case "$_ha_source_name" in
   prompt) _ha_prompt=1 ;;
   hermes) _ha_hermes=1 ;;
   *)
-    warn "unknown harness-approval source '$_ha_source': asking locally"
-    _ha_finish ask
+    warn "unknown harness-approval source '$_ha_source_name'"
+    _ha_finish_error "unknown harness-approval source '$_ha_source_name'"
     ;;
   esac
 done
 if [ "$_ha_prompt" -eq 0 ] && [ "$_ha_hermes" -eq 0 ]; then
-  _ha_finish ask
+  _ha_finish ask "no approval sources enabled" none
 fi
 
 _ha_timeout_prompt=0
 _ha_timeout_hermes=0
 for _ha_name in prompt hermes; do
   if ! _ha_value="$(jq -r --arg name "$_ha_name" '."harness-approval"."timeout-seconds"[$name] // 0' <<<"$_ha_config")"; then
-    warn "could not read harness-approval.timeout-seconds.$_ha_name: asking locally"
-    _ha_finish ask
+    warn "could not read harness-approval.timeout-seconds.$_ha_name"
+    _ha_finish_error "could not read harness-approval.timeout-seconds.$_ha_name"
   fi
   case "$_ha_value" in
   '' | *[!0-9]*)
-    warn "harness-approval.timeout-seconds.$_ha_name is not a whole number of seconds: asking locally"
-    _ha_finish ask
+    warn "harness-approval.timeout-seconds.$_ha_name is not a whole number of seconds"
+    _ha_finish_error "harness-approval.timeout-seconds.$_ha_name is not a whole number of seconds"
     ;;
   esac
   case "$_ha_name" in
@@ -214,8 +216,8 @@ done
 if [ -n "$_ha_timeout_arg" ]; then
   case "$_ha_timeout_arg" in
   *[!0-9]*)
-    warn "the timeout argument must be a whole number of seconds: asking locally"
-    _ha_finish ask
+    warn "the timeout argument must be a whole number of seconds"
+    _ha_finish_error "the timeout argument must be a whole number of seconds"
     ;;
   esac
   _ha_timeout_prompt="$_ha_timeout_arg"
@@ -231,11 +233,11 @@ _ha_response=""
 
 if [ "$_ha_hermes" -eq 1 ]; then
   # WHY: the state tree is the first thing created under the USER root, so an
-  # unwritable root fails here. Answering `ask` keeps the harness's own prompt
-  # instead of letting `set -e` end the run without a document.
+  # unwritable root fails here. The typed deny names the failure instead of
+  # letting `set -e` end the run without a document.
   if ! mkdir -p "$_ha_requests" "$_ha_responses"; then
     warn "could not create the harness-bridge state directory"
-    _ha_finish ask
+    _ha_finish_error "could not create the harness-bridge state directory"
   fi
 
   # WHY: a harness killed mid-poll leaves a request that can never be answered,
@@ -279,12 +281,12 @@ if [ "$_ha_hermes" -eq 1 ]; then
     >"$_ha_request_tmp"; then
     rm -f "$_ha_request_tmp"
     warn "could not write the approval request"
-    _ha_finish ask
+    _ha_finish_error "could not write the approval request"
   fi
   if ! mv -f "$_ha_request_tmp" "$_ha_request"; then
     rm -f "$_ha_request_tmp"
     warn "could not publish the approval request"
-    _ha_finish ask
+    _ha_finish_error "could not publish the approval request"
   fi
 
   # WHY best-effort: the request file is the source of truth, so a failed
@@ -301,11 +303,13 @@ fi
 # `ask` rather than read its own EOF as a refusal.
 _ha_prompt_live="$_ha_prompt"
 _ha_tty=0
+_ha_no_answer_reason="no approval source answered"
 if [ "$_ha_prompt" -eq 1 ]; then
   if exec 3<>/dev/tty; then
     _ha_tty=1
   else
-    warn "no terminal for the prompt source: asking locally"
+    warn "no terminal for the prompt source: answering ask"
+    _ha_no_answer_reason="no terminal for the prompt source"
     _ha_prompt_live=0
   fi
 fi
@@ -316,13 +320,15 @@ if [ "$_ha_tty" -eq 1 ]; then
   # which some harnesses read as a denial.
   if ! printf 'nucleus approval: %s: %s\n  run it? [y]es / [n]o / [a]llow once / [d]on'"'"'t: ' \
     "$_ha_tool" "$_ha_summary" >&3; then
-    warn "could not write to the terminal: asking locally"
+    warn "could not write to the terminal: answering ask"
+    _ha_no_answer_reason="could not write to the terminal"
     _ha_prompt_live=0
     _ha_tty=0
   fi
 fi
 
 _ha_answer=""
+_ha_answer_reason=""
 # Bytes already read but not yet a line: `read` saves partial input when it times
 # out, and a terminal a TUI put in raw mode delivers a keystroke at a time, so an
 # answer waits here for its line break instead of being thrown away.
@@ -347,22 +353,37 @@ while [ -z "$_ha_answer" ]; do
 
   if [ "$_ha_hermes_live" -eq 1 ] && [ -f "$_ha_response" ]; then
     _ha_hermes_live=0
-    if ! _ha_answer="$(jq -r '.decision // empty' "$_ha_response")"; then
-      warn "could not read the approval response: asking locally"
-      _ha_answer=""
+    if ! _ha_response_doc="$(jq -c 'if type == "object" then . else empty end' "$_ha_response" 2>/dev/null)"; then
+      _ha_response_doc=""
     fi
-    if [ -n "$_ha_answer" ]; then
+    # check-suppress:suppression_doc: jq fails on a malformed or non-JSON Hermes response; the empty decision is intentionally converted into the typed resolver-error decision below, not a silent fallback.
+    _ha_answer="$(jq -r '.decision // empty' <<<"$_ha_response_doc" 2>/dev/null || true)"
+    case "$_ha_answer" in
+    allow | deny)
+      _ha_answer_reason="$(jq -r 'if (.reason | type) == "string" and (.reason | length) > 0 then .reason else "hermes decision" end' <<<"$_ha_response_doc")"
       _ha_decided_by="hermes"
       break
-    fi
+      ;;
+    *)
+      warn "malformed hermes approval response: answering deny"
+      # WHY break instead of finishing here: the request and response are
+      # removed after the loop, and that cleanup must also run on this error.
+      _ha_answer="deny"
+      _ha_answer_reason="malformed hermes approval response"
+      _ha_decided_by="resolver-error"
+      break
+      ;;
+    esac
   fi
 
   if [ "$_ha_prompt_live" -eq 1 ] && [ "$_ha_prompt_deadline" -ne 0 ] &&
     [ "$_ha_now" -ge "$_ha_prompt_deadline" ]; then
+    _ha_mark_timeout prompt
     _ha_prompt_live=0
   fi
   if [ "$_ha_hermes_live" -eq 1 ] && [ "$_ha_hermes_deadline" -ne 0 ] &&
     [ "$_ha_now" -ge "$_ha_hermes_deadline" ]; then
+    _ha_mark_timeout hermes
     _ha_hermes_live=0
   fi
   if [ "$_ha_prompt_live" -eq 0 ] && [ "$_ha_hermes_live" -eq 0 ]; then
@@ -404,10 +425,12 @@ while [ -z "$_ha_answer" ]; do
       case "$_ha_word" in
       a | allow | y | yes)
         _ha_answer="allow"
+        _ha_answer_reason="prompt allowed"
         _ha_decided_by="prompt"
         ;;
       d | "don't" | dont | n | no)
         _ha_answer="deny"
+        _ha_answer_reason="prompt denied"
         _ha_decided_by="prompt"
         ;;
       # An empty line, or any other word, is not an answer: the prompt stays live
@@ -421,7 +444,8 @@ while [ -z "$_ha_answer" ]; do
     # separate an EOF from a read error, so nobody can answer from that terminal
     # any more and waiting out the timeout would only delay the harness's prompt.
     if [ "$_ha_rc" -ne 0 ] && [ "$_ha_rc" -le 128 ]; then
-      warn "the terminal is at end of input or closed before an answer: asking locally"
+      warn "the terminal is at end of input or closed before an answer: answering ask"
+      _ha_no_answer_reason="the terminal closed before an answer"
       _ha_prompt_live=0
     fi
   else
@@ -446,4 +470,7 @@ if [ "$_ha_hermes" -eq 1 ]; then
   rm -f "$_ha_request" "$_ha_response"
 fi
 
-_ha_finish "$_ha_answer"
+if jq -e 'index("hermes") != null and index("prompt") != null' <<<"$_ha_timed_out" >/dev/null 2>&1; then
+  _ha_finish deny "all approval sources timed out (hermes 300s, prompt 600s)" all-timeouts
+fi
+_ha_finish "${_ha_answer:-ask}" "${_ha_answer_reason:-$_ha_no_answer_reason}" "${_ha_decided_by:-none}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Suite for the approval gate's sources (src/scripts/notify/harness/request-approval.sh)
-# and for the runner that consults them (src/scripts/notify/harness/decide-call.sh).
+# Suite for the approval gate's resolver (src/scripts/notify/harness/request-approval.sh)
+# and for the typed decision document it hands to the harness adapters.
 #
 # The gate has two independent sources and a matrix of ways to configure them, so
 # the cases run the shipped scripts against a config file this suite writes, and
@@ -27,8 +27,7 @@ init_test_state
 ensure_safe_rm_env
 
 APPROVAL="$REPO_ROOT/src/scripts/notify/harness/request-approval.sh"
-RUNNER="$REPO_ROOT/src/scripts/notify/harness/decide-call.sh"
-readonly APPROVAL RUNNER
+readonly APPROVAL
 
 require_command jq "the approval gate reads its config, writes requests, and parses responses with jq"
 require_command python3 "the faked terminal is a pty driven by python3"
@@ -147,6 +146,15 @@ pending_requests() {
   find "$_state/requests" -name '*.json' -print -quit 2>/dev/null
 }
 
+# Both sides of a published request have to disappear on every exit path, not
+# just on a decision the bridge can answer.
+pending_bridge_files() {
+  local _state
+  _state="$(find "$HOME" -type d -name harness-bridge -print -quit 2>/dev/null)"
+  [ -n "$_state" ] || return 0
+  find "$_state/requests" "$_state/responses" -name '*.json' -print -quit
+}
+
 # Recording stub: proves the Hermes source announced the request, without a
 # Hermes installation or a network call.
 mkdir -p "$WORK/bin"
@@ -180,10 +188,15 @@ tty_run() { # <typed> <outfile> <args...>
   python3 "$TERMINAL_HELPER" tty "$_typed" "$_out" bash "$APPROVAL" "$@"
 }
 
-# The decision is the last line of a transcript that is exactly a decision, which
-# is how a pty child's document is told apart from the prompt echo.
+# The resolver prints one JSON document; a pty transcript also carries the
+# prompt echo, so the last line that starts with `{` is the document under test.
+document_of() { # <file>
+  tr -d '\r' <"$1" |
+    jq -RscM 'split("\n") | map(select(startswith("{"))) | last // empty | fromjson' 2>/dev/null || true
+}
+
 decision_of() { # <file>
-  tr -d '\r' <"$1" | grep -x -E 'allow|deny|ask' | tail -1 || true
+  document_of "$1" | jq -rM '.decision // empty' 2>/dev/null || true
 }
 
 elapsed_since() { # <epoch-seconds>
@@ -207,10 +220,21 @@ wait_for_request() { # <outfile>
 
 answer_request() { # <request-file> <decision>
   local _request="$1" _decision="$2"
+  local _state _reason
+  _state="$(dirname "$(dirname "$_request")")"
+  case "$_decision" in
+  allow) _reason="approved by chat" ;;
+  *) _reason="denied by chat" ;;
+  esac
+  printf '{"decision":"%s","decided_by":"chat","reason":"%s"}\n' \
+    "$_decision" "$_reason" >"$_state/responses/$(basename "$_request")"
+}
+
+answer_raw_request() { # <request-file> <json>
+  local _request="$1" _document="$2"
   local _state
   _state="$(dirname "$(dirname "$_request")")"
-  printf '{"decision":"%s","decided_by":"chat"}\n' "$_decision" \
-    >"$_state/responses/$(basename "$_request")"
+  printf '%s\n' "$_document" >"$_state/responses/$(basename "$_request")"
 }
 
 # The audit line names the source that answered, which is the only record of who
@@ -218,6 +242,147 @@ answer_request() { # <request-file> <decision>
 approval_source() {
   jq -rs 'map(select(.kind == "approval")) | last | .source // ""' "$NUCLEUS_LOG_DIR/harness.log" 2>/dev/null || true
 }
+
+section 0 "the typed decision contract"
+
+# nucleus-config is the source users discover, so its shipped section has to name
+# both sources and the same bounds the resolver advertises on the wire.
+_defaults="$(bash "$REPO_ROOT/scripts/config.sh" get harness-approval | tr -d '\n ')"
+if [ "$_defaults" = '{"sources":["prompt","hermes"],"timeout-seconds":{"hermes":300,"prompt":600}}' ]; then
+  assert_pass "nucleus-config defaults to both sources with 300 and 600 second timeouts"
+else
+  assert_fail "config defaults" "got $_defaults"
+fi
+
+# Both sources are live and neither answers: the document has to carry the
+# contract reason verbatim, with the timeouts and the sources that gave up.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt","hermes"],"timeout-seconds":{"prompt":1,"hermes":1}}}'
+if tty_run - "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  _doc="$(document_of "$WORK/out")"
+  if [ "$_doc" = '{"version":1,"decision":"deny","reason":"all approval sources timed out (hermes 300s, prompt 600s)","source":"all-timeouts","timeouts":{"hermes":300,"prompt":600},"timedOutSources":["hermes","prompt"]}' ]; then
+    assert_pass "all sources timing out emits the exact typed deny document"
+  else
+    assert_fail "all-timeouts document" "got $_doc"
+  fi
+else
+  assert_fail "all-timeouts document" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
+if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if jq -e '.version == 1 and .decision == "allow" and .reason == "prompt allowed" and .source == "prompt" and .timeouts == {"hermes":300,"prompt":600} and .timedOutSources == []' <<<"$(document_of "$WORK/out")" >/dev/null 2>&1; then
+    assert_pass "a typed prompt allow names its source and carries no timed-out sources"
+  else
+    assert_fail "prompt allow document" "got $(document_of "$WORK/out")"
+  fi
+else
+  assert_fail "prompt allow document" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
+notty_run "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err" &
+_approval_pid=$!
+if _request="$(wait_for_request)"; then
+  answer_request "$_request" deny
+  if wait "$_approval_pid"; then
+    if jq -e '.version == 1 and .decision == "deny" and .reason == "denied by chat" and .source == "hermes" and .timeouts == {"hermes":300,"prompt":600} and .timedOutSources == []' <<<"$(document_of "$WORK/out")" >/dev/null 2>&1; then
+      assert_pass "a Hermes deny carries the reason from the response file"
+    else
+      assert_fail "Hermes deny document" "got $(document_of "$WORK/out")"
+    fi
+  else
+    assert_fail "Hermes deny document" "the gate exited non-zero: $(cat "$WORK/err")"
+  fi
+else
+  kill "$_approval_pid" 2>/dev/null || true
+  wait "$_approval_pid" 2>/dev/null || true
+  assert_fail "Hermes deny document" "no request file appeared"
+fi
+
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":[],"timeout-seconds":{"hermes":30}}}'
+if notty_run "$WORK/out" pi bash "rm -rf build" 30 >/dev/null 2>"$WORK/err"; then
+  if [ "$(document_of "$WORK/out")" = '{"version":1,"decision":"ask","reason":"no approval sources enabled","source":"none","timeouts":{"hermes":300,"prompt":600},"timedOutSources":[]}' ]; then
+    assert_pass "an empty source list emits a typed ask with the none source"
+  else
+    assert_fail "empty sources document" "got $(document_of "$WORK/out")"
+  fi
+else
+  assert_fail "empty sources document" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# A resolver that cannot read its own configuration has no source to consult,
+# so it names the failure in a typed deny instead of printing a raw word.
+clear_state
+write_config '{'
+if notty_run "$WORK/out" pi bash "rm -rf build" 30 >/dev/null 2>"$WORK/err"; then
+  if [ "$(document_of "$WORK/out")" = '{"version":1,"decision":"deny","reason":"could not parse nucleus config","source":"resolver-error","timeouts":{"hermes":300,"prompt":600},"timedOutSources":[]}' ]; then
+    assert_pass "an unparsable config emits a typed resolver-error deny"
+  else
+    assert_fail "resolver error document" "got $(document_of "$WORK/out")"
+  fi
+else
+  assert_fail "resolver error document" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# A source that answered with a word outside the contract is an error, not an
+# all-timeout and not a decision the harness may act on.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
+notty_run "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err" &
+_approval_pid=$!
+if _request="$(wait_for_request)"; then
+  answer_raw_request "$_request" '{"decision":"maybe","decided_by":"chat","reason":"odd"}'
+  if wait "$_approval_pid"; then
+    if [ "$(document_of "$WORK/out")" = '{"version":1,"decision":"deny","reason":"malformed hermes approval response","source":"resolver-error","timeouts":{"hermes":300,"prompt":600},"timedOutSources":[]}' ]; then
+      assert_pass "a malformed Hermes response emits a typed resolver-error deny"
+    else
+      assert_fail "malformed Hermes response" "got $(document_of "$WORK/out")"
+    fi
+    if [ -z "$(pending_bridge_files)" ]; then
+      assert_pass "a malformed Hermes response leaves no pending request or response"
+    else
+      assert_fail "malformed Hermes response cleanup" "left=[$(pending_bridge_files)]"
+    fi
+  else
+    assert_fail "malformed Hermes response" "the gate exited non-zero: $(cat "$WORK/err")"
+  fi
+else
+  kill "$_approval_pid" 2>/dev/null || true
+  wait "$_approval_pid" 2>/dev/null || true
+  assert_fail "malformed Hermes response" "no request file appeared"
+fi
+
+# The bridge writer has to put a validated reason in the response file, or the
+# Hermes source cannot carry one into the decision document.
+if python3 - "$REPO_ROOT/src/users/default/hermes/plugins/harness-bridge/__init__.py" <<'PY'
+import importlib.util
+import json
+import sys
+
+spec = importlib.util.spec_from_file_location("harness_bridge", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module._write_json(module._requests_dir() / "abc12345.json", {"id": "abc12345"})
+module._cmd_decide(["abc12345"], "deny")
+response = json.loads((module._responses_dir() / "abc12345.json").read_text())
+assert response["decision"] == "deny"
+assert response["reason"] == "denied by chat"
+try:
+    module._decision_reason("maybe")
+except ValueError:
+    pass
+else:
+    raise SystemExit("an unknown decision passed reason validation")
+PY
+then
+  assert_pass "the Hermes bridge writes a validated reason into its response"
+else
+  assert_fail "bridge response reason" "the Python check failed"
+fi
 
 section 1 "the sources matrix"
 
@@ -229,7 +394,7 @@ clear_state
 write_config '{"harness-notify":{"channels":["telegram"]}}'
 if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   if [ "$(decision_of "$WORK/out")" = "allow" ]; then
-    assert_pass "an absent harness-approval section defaults to the prompt source and takes a typed allow"
+    assert_pass "an absent harness-approval section takes a typed allow from the prompt source"
   else
     assert_fail "absent section default" "transcript=$(tr -d '\r' <"$WORK/out")"
   fi
@@ -521,8 +686,8 @@ else
   assert_fail "infinite hermes timeout" "no request file appeared"
 fi
 
-# The document each harness reads is still rendered from whatever the sources
-# answered: a hook that calls the resolver directly gets its own shape, not a word.
+# Native rendering belongs to the adapters, not to the resolver, so a direct
+# call always gets the one typed document whatever harness name it passes.
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
 python3 "$TERMINAL_HELPER" notty - "$WORK/out" bash "$APPROVAL" cursor beforeShellExecution "rm -rf build" >/dev/null 2>"$WORK/err" &
@@ -530,10 +695,10 @@ _approval_pid=$!
 if _request="$(wait_for_request)"; then
   answer_request "$_request" deny
   if wait "$_approval_pid"; then
-    if jq -e '.permission == "deny"' "$WORK/out" >/dev/null 2>&1; then
-      assert_pass "a remote decision is rendered as the calling harness's document"
+    if jq -e '.version == 1 and .decision == "deny" and .source == "hermes"' <<<"$(document_of "$WORK/out")" >/dev/null 2>&1; then
+      assert_pass "a remote decision is emitted as the typed document even for cursor"
     else
-      assert_fail "cursor document" "document=$(cat "$WORK/out")"
+      assert_fail "cursor document" "document=$(document_of "$WORK/out")"
     fi
   else
     assert_fail "cursor document" "the gate exited non-zero: $(cat "$WORK/err")"
@@ -589,15 +754,16 @@ else
   assert_fail "race hermes-first" "no request file appeared"
 fi
 
-section 3 "configuration mistakes fail open"
+section 3 "configuration mistakes are named resolver errors"
 
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["telegram"],"timeout-seconds":{"hermes":30}}}'
 if notty_run "$WORK/out" pi bash "rm -rf build" 30 >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ -z "$(pending_requests)" ]; then
-    assert_pass "an unknown source name answers ask rather than waiting on a source that cannot answer"
+  if jq -eM '.decision == "deny" and .source == "resolver-error" and .reason == "unknown harness-approval source '\''telegram'\''"' <<<"$(document_of "$WORK/out")" >/dev/null 2>&1 &&
+    [ -z "$(pending_requests)" ]; then
+    assert_pass "an unknown source name answers a typed resolver-error deny without publishing a request"
   else
-    assert_fail "unknown source" "out=$(cat "$WORK/out") requests=$(pending_requests)"
+    assert_fail "unknown source" "out=$(document_of "$WORK/out") requests=$(pending_requests)"
   fi
 else
   assert_fail "unknown source" "the gate exited non-zero: $(cat "$WORK/err")"
@@ -606,48 +772,41 @@ fi
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":"prompt"}}'
 if notty_run "$WORK/out" pi bash "rm -rf build" 10 >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ]; then
-    assert_pass "a source list that is not a list answers ask"
+  if jq -eM '.decision == "deny" and .source == "resolver-error" and .reason == "harness-approval.sources is not a list"' <<<"$(document_of "$WORK/out")" >/dev/null 2>&1; then
+    assert_pass "a source list that is not a list answers a typed resolver-error deny"
   else
-    assert_fail "sources not a list" "out=$(cat "$WORK/out")"
+    assert_fail "sources not a list" "out=$(document_of "$WORK/out")"
   fi
 else
   assert_fail "sources not a list" "the gate exited non-zero: $(cat "$WORK/err")"
 fi
 
-section 4 "the runner consults the same sources"
+section 4 "one contract document for every caller"
 
-# A payload the filters leave undecided is answered by the sources, and the
-# runner renders the harness's own document. The shipped registry asks for an
-# unproven redirect, and the fixture pins that value in its own copy so the case
-# states the setting it depends on: the fixture carries that one file, and the
-# runner still resolves its filters beside itself.
-GATE_TREE="$WORK/gate-tree"
-mkdir -p "$GATE_TREE/src/modules/configs"
-printf '%s\n' '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"ask"}}]}' \
-  >"$GATE_TREE/src/modules/configs/harness-filters.json"
-clear_state
+# The adapters render the harness vocabulary. The resolver itself must not grow
+# a second shape for a hook name, so every caller receives the same contract.
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
-printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm x"}}' >"$WORK/payload"
-python3 "$TERMINAL_HELPER" notty - "$WORK/out" bash -c \
-  "NUCLEUS_REPO_ROOT='$GATE_TREE' bash '$RUNNER' copilot <'$WORK/payload'" >/dev/null 2>"$WORK/err" &
-_runner_pid=$!
-if _request="$(wait_for_request)"; then
-  answer_request "$_request" deny
-  if wait "$_runner_pid"; then
-    if jq -e '.hookSpecificOutput.permissionDecision == "deny"' "$WORK/out" >/dev/null 2>&1 &&
-      [ -z "$(pending_requests)" ]; then
-      assert_pass "an undecided call is answered by the sources and rendered as the harness document"
+for _harness in copilot cursor opencode pi; do
+  clear_state
+  python3 "$TERMINAL_HELPER" notty - "$WORK/out.$_harness" bash "$APPROVAL" \
+    "$_harness" beforeShellExecution "rm -rf build" >/dev/null 2>"$WORK/err" &
+  _approval_pid=$!
+  if _request="$(wait_for_request)"; then
+    answer_request "$_request" allow
+    if wait "$_approval_pid"; then
+      if jq -e '.version == 1 and .decision == "allow" and .reason == "approved by chat" and .source == "hermes"' <<<"$(document_of "$WORK/out.$_harness")" >/dev/null 2>&1; then
+        assert_pass "the $_harness caller receives the same typed document"
+      else
+        assert_fail "typed document for $_harness" "document=$(document_of "$WORK/out.$_harness")"
+      fi
     else
-      assert_fail "runner consults sources" "document=$(cat "$WORK/out")"
+      assert_fail "typed document for $_harness" "the gate exited non-zero: $(cat "$WORK/err")"
     fi
   else
-    assert_fail "runner consults sources" "the runner exited non-zero: $(cat "$WORK/err")"
+    kill "$_approval_pid" 2>/dev/null || true
+    wait "$_approval_pid" 2>/dev/null || true
+    assert_fail "typed document for $_harness" "no request file appeared"
   fi
-else
-  kill "$_runner_pid" 2>/dev/null || true
-  wait "$_runner_pid" 2>/dev/null || true
-  assert_fail "runner consults sources" "the runner published no request: $(cat "$WORK/out")"
-fi
+done
 
 finish_tests

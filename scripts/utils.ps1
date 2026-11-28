@@ -17,9 +17,6 @@
   Switch (strip-metadata only). Show one modal popup listing every input that was
   not processed. Needed by GUI callers: the context-menu verb runs with
   -WindowStyle Hidden, which discards stdout and stderr.
-.PARAMETER Plain
-  Switch (harness request-approval only). Print the decision word alone instead of the
-  harness's document.
 .PARAMETER File
   One or more file paths to process, or positional arguments forwarded to
   harness verbs.
@@ -43,9 +40,6 @@ param(
 
   [Parameter()]
   [switch]$Dialog,
-
-  [Parameter()]
-  [switch]$Plain,
 
   [Parameter()]
   [string]$Format,
@@ -561,22 +555,18 @@ function Invoke-NucleusHarness {
     }
     'request-approval' {
       $scriptPath = Join-Path $PSScriptRoot '..\src\scripts\notify\harness\request-approval.ps1'
-      $plain = $false
-      $positionals = @()
-      foreach ($arg in $rest) {
-        if ($arg -eq '--plain' -or $arg -eq '-Plain') { $plain = $true; continue }
-        $positionals += [string]$arg
+      $approvalArgs = @($rest)
+      # WHY validate before the splat: the resolver's [int] parameter binds
+      # before its typed error path, so a non-numeric timeout would otherwise
+      # fail with a parameter-binding error instead of a decision document.
+      # -2 is below the resolver's accepted minimum and reaches that path.
+      if ($approvalArgs.Count -ge 4) {
+        $timeoutSeconds = 0
+        if (-not [int]::TryParse([string]$approvalArgs[3], [ref]$timeoutSeconds)) {
+          $approvalArgs[3] = '-2'
+        }
       }
-      $haSplat = @{}
-      if ($plain) { $haSplat['Plain'] = $true }
-      if ($positionals.Count -ge 1) { $haSplat['Harness'] = $positionals[0] }
-      if ($positionals.Count -ge 2) { $haSplat['Tool'] = $positionals[1] }
-      if ($positionals.Count -ge 3) { $haSplat['Summary'] = $positionals[2] }
-      if ($positionals.Count -ge 4) {
-        $ts = 0
-        if ([int]::TryParse([string]$positionals[3], [ref]$ts)) { $haSplat['TimeoutSeconds'] = $ts }
-      }
-      & $scriptPath @haSplat
+      & $scriptPath @approvalArgs
       exit $LASTEXITCODE
     }
     'continue-turn' {
@@ -776,7 +766,6 @@ switch ($Action) {
     if ($PSBoundParameters.ContainsKey('SessionId')) { $harnessArgs += @('--session-id', $SessionId) }
     if ($PSBoundParameters.ContainsKey('Settings')) { $harnessArgs += @('--settings', $Settings) }
     if ($PSBoundParameters.ContainsKey('TargetCommand')) { $harnessArgs += @('--command', $TargetCommand) }
-    if ($Plain) { $harnessArgs += '--plain' }
     if ($Hook) { $harnessArgs += '--hook' }
     Invoke-NucleusHarness -Arguments $harnessArgs
   }

@@ -42,18 +42,17 @@ _new_home() {
   mktemp -d
 }
 
-# _t_get_prints_default_zero: the headline case, a default leaf that is false-y
-# in jq. `0` is the timeout every approval source starts with, and `// null`
-# turned it into a missing key.
-_t_get_prints_default_zero() {
+# _t_get_prints_default_prompt_timeout: a scalar default under the section the
+# old jq filter flattened. The shipped prompt bound is 600 seconds.
+_t_get_prints_default_prompt_timeout() {
   local home out rc=0
   home="$(_new_home)"
   trap 'rm -rf "$home"' RETURN
   out="$(_cfg "$home" get harness-approval.timeout-seconds.prompt)" || rc=$?
-  if [ "$rc" -eq 0 ] && [ "$out" = "0" ]; then
-    assert_pass "get prints a default zero as 0"
+  if [ "$rc" -eq 0 ] && [ "$out" = "600" ]; then
+    assert_pass "get prints the 600-second prompt timeout default"
   else
-    assert_fail "get on a zero default" "rc=$rc output=[$out] expected rc=0 output=[0]"
+    assert_fail "get on the prompt timeout default" "rc=$rc output=[$out] expected rc=0 output=[600]"
   fi
 }
 
@@ -125,7 +124,7 @@ _t_set_null_restores_the_default() {
   _cfg "$home" set harness-approval.timeout-seconds.hermes 30 >/dev/null
   _cfg "$home" set harness-approval.timeout-seconds.hermes null >/dev/null
   out="$(_cfg "$home" get harness-approval.timeout-seconds.hermes)" || rc=$?
-  if [ "$rc" -eq 0 ] && [ "$out" = "0" ]; then
+  if [ "$rc" -eq 0 ] && [ "$out" = "300" ]; then
     assert_pass "setting null restores the default value"
   else
     assert_fail "set null restores the default" "rc=$rc output=[$out]"
@@ -146,7 +145,7 @@ _t_get_list_and_section_outputs_are_unchanged() {
   section="$(_cfg "$home" get harness-approval | tr -d '\n ')"
   dump="$(_cfg "$home" get | jq -c 'keys' 2>/dev/null)" || rc=$?
   if [ "$max" = "800" ] && [ "$chars" = '["ntfy"]' ] && [ -n "$beat" ] &&
-    [ "$section" = '{"sources":["prompt"],"timeout-seconds":{"hermes":0,"prompt":0}}' ] &&
+    [ "$section" = '{"sources":["prompt","hermes"],"timeout-seconds":{"hermes":300,"prompt":600}}' ] &&
     [ "$dump" = '["applyHistoryLimit","camilladsp","harness-approval","harness-drive","harness-notify","sandbox-context"]' ] && [ "$rc" -eq 0 ]; then
     assert_pass "number, array, bare-string, section and full-dump outputs are unchanged"
   else
@@ -183,7 +182,7 @@ _t_ps1_get_prints_default_channels() {
 }
 
 section 1 "get and set handle a false boolean"
-_t_get_prints_default_zero
+_t_get_prints_default_prompt_timeout
 _t_get_prints_user_false
 _t_set_false_stores_boolean
 _t_set_null_restores_the_default

@@ -187,25 +187,27 @@ in
       "Cursor stop must run harness continue-turn via nucleus-utils, which notifies and injects a queued prompt"
     )
 
-    # --- Per-action gates: master on, prompt approval, drive on ---
+    # --- Per-action gates: master on, approval defaults, drive on ---
     # WHY: defaults are declared independently in nucleus-config implementations
     # and in the resolver scripts with nothing shared between them, so this file
     # pins declarations; script fallback gates are asserted by harness suites.
     (assert'
       (
-        builtins.match ".*\"harness-approval\": [{][ ]*\"sources\": [[]\"prompt\"],.*" flatConfigSh != null
+        builtins.match ".*\"harness-approval\": [{][ ]*\"sources\": [[]\"prompt\", \"hermes\"],[ ]*\"timeout-seconds\": [{][ ]*\"hermes\": 300,[ ]*\"prompt\": 600.*" flatConfigSh
+        != null
       )
-      "nucleus-config DEFAULTS must ship harness-approval.sources=[\"prompt\"], so no host brokers a tool call until it opts in"
+      "nucleus-config DEFAULTS must ship harness-approval.sources=[\"prompt\",\"hermes\"] with hermes=300 and prompt=600 timeouts"
     )
     (assert' (builtins.match ".*\"harness-drive\": [{][^}]*\"enable\": true.*" flatConfigSh != null)
       "nucleus-config DEFAULTS must ship harness-drive.enable=true, so a finished turn is announced and remote driving keeps working"
     )
     (assert' (
-      builtins.match ".*'harness-approval' = @[{][ ]*sources = @[(]'prompt'[)].*" flatConfigPs1 != null
-    ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.sources=['prompt']")
+      builtins.match ".*'harness-approval' = @[{][ ]*sources = @[(]'prompt', 'hermes'[)][ ]*'timeout-seconds' = @[{][ ]*hermes = 300[ ]*prompt = 600.*" flatConfigPs1
+      != null
+    ) "the PowerShell nucleus-config DEFAULTS must ship the same sources and 300/600 timeouts")
     (assert'
       (
-        builtins.match ".*'harness-approval' = @[{][ ]*sources[ ]*= @[(]'prompt'[)][ ]*'timeout-seconds' = @[{][ ]*hermes = 0; prompt = 0.*" flatApprovalScriptPs1
+        builtins.match ".*'harness-approval' = @[{][ ]*sources[ ]*= @[(]'prompt', 'hermes'[)][ ]*'timeout-seconds' = @[{][ ]*hermes = 300; prompt = 600.*" flatApprovalScriptPs1
         != null
       )
       "request-approval.ps1 carries its own copy of the defaults, and a hook that runs without a config file falls back to it, so it must ship the same source list and per-source timeouts"
@@ -217,7 +219,7 @@ in
     # --- Source default parity ---
     (assert'
       (
-        builtins.match ".*\"harness-approval\":[{]\"sources\":[[]\"prompt\"],\"timeout-seconds\":[{]\"hermes\":0,\"prompt\":0[}][}].*" flatApprovalScript
+        builtins.match ".*\"harness-approval\":[{]\"sources\":[[]\"prompt\",\"hermes\"],\"timeout-seconds\":[{]\"hermes\":300,\"prompt\":600[}][}].*" flatApprovalScript
         != null
       )
       "harness-approval must ship the same source list and per-source timeouts as nucleus-config, since a hook that runs without a config file falls back to these"

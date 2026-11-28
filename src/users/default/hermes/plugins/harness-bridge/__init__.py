@@ -105,6 +105,23 @@ def _write_json(path: Path, payload: Dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+DECISION_REASONS = {"allow": "approved by chat", "deny": "denied by chat"}
+
+
+def _decision_reason(decision: str) -> str:
+    """Return the reason a response carries for one decision.
+
+    The resolver copies this string into its typed document, so an unknown
+    decision or an empty reason must not reach a response file.
+    """
+    if decision not in DECISION_REASONS:
+        raise ValueError(f"unsupported approval decision {decision!r}")
+    reason = DECISION_REASONS[decision]
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError(f"approval reason for {decision!r} must be a non-empty string")
+    return reason
+
+
 def _pending_requests() -> List[Dict[str, Any]]:
     """Requests that have no response yet, newest last."""
     pending: List[Dict[str, Any]] = []
@@ -167,12 +184,14 @@ def _cmd_decide(args: List[str], decision: str) -> str:
     pending = {str(item.get("id", "")): item for item in _pending_requests()}
     if request_id not in pending:
         return f"No pending request '{request_id}'."
+    reason = _decision_reason(decision)
     _write_json(
         _responses_dir() / f"{request_id}.json",
         {
             "decision": decision,
             "decided_by": "chat",
             "decided_at": time.time(),
+            "reason": reason,
         },
     )
     request = pending[request_id]

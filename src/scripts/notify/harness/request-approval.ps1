@@ -6,10 +6,9 @@
 .DESCRIPTION
   Windows twin of request-approval.sh. A harness hook (VS Code Copilot
   PreToolUse, Cursor beforeShellExecution, pi tool_call, opencode permission)
-  calls this, then maps the printed decision onto its own response shape. With
-  no -Plain the document is that harness's own vocabulary; with -Plain it is the
-  decision word alone, which is how `nucleus-utils harness decide-call` consults
-  the same sources for a call no filter decides.
+  calls this and reads the one JSON decision document it prints. Harness
+  adapters render that document in their own vocabulary; there is no plain-word
+  mode and no per-harness shape.
 
   Sources are independent and race when more than one is enabled; the first
   answer wins and the other is dropped:
@@ -31,9 +30,9 @@
   is dot-sourced for shared helpers.
 
   `ask` means "no source decided": the harness must fall back to its own local
-  prompt.  Every path prints a decision and exits 0: a harness hook that fails is
-  treated as a denial by some harnesses, which would turn a broker outage into a
-  blocked session.
+  prompt. A resolver error or every source timing out is a typed deny that names
+  the reason. Every path prints a document and exits 0: some harnesses treat a
+  failed hook as a denial.
 
 .PARAMETER Harness
   Harness name (pi, opencode, cursor, copilot).
@@ -48,14 +47,8 @@
   Wait override applied to every enabled source; omitted means each source keeps
   its configured timeout. 0 waits indefinitely.
 
-.PARAMETER Plain
-  Print the decision word alone instead of the harness's document.
-
 .EXAMPLE
   pwsh -NoProfile -File request-approval.ps1 cursor Shell 'git push --force'
-
-.EXAMPLE
-  pwsh -NoProfile -File request-approval.ps1 -Plain copilot runInTerminal 'rm -rf x'
 
 .NOTES
   Exit codes: always 0.
@@ -64,10 +57,10 @@
     harness-notify.enable                      boolean, default true; false
                                                answers `ask` at once
     harness-approval.sources                   list of sources, default
-                                               ["prompt"]; an empty list answers
-                                               `ask` at once
-    harness-approval.timeout-seconds.<source>  integer seconds, default 0, which
-                                               waits indefinitely
+                                               ["prompt","hermes"]; an empty
+                                               list answers `ask` at once
+    harness-approval.timeout-seconds.<source>  integer seconds, default 300 for
+                                               hermes and 600 for prompt
 #>
 
 
@@ -83,9 +76,7 @@ param(
   [string]$Summary,
 
   [Parameter(Position = 3)]
-  [int]$TimeoutSeconds = -1,
-
-  [switch]$Plain
+  [int]$TimeoutSeconds = -1
 )
 
 . (Join-Path $PSScriptRoot '..\..\lib\pwsh-guard.ps1')
@@ -103,7 +94,6 @@ $ErrorActionPreference = 'Stop'
 # fingerprint are collected here as the run produces them.
 $script:auditStart = [datetime]::UtcNow
 $script:auditDigest = ''
-$script:decidedBy = ''
 $script:requestId = ''
 
 function Get-HarnessBridgeApprovalConfig {
@@ -126,8 +116,8 @@ function Get-HarnessBridgeApprovalConfig {
 
   $config = @{
     'harness-approval' = @{
-      sources           = @('prompt')
-      'timeout-seconds' = @{ hermes = 0; prompt = 0 }
+      sources           = @('prompt', 'hermes')
+      'timeout-seconds' = @{ hermes = 300; prompt = 600 }
     }
     'harness-notify'   = @{ enable = $true }
   }
@@ -135,7 +125,8 @@ function Get-HarnessBridgeApprovalConfig {
   $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
   if ([string]::IsNullOrWhiteSpace($raw)) { return $config }
 
-  # Malformed JSON throws: the caller answers `ask`, matching the POSIX twin.
+  # Malformed JSON throws: the caller emits a typed resolver-error deny,
+  # matching the POSIX twin.
   $parsed = ConvertFrom-Json -InputObject $raw -AsHashtable
   if ($parsed -isnot [hashtable]) { return $config }
   foreach ($sectionName in @('harness-approval', 'harness-notify')) {
@@ -158,46 +149,48 @@ function Get-HarnessBridgeApprovalConfig {
 function ConvertTo-HarnessApprovalDocument {
   <#
   .SYNOPSIS
-    Renders a decision in the calling harness's own vocabulary.
+    Renders the one typed decision document the adapters consume.
   .DESCRIPTION
-    `ask` is valid in every shape, so the neutral answer is always expressible.
-  .PARAMETER Harness
-    Calling harness name.
+    The field order and the timeout values are the wire contract. An empty
+    reason would leave the adapter with nothing to show the operator, so it is
+    rejected here rather than printed.
   .PARAMETER Decision
-    allow, ask, or deny.
-  .PARAMETER Plain
-    Print the word alone, for a caller that renders its own document.
+    allow, deny, or ask.
+  .PARAMETER Reason
+    Why the resolver answered this way.
+  .PARAMETER Source
+    Source that decided, or a resolver status when none did.
+  .PARAMETER TimedOutSources
+    Sources that gave up waiting.
   #>
   [CmdletBinding()]
   [OutputType([string])]
   param(
     [Parameter(Mandatory)]
-    [string]$Harness,
-
-    [Parameter(Mandatory)]
-    [ValidateSet('allow', 'ask', 'deny')]
+    [ValidateSet('allow', 'deny', 'ask')]
     [string]$Decision,
 
-    [switch]$Plain
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Reason,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('prompt', 'hermes', 'all-timeouts', 'resolver-error', 'none')]
+    [string]$Source,
+
+    [string[]]$TimedOutSources = @()
   )
 
-  if ($Plain) { return $Decision }
-
-  switch ($Harness) {
-    'cursor' {
-      return (ConvertTo-Json -InputObject @{ permission = $Decision } -Compress -Depth 5)
-    }
-    'copilot' {
-      return (ConvertTo-Json -InputObject @{
-          hookSpecificOutput = @{
-            hookEventName             = 'PreToolUse'
-            permissionDecision        = $Decision
-            permissionDecisionReason  = 'nucleus-utils harness request-approval'
-          }
-        } -Compress -Depth 5)
-    }
-    default { return $Decision }
+  if ([string]::IsNullOrWhiteSpace($Reason)) { throw 'a decision document needs a reason' }
+  $document = [ordered]@{
+    version         = 1
+    decision        = $Decision
+    reason          = $Reason
+    source          = $Source
+    timeouts        = [ordered]@{ hermes = 300; prompt = 600 }
+    timedOutSources = @($TimedOutSources | Sort-Object -Unique)
   }
+  return (ConvertTo-Json -InputObject $document -Compress -Depth 5)
 }
 
 function Resolve-HarnessApprovalSource {
@@ -473,6 +466,9 @@ function Wait-HarnessApproval {
 
   $promptLive = $Source -contains 'prompt'
   $hermesLive = $Source -contains 'hermes' -and -not [string]::IsNullOrEmpty($ResponsePath)
+  $timedOut = [System.Collections.Generic.List[string]]::new()
+  $noAnswerReason = 'no approval source answered'
+  $reason = ''
 
   $console = $null
   $pending = $null
@@ -484,7 +480,8 @@ function Wait-HarnessApproval {
   if ($promptLive) {
     try { $console = Open-HarnessApprovalConsole }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'no console for the prompt source: asking locally'
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'no console for the prompt source: answering ask'
+      $noAnswerReason = 'no terminal for the prompt source'
       $promptLive = $false
     }
   }
@@ -496,7 +493,8 @@ function Wait-HarnessApproval {
       $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length)
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not write to the console: asking locally'
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not write to the console: answering ask'
+      $noAnswerReason = 'could not write to the terminal'
       $promptLive = $false
       $pending = $null
     }
@@ -516,18 +514,38 @@ function Wait-HarnessApproval {
       try {
         $answer = ConvertFrom-Json -InputObject (Get-Content -LiteralPath $ResponsePath -Raw -Encoding UTF8) -AsHashtable
         if ($answer -is [hashtable] -and $answer.ContainsKey('decision')) {
-          $decision = [string]$answer['decision']
-          $answeredBy = 'hermes'
+          $candidate = [string]$answer['decision']
+          if ($candidate -in @('allow', 'deny')) {
+            $decision = $candidate
+            $answeredBy = 'hermes'
+            $reason = if ($answer.ContainsKey('reason') -and $answer['reason'] -is [string] -and
+              -not [string]::IsNullOrWhiteSpace([string]$answer['reason'])) {
+              [string]$answer['reason']
+            }
+            else { 'hermes decision' }
+          }
         }
       }
       catch {
-        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'unreadable approval response: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'unreadable approval response'
       }
-      if (-not [string]::IsNullOrEmpty($decision)) { break }
+      if ([string]::IsNullOrEmpty($decision)) {
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'malformed hermes approval response: answering deny'
+        $decision = 'deny'
+        $answeredBy = 'resolver-error'
+        $reason = 'malformed hermes approval response'
+      }
+      break
     }
 
-    if ($promptLive -and $now -ge $promptDeadline) { $promptLive = $false }
-    if ($hermesLive -and $now -ge $hermesDeadline) { $hermesLive = $false }
+    if ($promptLive -and $now -ge $promptDeadline) {
+      if ($timedOut -notcontains 'prompt') { $timedOut.Add('prompt') }
+      $promptLive = $false
+    }
+    if ($hermesLive -and $now -ge $hermesDeadline) {
+      if ($timedOut -notcontains 'hermes') { $timedOut.Add('hermes') }
+      $hermesLive = $false
+    }
     if (-not $promptLive -and -not $hermesLive) { break }
 
     if ($promptLive -and $null -ne $pending) {
@@ -543,12 +561,14 @@ function Wait-HarnessApproval {
       catch {
         # A closed console faults the pending read, which is the same situation as
         # a console that was never there.
-        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: answering ask'
+        $noAnswerReason = 'the terminal closed before an answer'
         $promptLive = $false
         $pending = $null
       }
       if ($answered -and $bytesRead -le 0) {
-        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
+        Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: answering ask'
+        $noAnswerReason = 'the terminal closed before an answer'
         $promptLive = $false
         $pending = $null
       }
@@ -571,6 +591,7 @@ function Wait-HarnessApproval {
           $typedLine.Clear() > $null
           if (-not [string]::IsNullOrEmpty($decision)) {
             $answeredBy = 'prompt'
+            $reason = if ($decision -eq 'allow') { 'prompt allowed' } else { 'prompt denied' }
             break
           }
         }
@@ -578,7 +599,8 @@ function Wait-HarnessApproval {
         # again rather than decide on either.
         try { $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length) }
         catch {
-          Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: asking locally'
+          Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the console closed before an answer: answering ask'
+          $noAnswerReason = 'the terminal closed before an answer'
           $promptLive = $false
           $pending = $null
         }
@@ -605,16 +627,29 @@ function Wait-HarnessApproval {
     $console.Out.Dispose()
   }
 
-  if ($decision -in @('allow', 'deny')) { return @{ Decision = $decision; Source = $answeredBy } }
-  # WHY keep the source: a source that answered with something unusable still
-  # answered, and the audit line has to say which one it was.
-  return @{ Decision = 'ask'; Source = $answeredBy }
+  if (-not [string]::IsNullOrEmpty($decision)) {
+    return @{
+      Decision = $decision
+      Source = $answeredBy
+      Reason = $reason
+      TimedOutSources = $timedOut.ToArray()
+    }
+  }
+  if ($timedOut -contains 'hermes' -and $timedOut -contains 'prompt') {
+    return @{
+      Decision = 'deny'
+      Source = 'all-timeouts'
+      Reason = 'all approval sources timed out (hermes 300s, prompt 600s)'
+      TimedOutSources = $timedOut.ToArray()
+    }
+  }
+  return @{ Decision = 'ask'; Source = 'none'; Reason = $noAnswerReason; TimedOutSources = $timedOut.ToArray() }
 }
 
 function Complete-HarnessApproval {
   <#
   .SYNOPSIS
-    Records the decision, prints it in the caller's vocabulary, and exits 0.
+    Records the decision, prints its typed document, and exits 0.
   .PARAMETER Harness
     Calling harness name.
   .PARAMETER Tool
@@ -623,8 +658,12 @@ function Complete-HarnessApproval {
     One-line description of the call.
   .PARAMETER Decision
     allow, deny, or ask.
-  .PARAMETER Plain
-    Print the decision word alone.
+  .PARAMETER Reason
+    Why the resolver answered this way.
+  .PARAMETER Source
+    Source that decided, or a resolver status when none did.
+  .PARAMETER TimedOutSources
+    Sources that gave up waiting.
   #>
   [CmdletBinding()]
   param(
@@ -642,7 +681,15 @@ function Complete-HarnessApproval {
     [Parameter(Mandatory)]
     [string]$Decision,
 
-    [switch]$Plain
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Reason,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('prompt', 'hermes', 'all-timeouts', 'resolver-error', 'none')]
+    [string]$Source,
+
+    [string[]]$TimedOutSources = @()
   )
 
   $final = if ($Decision -in @('allow', 'deny')) { $Decision } else { 'ask' }
@@ -651,13 +698,13 @@ function Complete-HarnessApproval {
   $summaryText = if ([string]::IsNullOrEmpty($Tool)) { $Summary } else { "${Tool}: ${Summary}" }
   try {
     Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $Harness -Decision $final `
-      -Source $script:decidedBy -Summary $summaryText -Digest $script:auditDigest `
+      -Source $Source -Summary $summaryText -Digest $script:auditDigest `
       -StartTime $script:auditStart -Id $script:requestId
   }
   catch {
     Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
-  Write-Output (ConvertTo-HarnessApprovalDocument -Harness $Harness -Decision $final -Plain:$Plain)
+  Write-Output (ConvertTo-HarnessApprovalDocument -Decision $final -Reason $Reason -Source $Source -TimedOutSources $TimedOutSources)
   exit 0
 }
 
@@ -673,52 +720,59 @@ try {
 
   if ([string]::IsNullOrWhiteSpace($harnessName)) {
     Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'usage: nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]'
-    Write-Output 'ask'
-    exit 0
+    Complete-HarnessApproval -Harness 'other' -Tool '' -Summary '' -Decision 'deny' `
+      -Reason 'harness-approval requires a harness name' -Source 'resolver-error'
   }
 
   $configPath = Get-HarnessBridgeConfigPath
 
   if ([string]::IsNullOrWhiteSpace($toolName)) {
     Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'usage: nucleus-utils harness request-approval <harness> <tool> <summary> [timeout-seconds]'
-    Complete-HarnessApproval -Harness $harnessName -Tool '' -Summary '' -Decision 'ask' -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool '' -Summary '' -Decision 'deny' `
+      -Reason 'harness-approval requires a tool name' -Source 'resolver-error'
   }
   if ($TimeoutSeconds -lt -1) {
     Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'the timeout argument must be a whole number of seconds'
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'deny' `
+      -Reason 'the timeout argument must be a whole number of seconds' -Source 'resolver-error'
   }
 
   try { $config = Get-HarnessBridgeApprovalConfig -ConfigPath $configPath }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not parse nucleus config: asking locally'
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message 'could not parse nucleus config'
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'deny' `
+      -Reason 'could not parse nucleus config' -Source 'resolver-error'
   }
 
   if (-not $config['harness-notify'].enable) {
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' `
+      -Reason 'harness notifications are disabled' -Source 'none'
   }
 
   # The sources are the gate: none enabled keeps the hooks wired while every tool
   # call is answered `ask` at once and the harness keeps its own prompt.
   try { $sourceName = Resolve-HarnessApprovalSource -Config $config['harness-approval'] }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "$($_.Exception.Message): asking locally"
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message $($_.Exception.Message)
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'deny' `
+      -Reason $($_.Exception.Message) -Source 'resolver-error'
   }
   try {
     $promptTimeout = Get-HarnessApprovalSourceTimeout -Config $config['harness-approval'] -Source 'prompt'
     $hermesTimeout = Get-HarnessApprovalSourceTimeout -Config $config['harness-approval'] -Source 'hermes'
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "$($_.Exception.Message): asking locally"
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Write-HarnessBridgeWarning -CommandName 'request-approval' -Message $($_.Exception.Message)
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'deny' `
+      -Reason $($_.Exception.Message) -Source 'resolver-error'
   }
   if ($TimeoutSeconds -ge 0) {
     $promptTimeout = $TimeoutSeconds
     $hermesTimeout = $TimeoutSeconds
   }
   if (@($sourceName).Count -eq 0) {
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' `
+      -Reason 'no approval sources enabled' -Source 'none'
   }
 
   # A zero wait would sweep the very request this run is waiting on, so the
@@ -736,8 +790,9 @@ try {
         -WindowSeconds $windowSeconds -UserRoot (Get-HarnessBridgeUserRoot)
     }
     catch {
-      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not publish the approval request: asking locally ($($_.Exception.Message))"
-      Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
+      Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not publish the approval request: $($_.Exception.Message)"
+      Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'deny' `
+        -Reason 'could not publish the approval request' -Source 'resolver-error'
     }
     $requestPath = $request.RequestPath
     $responsePath = $request.ResponsePath
@@ -746,7 +801,6 @@ try {
 
   $wait = Wait-HarnessApproval -Source $sourceName -PromptTimeout $promptTimeout `
     -HermesTimeout $hermesTimeout -Tool $toolName -Summary $summaryText -ResponsePath $responsePath
-  $script:decidedBy = $wait.Source
   $decision = $wait.Decision
 
   # The request is consumed either way: an answered request would otherwise stay
@@ -756,24 +810,25 @@ try {
     Remove-Item -LiteralPath $responsePath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: absent unless answered; a missing file is the expected steady state
   }
 
-  Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision $decision -Plain:$Plain
+  Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText `
+    -Decision $decision -Reason $wait.Reason -Source $wait.Source -TimedOutSources $wait.TimedOutSources
 }
 catch {
-  # Fail open: an unreachable broker or an unwritable state directory must not
-  # wedge the harness, and must not silently authorise anything either.
+  # An unexpected resolver failure is a typed deny: no source can be trusted to
+  # have decided, and an accidental allow is worse than a blocked call.
   Write-HarnessBridgeWarning -CommandName 'request-approval' -Message $_.Exception.Message
   $fallbackHarness = if ([string]::IsNullOrWhiteSpace($harnessName)) { 'other' } else { $harnessName }
   # WHY its own try: this is the crash path a review looks for, so it is audited
   # rather than only printed, and logging here must not break the document either.
   try {
-    Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $fallbackHarness -Decision 'ask' `
-      -Source 'none' -Summary 'harness-approval (fail-open)' -Digest $script:auditDigest `
+    Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $fallbackHarness -Decision 'deny' `
+      -Source 'resolver-error' -Summary 'harness-approval (resolver-error)' -Digest $script:auditDigest `
       -StartTime $script:auditStart
   }
   catch {
     Write-HarnessBridgeWarning -CommandName 'request-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
-  Write-Output (ConvertTo-HarnessApprovalDocument -Harness $fallbackHarness -Decision 'ask' -Plain:$Plain)
+  Write-Output (ConvertTo-HarnessApprovalDocument -Decision 'deny' -Reason 'approval resolver failed' -Source 'resolver-error')
 }
 
 exit 0

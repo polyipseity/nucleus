@@ -80,7 +80,7 @@ Verbs:
               Dispatches to src/scripts/notify/harness/decide-call.sh.
 
   request-approval <harness> <tool> <summary> [timeout-seconds]
-              Request an approval decision for a harness tool call.
+              Request an approval decision and print one typed JSON document.
               Dispatches to src/scripts/notify/harness/request-approval.sh.
 
   continue-turn <harness>

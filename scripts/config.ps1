@@ -59,10 +59,10 @@ $script:Defaults = @{
     heartbeat = $true
   }
   'harness-approval' = @{
-    sources = @('prompt')
+    sources = @('prompt', 'hermes')
     'timeout-seconds' = @{
-      hermes = 0
-      prompt = 0
+      hermes = 300
+      prompt = 600
     }
   }
   'harness-drive' = @{
