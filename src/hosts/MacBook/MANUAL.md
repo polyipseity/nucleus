@@ -60,7 +60,15 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 Apply installs the `harness-bridge` plugin. To provision a channel once: seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN` in your SOPS file, list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, set `platforms.<name>.enabled` in the gateway config, then re-run `nucleus-apply`.
 
-Approvals are asked in the terminal by default (`harness-approval.sources` is `["prompt"]`); `nucleus-config set harness-approval.sources '["prompt","hermes"]'` adds the remote channel, and `harness-approval.timeout-seconds.<source>` bounds each wait, `0` meaning until answered. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
+Approval sources default to `["prompt","hermes"]`. Hermes waits 300 seconds and the terminal prompt waits 600 seconds as independent races, so the first answer wins. An all-timeout decision is a typed deny with source `all-timeouts` and reason `all approval sources timed out (hermes 300s, prompt 600s)`. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine. The six-field decision contract and native rendering live in `.agents/instructions/harness-adapters.reference.md`.
+
+Proof the local Hermes profile with `hermes model`, `hermes chat -q "Reply with exactly: ready"` for a real model call, and `hermes chat -q "Use the shell tool to print the current working directory" -v` for a real tool call. Keep the terminal output.
+
+Proof the gateway with `hermes --profile gateway gateway status`. Send one real Telegram message and one real Discord message from approved accounts, and publish one message to the private ntfy topic. Keep the replies in Telegram and Discord and the delivered ntfy message. Pair unknown senders with `hermes --profile gateway pairing list`, `hermes --profile gateway pairing approve telegram <request-id or code>`, `hermes --profile gateway pairing approve discord <request-id or code>`, then `hermes --profile gateway pairing list` again for pairing state.
+
+Proof a harness approval: trigger a tool call that reaches the gate, run `/harness status` in a Hermes session, answer with `/harness approve <id>` or `/harness deny <id>`, keep the decision output, and read the event with `nucleus-logs show harness --json`.
+
+If apply fails on `/nix`, collect evidence before choosing a fix: `bash src/scripts/diagnostics/collect-apply-failure.sh <output-file>`. Keep the written decision on the store-lock holder. Nothing reclaims the store automatically.
 
 The rules behind those switches and the `/harness` commands are in `.agents/instructions/agents-and-skills.instructions.md`.
 

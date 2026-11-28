@@ -36,6 +36,20 @@ A session-memory entry is one file whose name the workflow chooses, so `plan-<da
 
 opencode, Cursor, Claude Code, Hermes, and CLI agents have no verified mapping for most capabilities in this repository. State the gap and use repository files instead of an unverified tool name.
 
+## Approval decisions and native rendering
+
+`nucleus-utils harness request-approval` prints one typed decision document on stdout. The typed decision contract has six fields: `version`, `decision`, `reason`, `source`, `timeouts`, and `timedOutSources`. `decision` is `allow`, `deny`, or `ask`. `source` is `prompt`, `hermes`, `all-timeouts`, `resolver-error`, or `none`. Sources default to `["prompt","hermes"]`. Hermes waits 300 seconds and the terminal prompt waits 600 seconds as independent races, so the first answer wins. When both `hermes` and `prompt` time out, the document is a typed `deny` with source `all-timeouts` and reason `all approval sources timed out (hermes 300s, prompt 600s)`. A resolver error is a typed `deny` with source `resolver-error`. The decision is not encoded in stderr.
+
+`nucleus-utils harness decide-call <harness>` renders the typed document in the harness's own vocabulary. Cursor receives `{"permission":"allow"|"ask"|"deny"}`. Claude Code and VS Code Copilot receive `hookSpecificOutput.permissionDecision` with `hookSpecificOutput.permissionDecisionReason` from the typed reason. Pi, OpenCode, Codex, and other harnesses consume the typed document itself. Hooks print one document and exit 0 on every path.
+
+## Hermes profiles and nucleus skills
+
+The local CLI profile uses `~/.hermes/config.yaml`, `~/.hermes/SOUL.md`, `~/.hermes/.env`, and `~/.hermes/skills/`. The gateway profile uses `~/.hermes/profiles/gateway/config.yaml`, `~/.hermes/profiles/gateway/SOUL.md`, `~/.hermes/profiles/gateway/.env`, and `~/.hermes/profiles/gateway/skills/`. Each profile reads its own `.env`. Use `hermes model` for the CLI model picker and `hermes --profile gateway gateway status` for the gateway.
+
+The six nucleus skill bundles live in `src/users/default/agents/skills/<name>/SKILL.md`: `nucleus-citation-reference`, `nucleus-harness-reference`, `nucleus-platform-reference`, `nucleus-policy-reference`, `nucleus-service-reference`, and `nucleus-vm-reference`. Hermes gets relative symlinks at `src/users/default/hermes/skills/<name>` that point at `../../agents/skills/<name>`. On POSIX hosts, apply seeds those bundles into both Hermes profiles.
+
+On Windows, apply writes the gateway autostart to the HKCU Run value `nucleus-hermes-gateway` with the command `hermes --profile gateway gateway run --replace`. Log off and on after a command change.
+
 ## Prompt tools capability (continue / copy user prompt / repeat user prompt)
 
 The machine-checked capability matrix is `src/modules/configs/harness-capabilities.json` (schema `harness-capabilities.schema.json`); truthfulness rules are enforced by `tests/scripts/harness-capability-truth-tests.sh`.
