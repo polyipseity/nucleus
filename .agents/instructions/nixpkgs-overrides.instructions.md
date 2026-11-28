@@ -10,4 +10,4 @@ applyTo: "src/flake.nix, src/modules/packages/nixpkgs-overrides.nix"
 
 Every entry carries adjacent `# TEMPORARY:` (why now), `# REMOVE WHEN:` (concrete condition), and `# WHY:` (why `nixpkgs-next`) markers. Remove entries in the pin-bump commit; never delete the file, the wiring, or this instruction while the mechanism exists. Keep the file header intact.
 
-Details: `.agents/skills/nucleus-platform-reference/references/nixpkgs-overrides.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/nixpkgs-overrides.md`.

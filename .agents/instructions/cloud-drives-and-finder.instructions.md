@@ -10,4 +10,4 @@ Mounts use `rclone mount`; replicas use pull-only `rclone sync`. No push, bisync
 
 Remote ids are stable; update display labels only when they change. Keep `RCLONE_CONFIG_PASS` non-interactive after secrets, validate with root-level `rclone lsd /`, and converge paths without duplicate mounts or directories. Finder favorites never use NSKeyedArchiver, JXA, or `sfltool`; ensure canonical directories then set the exact ordered list with URI-encoded `mysides` in activation, restart Finder, sharedfilelistd, and cfprefsd, and log a logout hint when stale.
 
-Expect 5-15 minutes for full-root incremental sync; runtime paths use no throttle flags. Platform exceptions need `# WHY:`, and non-automatable behavior gets a `MANUAL.md` step in the same change. Details: `.agents/skills/nucleus-platform-reference/references/cloud-drives-and-finder.md`.
+Expect 5-15 minutes for full-root incremental sync; runtime paths use no throttle flags. Platform exceptions need `# WHY:`, and non-automatable behavior gets a `MANUAL.md` step in the same change. Details: `src/users/default/agents/skills/nucleus-platform-reference/references/cloud-drives-and-finder.md`.

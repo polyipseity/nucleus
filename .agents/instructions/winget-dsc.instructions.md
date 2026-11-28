@@ -12,4 +12,4 @@ Group order: packages, system settings, registry, environment, script. Sort each
 
 `PSDscResources/Script` requires a simple reliable `TestScript`, no native resource, reliable PATH in both scripts, and a concrete idempotency or `dependsOn` benefit. Scoop tools are handled after DSC by `Invoke-ScoopSetup`, never by a Script resource. Dry run with `winget configure --what-if`; full apply needs elevation and `--accept-configuration-agreements`. Avoid duplicates, accidental pins, and commented-out resources; names are verb-noun without `nucleus*`.
 
-Details, path examples, and module rules: `.agents/skills/nucleus-platform-reference/references/winget-dsc.md`.
+Details, path examples, and module rules: `src/users/default/agents/skills/nucleus-platform-reference/references/winget-dsc.md`.

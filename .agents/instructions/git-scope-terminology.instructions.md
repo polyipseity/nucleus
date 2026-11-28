@@ -12,4 +12,4 @@ Machine gitconfig lives in `src/modules/configs/git/<Host>.gitconfig`; user conf
 
 Every replaced scope gets one same-folder `.bak`, never overwritten; only Windows disable restores it, with no `.bak` leaving no file. POSIX backs up once and never restores. Name, email, and signing key live in `~/.config/git/identity` through `include.path`, not the symlinked gitconfig.
 
-Details: `.agents/skills/nucleus-platform-reference/references/git-scope-terminology.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/git-scope-terminology.md`.

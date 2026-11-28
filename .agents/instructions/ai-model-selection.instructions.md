@@ -10,4 +10,4 @@ applyTo: "scripts/ai.sh, src/modules/ai.nix, src/modules/configs/ollama/**, src/
 
 One change updates `models.json` and `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`; each host's IDs must be a subset with no stale entries. Tags are `<base>-<quant>`; no q3 or lower. Default `q4_K_M`, `q8_0` ~1.7x, `fp16`/`bf16` ~2x, `it-qat` for Gemma, `nvfp4` NVIDIA only, `mxfp8` ~1.5x, `mlx-bf16` for Apple MLX. Larger parameter count beats better quantization; NixOS and Windows use `q4_K_M` only.
 
-A tool-calling model is not deployable until a function-call curl test passes on that host; record `tool-calling curl-tested on <host>: PASS` or `FAIL` in the commit message. Details: `.agents/skills/nucleus-platform-reference/references/ai-model-selection.md`.
+A tool-calling model is not deployable until a function-call curl test passes on that host; record `tool-calling curl-tested on <host>: PASS` or `FAIL` in the commit message. Details: `src/users/default/agents/skills/nucleus-platform-reference/references/ai-model-selection.md`.

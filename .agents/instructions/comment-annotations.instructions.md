@@ -10,4 +10,4 @@ Grammar: `# <prefix>: <reason>` or `# <prefix>: <subject> -- <reason>`; `--` is 
 
 Tool-enforced ids and consumers: `suppression_doc` (step 11), `SuppressMessageAttribute` (step 11), `packer_validate` (`check.*`), `embedded-content` (step 13), `config-method` (step 12). `|| true`, `$null =`, `[void]`, `2>$null`, and `-ErrorAction SilentlyContinue` need `# check-suppress:suppression_doc:` in production code (tests exempt), not `# WHY:`. A new marker needs its id and machine consumer registered before use. Review-only violations are listed in the reference.
 
-Full grammar, tables, and enforcement: `.agents/skills/nucleus-citation-reference/references/comment-annotations.md`.
+Full grammar, tables, and enforcement: `src/users/default/agents/skills/nucleus-citation-reference/references/comment-annotations.md`.

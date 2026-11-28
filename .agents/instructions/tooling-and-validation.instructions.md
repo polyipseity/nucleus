@@ -12,4 +12,4 @@ No skip guards: a missing tool hard-fails; provisioning installs and preflight v
 
 Nix format is treefmt only; `nixf-tidy < file`; deadnix findings are real; commitlint runs through prek; prek hooks stay idempotent with `require_serial` and never use `treefmt --no-cache`. No new checks go into `ci.yml`. Validate every changed file type and cite a source for identifiers nothing validates.
 
-Details: `.agents/skills/nucleus-citation-reference/references/tooling-and-validation.md`.
+Details: `src/users/default/agents/skills/nucleus-citation-reference/references/tooling-and-validation.md`.

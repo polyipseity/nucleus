@@ -12,4 +12,4 @@ Pinned root hard-fails on drift; `suggestions` is warn-only. Anything that can o
 
 Probes live only in `lockfile-enforcement-lib.*` for the update action; step 05 checks structure. Probes scope to `desired.json` and resolve `flake:` pins against `flake.lock`. `cursor.superpowers` pins source plus rev on both hosts. `--verify` diffs; `--verify-installed` compares installed versions, never writes, and warns for suggestions.
 
-Details: `.agents/skills/nucleus-policy-reference/references/lockfile-enforcement.md`.
+Details: `src/users/default/agents/skills/nucleus-policy-reference/references/lockfile-enforcement.md`.

@@ -12,4 +12,4 @@ Host-keyed entries resolve to null elsewhere; consumers guard instead of substit
 
 Valid narrow scopes are incorrect behavior for unintended consumers, platform-specific values, and build-time infeasibility. `"CLI-only"` is invalid on NixOS and Windows. Parity tests are `tests/integration/env-parity-tests.nix` and `tests/platforms/Windows/modules/EnvVarParity.Tests.ps1`; a new variable needs both.
 
-Exception table and path details: `.agents/skills/nucleus-platform-reference/references/env-variable-scope.md`.
+Exception table and path details: `src/users/default/agents/skills/nucleus-platform-reference/references/env-variable-scope.md`.

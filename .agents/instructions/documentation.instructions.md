@@ -11,4 +11,4 @@ Document WHY with `# WHY: <reason>`; no backwards compatibility and no em dash i
 
 Sentence-case user-facing labels; YAML uses `.yml` except required `.sops.yaml`. Deterministic JSON is byte-stable: case-sensitive sorted keys, sorted set arrays, one trailing newline, 2-space indent, compact empty objects and arrays, via `toSortedJSON` or `ConvertTo-SortedJson`. `.instructions.md` and `.prompt.md` need valid frontmatter; edit `commit-staged.prompt.md` in both locations together; never add `.github/copilot-instructions.md`.
 
-Per-file comment, MANUAL, markdown, and citation rules: `.agents/skills/nucleus-citation-reference/references/documentation.md`; source rules: `citation-quality.md` in the same skill.
+Per-file comment, MANUAL, markdown, and citation rules: `src/users/default/agents/skills/nucleus-citation-reference/references/documentation.md`; source rules: `citation-quality.md` in the same skill.

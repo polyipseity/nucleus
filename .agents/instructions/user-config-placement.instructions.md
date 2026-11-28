@@ -12,4 +12,4 @@ Machine-wide singletons live in `src/modules/configs/`; per-user homedir config 
 
 Selectors: `selectSource`/`Resolve-UserConfigSource`, `selectFile`/`Resolve-UserConfigFile`, `selectFirstLevelEntry`/`Resolve-UserConfigFirstLevelEntry`, `listFirstLevelEntries`/`Get-UserConfigFirstLevelEntryList`, and registry loaders. Testing uses fixtures or temp dirs, never a production user. Anti-patterns: per-user config in `configs/`, duplicated config, mixed scopes, second-level overrides.
 
-Full table: `.agents/skills/nucleus-platform-reference/references/user-config-placement.md`.
+Full table: `src/users/default/agents/skills/nucleus-platform-reference/references/user-config-placement.md`.

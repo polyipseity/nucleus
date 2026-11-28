@@ -12,4 +12,4 @@ Registry kinds: `macos-launchagent`, `macos-system-extension`, `manual`, `nixos-
 
 `statusIcon` in `apps.json` is the single source for menu-bar icons, converged by `menu-bar.sh`/`.ps1` and `Sync-MenuBar.ps1`. MacBook hides icons by default except Amphetamine, Stats, Mounty, and OrbStack; system items have their own defaults and spacing uses 0 with fallback 4. ByHost plists go through `macos-console-user.sh`.
 
-Full tables and commands: `.agents/skills/nucleus-platform-reference/references/app-autostart.md`.
+Full tables and commands: `src/users/default/agents/skills/nucleus-platform-reference/references/app-autostart.md`.

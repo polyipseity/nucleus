@@ -16,4 +16,4 @@ Use `pkgs.writeNucleusShellApplication`, not `writeShellApplication`, except wit
 
 Extract real logic and runtime imperative work into scripts; keep Nix-expression loops and snippets under 10 lines inline. Libraries hold only definitions. nixpkgs has no Xcode shims, so use the managed `apple-sdk-*` modules. Validate with `nix-instantiate --parse`, `nix flake check`, and `scripts/gc.sh`/`.ps1` cleanup; use `--replace-fail`, not deprecated `--replace-warn`.
 
-Details: `.agents/skills/nucleus-platform-reference/references/nix-authoring.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/nix-authoring.md`.

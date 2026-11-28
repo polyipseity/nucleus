@@ -6,7 +6,7 @@ applyTo: "scripts/vm.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/v
 
 # VM management
 
-Manifest: `src/modules/vms/VMs.json`. Field contracts, host-guest matrix, ports, paths, size grammar, and backend detail live in `.agents/skills/nucleus-vm-reference/references/vm-reference.md`; workflow detail lives in `vm-management.md` in that same references directory.
+Manifest: `src/modules/vms/VMs.json`. Field contracts, host-guest matrix, ports, paths, size grammar, and backend detail live in `src/users/default/agents/skills/nucleus-vm-reference/references/vm-reference.md`; workflow detail lives in `vm-management.md` in that same references directory.
 
 Ids use `vm_id`, `$vmId`, `-VmId`, never `vm_name`; id-list functions are `vm_get_manifest_vm_ids`, `vm_get_running_ids`, `Get-VMRunningIdList`. Guest hostname comes from `hostname` (equal to `name`), never a literal: NixOS `NUCLEUS_VM_GUEST_HOSTNAME`, Packer `guest_hostname`, macOS `vm_hostname`, Windows `__GUEST_HOSTNAME__`. Credentials come from per-user SOPS and `vmGuest`, SSH keys from `vm-guest-ssh-public-key-paths.json`; update `vm-setup-manifest-tests.nix` on change.
 

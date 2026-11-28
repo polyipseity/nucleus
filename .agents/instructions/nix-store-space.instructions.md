@@ -12,4 +12,4 @@ A store lock held an hour with no CPU growth across watchdog ticks is stalled: S
 
 Btrfs `compress-force=zstd` underreports `df`/`du`; measure with `compsize` or `btdu`. NixOS runs weekly `duperemove` over `/nix/store` via `gc.sh`; opt out with `--no-duperemove-gc`. `writeNucleusShellApplication` puts scripts and src under `$out` with shared derivations; reflinks apply to wallpaper and VM images, while `equaliser` and `camillagui-backend` must be copied. Rejected: disabling keep flags, `nix store optimise` after every rebuild, `-d` GC. Store audit: `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`.
 
-Details: `.agents/skills/nucleus-platform-reference/references/nix-store-space.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/nix-store-space.md`.

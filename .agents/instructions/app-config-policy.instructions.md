@@ -12,4 +12,4 @@ Method 1 uses `seed-writable-symlink.sh` on POSIX and `Deploy-WritableSymlink` w
 
 Host-specific `lib/` directories hold auto-loaded overrides. Per-user overrides follow `src/users/<username>/<config>/` with merge order `defaults // platform_overrides // user_overrides`. Store the app's native format, implement on every host with the app, and cover enabled hosts with tests.
 
-Details: `.agents/skills/nucleus-platform-reference/references/app-config-policy.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/app-config-policy.md`.

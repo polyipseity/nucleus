@@ -6,7 +6,8 @@
     ".agents/instructions/**/*.instructions.md"
   ],
   "skills": [
-    ".agents/skills"
+    ".agents/skills",
+    "src/users/default/agents/skills"
   ],
   "plugins": [],
 }

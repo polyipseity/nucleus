@@ -7,7 +7,7 @@ alwaysApply: true
 
 # Documentation standards
 
-Document WHY, not WHAT: rationale, security, tradeoffs, never a restatement of code. Rationale goes in `# WHY: <reason>`. No backwards compatibility. Cite a source inline when a setting cannot be auto-validated; source rules are in `.agents/skills/nucleus-citation-reference/references/citation-quality.md`.
+Document WHY, not WHAT: rationale, security, tradeoffs, never a restatement of code. Rationale goes in `# WHY: <reason>`. No backwards compatibility. Cite a source inline when a setting cannot be auto-validated; source rules are in `src/users/default/agents/skills/nucleus-citation-reference/references/citation-quality.md`.
 
 Before editing text, check for a test that pins lines: `grep -rl '<file>' tests/`, then look for a line-number allowlist. Edit only below the pin, because a line comparison against HEAD fails on any shift.
 
@@ -39,7 +39,7 @@ Shell: header after the shebang covering purpose, args, env vars, and exit condi
 
 Sentence case for every user-facing label on every host (macOS `NSMenuItem`, NixOS Nautilus/Dolphin `Name=`, Windows Registry `valueData`). Exceptions: system-internal identifiers, filenames differing from the display name, and AppleScript source.
 
-Developer docs over user help; Apple URLs include `en-us`; never cite a deprecated API as current. Full rules: `.agents/skills/nucleus-citation-reference/references/citation-quality.md`.
+Developer docs over user help; Apple URLs include `en-us`; never cite a deprecated API as current. Full rules: `src/users/default/agents/skills/nucleus-citation-reference/references/citation-quality.md`.
 
 ## Deterministic JSON
 

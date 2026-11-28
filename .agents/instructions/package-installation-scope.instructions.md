@@ -12,4 +12,4 @@ System-install-only tools are not for interactive dev use: `bun`, `cargo`, `rust
 
 `managedPackages` in `src/modules/core.nix` is the single declared registry, sorted by name; `platforms` gates nixpkgs and Homebrew carriers, never WinGet ids. No duplicate of a registry package in host files. A tap-qualified Homebrew formula requires uninstalling it on every MacBook before dropping the tap; no migration shim.
 
-Violations and full tables: `.agents/skills/nucleus-policy-reference/references/package-installation-scope.md`.
+Violations and full tables: `src/users/default/agents/skills/nucleus-policy-reference/references/package-installation-scope.md`.

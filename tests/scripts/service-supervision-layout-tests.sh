@@ -68,7 +68,7 @@ root=sys.argv[1]
 with open(os.path.join(root,'src/modules/services.json'),encoding='utf-8') as f:
     data=json.load(f)
 services=[k for k in data.keys() if not k.startswith('$')]
-with open(os.path.join(root,'.agents/skills/nucleus-service-reference/references/service-firing-policy.md'),encoding='utf-8') as f:
+with open(os.path.join(root,'src/users/default/agents/skills/nucleus-service-reference/references/service-firing-policy.md'),encoding='utf-8') as f:
     policy=f.read()
 missing=[]
 for s in services:

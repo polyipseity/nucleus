@@ -65,12 +65,8 @@ function New-ByteCapFixture {
   $null = New-Item -ItemType Directory -Path $instructions -Force
   $null = New-Item -ItemType SymbolicLink -Path (Join-Path $root 'src') -Target (Join-Path $repoRoot 'src')
   $null = New-Item -ItemType SymbolicLink -Path (Join-Path $instructions 'upstream-workarounds.instructions.md') -Target (Join-Path $repoRoot '.agents/instructions/upstream-workarounds.instructions.md')
-  $references = Join-Path $root '.agents/skills/nucleus-platform-reference/references'
-  $null = New-Item -ItemType Directory -Path $references -Force  # check-suppress:suppression_doc: fixture directory creation; output is not used
-  $null = New-Item -ItemType SymbolicLink -Path (Join-Path $references 'upstream-workarounds.md') -Target (Join-Path $repoRoot '.agents/skills/nucleus-platform-reference/references/upstream-workarounds.md')  # check-suppress:suppression_doc: fixture link creation; output is not used
-
-  # WHY: the staleness sub-check reads the reference registry, while the byte
-  # cap counts the instruction pointer. Keep both links in the fixture.
+  # WHY: the staleness sub-check reads the registry through the src link to
+  # the live tree; only the instruction pointer is fixture-local.
   $upstreamTarget = Join-Path $repoRoot '.agents/instructions/upstream-workarounds.instructions.md'
   $upstreamSize = (Get-Item -LiteralPath $upstreamTarget).Length
   $conditionalSize = if ($OverCap) { 20000 } else { 100000 - 2000 - 60000 - 30000 - $upstreamSize }

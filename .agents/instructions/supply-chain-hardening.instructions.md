@@ -10,4 +10,4 @@ Every managed package manager gets a release-age delay. Authoritative values liv
 
 WinGet, Scoop, cargo-binstall, rustup, and Homebrew have no delay and rely on lockfile pins; Homebrew disables activation updates and upgrades. `bun install -g` uses `--ignore-scripts` except allowlisted entries and `--linker hoisted`; `uv tool install` uses `--no-build`. Allowlist entries require reviewed lifecycle scripts and justifications. Check steps always validate lockfile structure and the allowlist; `--online` adds freshness and yanked detection.
 
-A new package manager needs delay configuration, script blocking, allowlist entries, locked CI mode, and a gap note when upstream lacks a feature. Details: `.agents/skills/nucleus-policy-reference/references/supply-chain-hardening.md`.
+A new package manager needs delay configuration, script blocking, allowlist entries, locked CI mode, and a gap note when upstream lacks a feature. Details: `src/users/default/agents/skills/nucleus-policy-reference/references/supply-chain-hardening.md`.

@@ -12,4 +12,4 @@ applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scrip
 
 Step 7 requires inline co-located `$schema` for nucleus JSON/YAML, with A8 exceptions. Step numbers come from `NN-` filenames; renumber and sweep references in one commit. A step reads only its context parameter and locals; documented env inputs are the exception. Color lives in shared helpers; raw ANSI, `tput`, and `echo -e` are banned outside them.
 
-Details: `.agents/skills/nucleus-platform-reference/references/step-runner.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/step-runner.md`.

@@ -1,6 +1,6 @@
 # Project guidelines
 
-Inspect the tree before assuming files, tests, or commands. Keep this file short: file rules in `.agents/instructions/*.instructions.md`, workflows in `.agents/prompts/*.prompt.md`, skills in `.agents/skills/<skill>/`. No `docs/`; never add `.github/copilot-instructions.md`.
+Inspect the tree before assuming files, tests, or commands. Keep this file short: file rules in `.agents/instructions/*.instructions.md`, workflows in `.agents/prompts/*.prompt.md`, project skills in `.agents/skills/<skill>/`, and user skills in `src/users/default/agents/skills/<skill>/`. No `docs/`; never add `.github/copilot-instructions.md`.
 
 ## Repository shape
 
@@ -11,7 +11,7 @@ Inspect the tree before assuming files, tests, or commands. Keep this file short
 - `src/users/`: registry JSON (`<username>/<domain>.json` with `default/` and co-located schemas), per-user app trees, assembly via `users-registry.nix`, `load-user-registry.sh`, `Load-UserRegistry.ps1`. Deep merge with `lib.recursiveUpdate`; arrays replace wholesale.
 - `scripts/`: user-facing `nucleus-*` commands, each `.sh`/`.ps1`. `src/scripts/`: Nix-internal tooling by domain. See `script-authoring.instructions.md`, `nucleus-apps.instructions.md`.
 - `tests/` mirrors `src/`, uses `tests/fixtures/`, never couples to real users (`testing.instructions.md`).
-- `opencode.jsonc` registers `.agents/instructions/**/*.md` and `.agents/skills/`; `.opencode/commands/` mirrors `.agents/prompts/`. Automation in `.github/`; formatting in `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`, `.agents/.markdownlint.jsonc`.
+- `opencode.jsonc` registers `.agents/instructions/**/*.md`, `.agents/skills/`, and `src/users/default/agents/skills`; `.opencode/commands/` mirrors `.agents/prompts/`. Automation in `.github/`; formatting in `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`, `.agents/.markdownlint.jsonc`.
 
 ## Build and validation
 
@@ -32,7 +32,7 @@ Inspect the tree before assuming files, tests, or commands. Keep this file short
 - Git scope: "global" is `git --system`, "user" is `git --global`; never use "global" for `--global` (`git-scope-terminology.instructions.md`).
 - Share POSIX behavior in shared modules. Windows uses PowerShell, POSIX uses bash, never bash on Windows; parity across all three hosts comes first (`cross-host-feature-parity.instructions.md`).
 - Centralize daemon and service restarts per OS; restart each daemon at most once per activation.
-- Services are persistent daemons by default; firing policy is in `.agents/skills/nucleus-service-reference/references/service-firing-policy.md`.
+- Services are persistent daemons by default; firing policy is in `src/users/default/agents/skills/nucleus-service-reference/references/service-firing-policy.md`.
 - `lockfile.json` must not duplicate `flake.lock`; `suggestions.vscode` is the sole exception. See `lockfile-enforcement.instructions.md`.
 - Sort unordered lists alphabetically; preserve semantic or load order. Service lists stay hand-written in declared order (alphabetical by name, PDF presets quality-descending), never auto-sorted.
 - Sentence case for user-facing labels (`documentation.instructions.md`). YAML uses `.yml`, except required `.sops.yaml`.

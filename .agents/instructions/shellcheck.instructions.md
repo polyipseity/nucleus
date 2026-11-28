@@ -10,4 +10,4 @@ Rewrite before suppressing: quote, use a static `# shellcheck source=`, or restr
 
 Common fixes: SC2086 quote unless intentional passthrough, SC2064 single-quoted trap, SC2016 extract awk over 10 lines, SC2154/SC2034 add a runtime source or suppress framework vars, SC2194 use an `__PLACEHOLDER__`. Keep `jq 'program'` and `"$FILE"` on one line and add `|| return`.
 
-Shellcheck runs through treefmt-nix at `style` severity, never at Nix build time; entry points are `nucleus-check sh` and CI. Any finding fails; never raise severity to warning or error. Details: `.agents/skills/nucleus-platform-reference/references/shellcheck.md`.
+Shellcheck runs through treefmt-nix at `style` severity, never at Nix build time; entry points are `nucleus-check sh` and CI. Any finding fails; never raise severity to warning or error. Details: `src/users/default/agents/skills/nucleus-platform-reference/references/shellcheck.md`.

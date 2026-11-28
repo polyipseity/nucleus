@@ -28,7 +28,7 @@ Behavioral parameters (`Enabled`, `Users`) are `[Parameter(Mandatory)]`. Never a
 
 ## Rule fixes
 
-Triggers, root causes, fixes, and the quick reference table live in `.agents/skills/nucleus-policy-reference/references/pssa-rules.md`. Key constraints: PSSA 1.25.0 flags only eight state-changing verbs (`New`, `Set`, `Remove`, `Reset`, `Stop`, `Restart`, `Start`, `Update`), fixed with `[CmdletBinding(SupportsShouldProcess)]` and `$PSCmdlet.ShouldProcess()`; `PSUseSingularNouns` is never suppressed; remove `[ValidateSet]` from a positional `Action` that also accepts `--list-*` flags and normalize with `Resolve-NucleusArgument` plus `Assert-NucleusCliAction`.
+Triggers, root causes, fixes, and the quick reference table live in `src/users/default/agents/skills/nucleus-policy-reference/references/pssa-rules.md`. Key constraints: PSSA 1.25.0 flags only eight state-changing verbs (`New`, `Set`, `Remove`, `Reset`, `Stop`, `Restart`, `Start`, `Update`), fixed with `[CmdletBinding(SupportsShouldProcess)]` and `$PSCmdlet.ShouldProcess()`; `PSUseSingularNouns` is never suppressed; remove `[ValidateSet]` from a positional `Action` that also accepts `--list-*` flags and normalize with `Resolve-NucleusArgument` plus `Assert-NucleusCliAction`.
 
 ## Adding a new rule policy
 

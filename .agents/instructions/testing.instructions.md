@@ -12,4 +12,4 @@ Nix tests must force evaluation with `builtins.seq (builtins.deepSeq <tests> nul
 
 Assertions must discriminate and be confirmed by breaking the behavior. A text-only check needs all four: no behavioral point, structural match, actionable failure, no duplicate enforcement. Test suites sourcing `test-lib.sh` end with `finish_tests`, which emits `# nucleus-tally`; missing tally fails. `exit` needs a subprocess, `& script.ps1` does not set `$LASTEXITCODE`, and run suites through `nucleus-test`.
 
-Validation: `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`, `cd src && nix flake check`, `nix run ./src#check`, PSSA and Syntax check steps, and `pwsh -File scripts/test.ps1 --only-steps=nix-tests`. Details: `.agents/skills/nucleus-platform-reference/references/testing.md`.
+Validation: `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`, `cd src && nix flake check`, `nix run ./src#check`, PSSA and Syntax check steps, and `pwsh -File scripts/test.ps1 --only-steps=nix-tests`. Details: `src/users/default/agents/skills/nucleus-platform-reference/references/testing.md`.

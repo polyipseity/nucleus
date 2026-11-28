@@ -12,4 +12,4 @@ nix-darwin calls only `preActivation`, `extraActivation`, and `postActivation`; 
 
 Prohibited: `readFile` or `replaceStrings` in activation bodies (except inline pure blocks of at most 3 lines with no loops, conditionals, or tools), `+` concatenation in script-producing expressions, tokens in bundle scripts, `$REPO_ROOT` at runtime, wrapper-only sourcing scripts, and inline Python. Exceptions need inline `# WHY:`.
 
-`nucleus.terminalActivations` needs TCC-sensitive terminal context, no alternative, and `# WHY: terminal-activations (last resort):`. Details: `.agents/skills/nucleus-platform-reference/references/activation-scripts.md`.
+`nucleus.terminalActivations` needs TCC-sensitive terminal context, no alternative, and `# WHY: terminal-activations (last resort):`. Details: `src/users/default/agents/skills/nucleus-platform-reference/references/activation-scripts.md`.

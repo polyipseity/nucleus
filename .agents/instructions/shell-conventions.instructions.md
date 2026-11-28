@@ -10,4 +10,4 @@ zsh expands aliases before functions, so a `shellAliases` entry must never shado
 
 `pi-unrestricted` resolves the application explicitly: zsh `command pi "$@"`, PowerShell `Get-Command <name> -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1` and throw when empty. History rules: zsh `HIST_IGNORE_SPACE` / `HIST_IGNORE_DUPS`, PowerShell `-AddToHistoryHandler` / `-HistoryNoDuplicates`, cmd.exe none. New managed shells enable the equivalent.
 
-Details: `.agents/skills/nucleus-platform-reference/references/shell-conventions.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/shell-conventions.md`.

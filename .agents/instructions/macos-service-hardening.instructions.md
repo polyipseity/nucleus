@@ -12,4 +12,4 @@ macOS 26+ SIP penalty-boxes a system daemon with non-root `UserName` on unsigned
 
 A new defaults domain needs a sorted `resetUserPreferenceDomains` entry for `.GlobalPreferences`/`NSGlobalDomain`; `.policy` domains go through user-terminal activation. Only built-in nix-darwin hook names run (`extraActivation`, `postActivation`), and forked daemons detach stdio. Use `launchd.agents.<name>.serviceConfig`, set `Label`, bundle iCloud files with `builtins.path`, and close the disable gate before `bootout`. Preserve `womp`, `disksleep=sleep`, `lowpowermode`, and `lidwake`; the 80% charge limit uses firmware SMC and stays manual. Wire sops readers to `waitForSopsSecrets`.
 
-Full detail: `.agents/skills/nucleus-platform-reference/references/macos-service-hardening.md`.
+Full detail: `src/users/default/agents/skills/nucleus-platform-reference/references/macos-service-hardening.md`.

@@ -13,4 +13,4 @@ Formats: F1 `[<ts> ]<cmd>: [<level>: ]<msg>` (errors/warnings to stderr); F2 `[s
 
 Color uses sixteen named colors plus dim and underline via shared helpers; `NO_COLOR` disables, `FORCE_COLOR`/`CLICOLOR_FORCE` enable, and raw ANSI, `tput`, `echo -e`, and `[char]27` are banned outside helpers (step 12). Logs: per-stream `stdout.log` and `stderr.log` under roots from `services.json`; `nucleus-logs` owns rotation, gzip, and 7d expiry (`NUCLEUS_LOG_EXPIRY`). Passthrough categories are in the reference.
 
-Details: `.agents/skills/nucleus-policy-reference/references/output-handling.md`.
+Details: `src/users/default/agents/skills/nucleus-policy-reference/references/output-handling.md`.

@@ -10,4 +10,4 @@ Three mechanisms: daemon (`launchd.daemons`, `/Library/LaunchDaemons`, system do
 
 Persistent jobs belong in Home Manager `launchd.agents.<name>` with `domain = "gui"`, because `environment.userLaunchAgents` only loads a job not already loaded, leaving a stale `KeepAlive` binary until logout. HM `setupLaunchAgents` compares plists and bootstraps on change. `environment.userLaunchAgents` is nix-darwin top level and invalid inside HM modules; reserve it for short-lived jobs.
 
-Source evidence, the load warning, and config shapes: `.agents/skills/nucleus-platform-reference/references/launchd.md`.
+Source evidence, the load warning, and config shapes: `src/users/default/agents/skills/nucleus-platform-reference/references/launchd.md`.

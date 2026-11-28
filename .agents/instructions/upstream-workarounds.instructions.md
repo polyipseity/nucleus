@@ -7,7 +7,7 @@ alwaysApply: false
 
 # Upstream workarounds registry
 
-A workaround compensates for an upstream limitation. Category A is temporary (upstream PR or issue exists): re-check quarterly and remove when fixed. Category B is permanent or structural: listed only, no re-check. The current registry is W01 through W24 in `.agents/skills/nucleus-platform-reference/references/upstream-workarounds.md`.
+A workaround compensates for an upstream limitation. Category A is temporary (upstream PR or issue exists): re-check quarterly and remove when fixed. Category B is permanent or structural: listed only, no re-check. The current registry is W01 through W24 in `src/users/default/agents/skills/nucleus-platform-reference/references/upstream-workarounds.md`.
 
 Check markers: `# WHY:` lines containing `PR #`, `issue #`, `nixpkgs`, `upstream`, `nix-darwin`, or `UTM #`; `overrideAttrs` on named packages; `patches = [ ./... ]`; `substituteInPlace`; `permittedInsecurePackages`. Quarterly cadence aligns with T3 review in `allow-and-deny-lists.instructions.md`.
 

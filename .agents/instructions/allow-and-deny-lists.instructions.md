@@ -6,7 +6,7 @@ applyTo: "scripts/**, src/**, tests/**"
 
 # Allow and deny list policy
 
-Every hard-coded filter list carries a category id, a justification, and a tier. The full instance registry, with IDs A2 through E1, tiers, reasons, and verification, is in `.agents/skills/nucleus-policy-reference/references/allow-and-deny-lists.md`.
+Every hard-coded filter list carries a category id, a justification, and a tier. The full instance registry, with IDs A2 through E1, tiers, reasons, and verification, is in `src/users/default/agents/skills/nucleus-policy-reference/references/allow-and-deny-lists.md`.
 
 Tiers: T1 eliminate or replace with dynamic discovery; T2 self-prune with an error on stale entries; T3 track with `# ref: allow-and-deny-lists.instructions.md` at the site and quarterly review.
 

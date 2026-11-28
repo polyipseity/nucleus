@@ -10,4 +10,4 @@ Disk encryption is installer or manual; `nucleus-apply` never repartitions or re
 
 MacBook `/nix` needs an APFS synthetic mount, so `ensure_macos_nix_mount` appends `nix` to `/etc/synthetic.conf` and exits until reboot; apply never touches that file. After a bare-metal NixOS install, merge `nixos-generate-config` output into `src/hosts/NixOS/hardware/` and keep the Btrfs options from `disks.nix`.
 
-Details: `.agents/skills/nucleus-platform-reference/references/host-filesystem-scope.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/host-filesystem-scope.md`.

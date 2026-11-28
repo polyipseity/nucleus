@@ -6,7 +6,7 @@ applyTo: "scripts/vm.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/v
 
 # VM management
 
-Manifest: `src/modules/vms/VMs.json`. Field contracts, tokens, paths, host/guest matrices, ports, and backend detail live in `.agents/skills/nucleus-vm-reference/references/vm-reference.md`.
+Manifest: `src/modules/vms/VMs.json`. Field contracts, tokens, paths, host/guest matrices, ports, and backend detail live in `src/users/default/agents/skills/nucleus-vm-reference/references/vm-reference.md`.
 
 Locals and parameters holding an id are `vm_id`, `$vmId`, `-VmId`, never `vm_name`. Functions returning id lists are `vm_get_manifest_vm_ids`, `vm_get_running_ids`, `Get-VMRunningIdList`, never `*names*`.
 

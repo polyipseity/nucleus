@@ -12,4 +12,4 @@ Adding functionality: keep non-user-facing work as a plain script, add a subcomm
 
 `src/modules/completions/nucleus-apps.json` is generated from `mkNucleusApps`; regenerate manifest and completions in the same change and never hand-edit generated files. `nucleus-bootstrap` installs deps only and may call apply after. Windows self-elevates for `%ProgramData%\nucleus\bin`. Every POSIX command with subcommands needs a `.ps1` twin with matching `$Action`. The VS Code agent host wrapper is system-level, never per-user.
 
-Details: `.agents/skills/nucleus-platform-reference/references/nucleus-apps.md`.
+Details: `src/users/default/agents/skills/nucleus-platform-reference/references/nucleus-apps.md`.

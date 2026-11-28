@@ -10,4 +10,4 @@ File content (templates, profiles, start scripts, wrappers, Caddyfiles, READMEs)
 
 The five exception classes are generated content, static content under 10 lines, C# interop up to 25 lines, split static/dynamic wrappers, and DSC Script Get/Test/Set of 1-3 lines. Structured data passed as parameters is exempt. Shared content uses one file when language and purpose match.
 
-Platform read paths, token mechanisms, the shared-file registry, and lint wiring: `.agents/skills/nucleus-citation-reference/references/embedded-content.md`.
+Platform read paths, token mechanisms, the shared-file registry, and lint wiring: `src/users/default/agents/skills/nucleus-citation-reference/references/embedded-content.md`.

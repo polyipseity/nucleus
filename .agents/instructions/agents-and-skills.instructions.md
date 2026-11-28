@@ -12,4 +12,4 @@ Commit MIT, BSD, Apache-2.0, or AGPL skills; never commit proprietary, CC-NC, or
 
 The harness bridge runs scripts from `src/scripts/notify/harness/` through `nucleus-utils`, filters from `harness-filters.json`, and denies over ask over allow with no allow by omission. Hooks exit 0, wait timeouts are ceilings, commands stay bare names, and queued prompts are consumed before printing. `harness-notify.enable` is master, approval sources race, and drive gates only prompt injection. Sandbox socket spellings and File Provider identity rules are in the reference.
 
-Details: `.agents/skills/nucleus-harness-reference/references/agents-and-skills.md` and the three harness reference files.
+Details: `src/users/default/agents/skills/nucleus-harness-reference/references/agents-and-skills.md` and the three harness reference files.
