@@ -109,10 +109,14 @@ else
   _approval_rc=1
 fi
 
-if [ "$_approval_rc" -eq 0 ] && [ "$(cat "$TMPDIR_ROOT/out")" = "allow" ]; then
-  assert_pass "an answered approval prints the decision"
+_approval_doc="$(cat "$TMPDIR_ROOT/out")"
+if [ "$_approval_rc" -eq 0 ] && jq -eM \
+  '.version == 1 and .decision == "allow" and .reason == "hermes decision" and
+   .source == "hermes" and .timeouts == {"hermes": 300, "prompt": 600} and
+   (.timedOutSources == [])' <<<"$_approval_doc" >/dev/null; then
+  assert_pass "an answered approval prints the typed decision with its source"
 else
-  assert_fail "approval document" "rc=$_approval_rc out=$(cat "$TMPDIR_ROOT/out") err=$(cat "$TMPDIR_ROOT/err")"
+  assert_fail "approval document" "rc=$_approval_rc document=$_approval_doc err=$(cat "$TMPDIR_ROOT/err")"
 fi
 
 if [ "$(events_of approval | jq 'length')" = "1" ] &&

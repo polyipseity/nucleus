@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test: request-approval.sh request/response contract, a blocking harness hook
-# must get exactly one of allow|deny|ask on stdout, in every path, and must exit
-# 0 even when the broker is unreachable.
+# must get exactly one typed decision document on stdout, in every path, and
+# must exit 0 even when the broker is unreachable.
 #
 # The Hermes CLI is replaced by a recording stub so the suite never sends
 # anything; the /harness approve|deny side is simulated by writing the same
@@ -19,6 +19,7 @@ APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness/request-approval.sh"
 
 require_command mktemp "temporary directories for the recording stub"
 require_command find "locating the harness-bridge state directory"
+require_command jq "the typed decision document is asserted as JSON"
 
 ensure_safe_rm_env
 
@@ -131,6 +132,18 @@ wait_for_decision() {
   approval_out="$(cat "$TMPDIR_ROOT/out")"
 }
 
+# The resolver prints one typed document, never a bare word: check every field
+# that decides how an adapter renders it, including the source and the reason.
+# A substring check could pass on a second line or a stale source.
+typed_decision_matches() { # <document> <decision> <reason> <source> <timed-out-sources-json>
+  local _doc="$1" _decision="$2" _reason="$3" _source="$4" _timed_out="$5"
+  jq -eM --arg decision "$_decision" --arg reason "$_reason" \
+    --arg source "$_source" --argjson timedOut "$_timed_out" \
+    '.version == 1 and .decision == $decision and .reason == $reason and
+     .source == $source and .timeouts == {"hermes": 300, "prompt": 600} and
+     (.timedOutSources == $timedOut)' <<<"$_doc" >/dev/null
+}
+
 test_audit_log_records_the_decision() {
   write_config '{"harness-notify":{"enable":false}}'
   HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
@@ -159,8 +172,9 @@ test_remote_allow() {
   fi
   answer_request "$_request" allow
   wait_for_decision
-  if [ "$approval_rc" -eq 0 ] && [ "$approval_out" = "allow" ]; then
-    assert_pass "a remote allow decision is printed as allow"
+  if [ "$approval_rc" -eq 0 ] &&
+    typed_decision_matches "$approval_out" allow "hermes decision" hermes '[]'; then
+    assert_pass "a remote allow decision is printed as a typed allow from hermes"
   else
     assert_fail "allow" "rc=$approval_rc out=$approval_out err=$(cat "$TMPDIR_ROOT/err")"
   fi
@@ -178,8 +192,9 @@ test_remote_deny() {
   fi
   answer_request "$_request" deny
   wait_for_decision
-  if [ "$approval_rc" -eq 0 ] && [ "$approval_out" = "deny" ]; then
-    assert_pass "a remote deny decision is printed as deny"
+  if [ "$approval_rc" -eq 0 ] &&
+    typed_decision_matches "$approval_out" deny "hermes decision" hermes '[]'; then
+    assert_pass "a remote deny decision is printed as a typed deny from hermes"
   else
     assert_fail "deny" "rc=$approval_rc out=$approval_out"
   fi
@@ -193,18 +208,19 @@ test_timeout_asks_locally() {
   _state="$(find_state)"
   # The request must not linger as pending: an unanswered request is not a
   # decision the user can still make.
-  if [ "$approval_rc" -eq 0 ] && [ "$approval_out" = "ask" ] &&
+  if [ "$approval_rc" -eq 0 ] &&
+    typed_decision_matches "$approval_out" ask "no approval source answered" none '["hermes"]' &&
     [ -z "$(find "$_state/requests" -name '*.json' -print -quit 2>/dev/null)" ]; then
-    assert_pass "no answer within the timeout prints ask and clears the request"
+    assert_pass "no answer within the timeout prints a typed ask, names hermes as timed out, and clears the request"
   else
     assert_fail "timeout" "rc=$approval_rc out=$approval_out state=$(find "$_state" -type f)"
   fi
 }
 
-test_unwritable_state_answers_ask() {
+test_unwritable_state_answers_resolver_error() {
   # A USER root that cannot be written must not leave the harness without a
   # document: Copilot reads an unanswered PreToolUse hook as a denial, so the
-  # failure has to come back as `ask` and let the harness prompt locally.
+  # failure comes back as a typed resolver-error deny that names the cause.
   #
   # The state directory lives under the platform's USER root, so the unwritable
   # level has to be the root's own parent: on macOS `<home>/Library/Application
@@ -228,14 +244,16 @@ test_unwritable_state_answers_ask() {
   local _residue
   _residue="$(find "$TMPDIR_ROOT" -name '*.tmp' -print -quit 2>/dev/null)"
   chmod 700 "$_ro_home" "$_ro_parent"
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
-    assert_elapsed_below "an unwritable state directory answers ask at once" 20 "$_elapsed" 30
+  if [ "$_rc" -eq 0 ] &&
+    typed_decision_matches "$_out" deny "could not create the harness-bridge state directory" resolver-error '[]' &&
+    [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_elapsed_below "an unwritable state directory answers a typed resolver-error deny at once" 20 "$_elapsed" 30
   else
     assert_fail "unwritable-state" "rc=$_rc out=$_out elapsed=${_elapsed}s residue=$_residue log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
 }
 
-test_unreadable_config_answers_ask() {
+test_unreadable_config_answers_resolver_error() {
   # An unreadable config is not a licence to die: this script must always print a
   # decision, and the .ps1 twin reaches its neutral answer through `catch`.
   write_config_brokering
@@ -246,9 +264,10 @@ test_unreadable_config_answers_ask() {
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" pi bash "rm -rf build" 30 2>/dev/null)" || _rc=$?
   chmod 600 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ -z "$(pending_requests)" ] &&
-    [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
-    assert_pass "an unreadable config answers ask without brokering"
+  if [ "$_rc" -eq 0 ] &&
+    typed_decision_matches "$_out" deny "could not read nucleus config" resolver-error '[]' &&
+    [ -z "$(pending_requests)" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_pass "an unreadable config answers a typed resolver-error deny without brokering"
   else
     assert_fail "unreadable-config" "rc=$_rc out=$_out requests=$(pending_requests) log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
@@ -261,9 +280,10 @@ test_disabled_bridge_asks_without_request() {
   local _out=""
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" pi bash "rm -rf build" 5)" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] &&
+  if [ "$_rc" -eq 0 ] &&
+    typed_decision_matches "$_out" ask "harness notifications are disabled" none '[]' &&
     [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
-    assert_pass "harness-notify.enable=false answers ask without notifying"
+    assert_pass "harness-notify.enable=false answers a typed ask without notifying"
   else
     assert_fail "disabled" "rc=$_rc out=$_out log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
@@ -278,8 +298,10 @@ test_approval_disabled_asks_without_request() {
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
   local _elapsed=$((SECONDS - _start))
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
-    assert_elapsed_below "an empty source list answers ask at once without notifying" 20 "$_elapsed" 30
+  if [ "$_rc" -eq 0 ] &&
+    typed_decision_matches "$_out" ask "no approval sources enabled" none '[]' &&
+    [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
+    assert_elapsed_below "an empty source list answers a typed ask at once without notifying" 20 "$_elapsed" 30
   else
     assert_fail "approval-off" "rc=$_rc out=$_out elapsed=${_elapsed}s log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
@@ -290,8 +312,9 @@ test_missing_arguments_asks() {
   local _out=""
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" pi 2>/dev/null)" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ]; then
-    assert_pass "missing arguments print ask and exit 0"
+  if [ "$_rc" -eq 0 ] &&
+    typed_decision_matches "$_out" deny "harness-approval requires a tool name" resolver-error '[]'; then
+    assert_pass "missing arguments print a typed resolver-error deny and exit 0"
   else
     assert_fail "usage" "rc=$_rc out=$_out"
   fi
@@ -354,8 +377,8 @@ test_request_file_carries_the_action() {
 test_remote_allow
 test_remote_deny
 test_timeout_asks_locally
-test_unwritable_state_answers_ask
-test_unreadable_config_answers_ask
+test_unwritable_state_answers_resolver_error
+test_unreadable_config_answers_resolver_error
 test_disabled_bridge_asks_without_request
 test_approval_disabled_asks_without_request
 test_missing_arguments_asks

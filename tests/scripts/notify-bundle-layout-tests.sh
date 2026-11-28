@@ -55,8 +55,14 @@ _stdout="$(printf '%s' '{"tool_name":"bash","tool_input":{"command":"rm -f /tmp/
     bash "$RUNNER" pi 2>"$WORK/stderr")" || _rc=$?
 _stderr="$(cat "$WORK/stderr")"
 
-if [ "$_rc" -eq 0 ] && [ "$_stdout" = "allow" ]; then
-  assert_pass "the store layout prints the filter verdict"
+# The filter's reason embeds the fixture wrapper path, so build the exact
+# expected document from the layout rather than checking a fragment of it.
+_expected_reason="safe-delete (proven-redirect): deletion command: rm resolves to the home-manager safe-delete wrapper at $LAYOUT/home/.local/bin/rm"
+if [ "$_rc" -eq 0 ] && jq -eM --arg reason "$_expected_reason" \
+  '.version == 1 and .decision == "allow" and .reason == $reason and
+   .source == "none" and .timeouts == {"hermes": 300, "prompt": 600} and
+   (.timedOutSources == [])' <<<"$_stdout" >/dev/null; then
+  assert_pass "the store layout prints the typed filter verdict"
 else
   assert_fail "store layout verdict" "rc=$_rc stdout='$_stdout' stderr: $_stderr"
 fi
