@@ -173,10 +173,13 @@ let
       hermesHostServices.NixOS == "hermes-agent.service"
     ) "NixOS hermes-agent service must be hermes-agent.service")
     (assert' (hermesHosts.NixOS.scope == "user") "NixOS hermes-agent must be user-scoped")
-    (assert' (hermesHostTypes.Windows == "windows-native") "Windows hermes-agent must be native SCM")
     (assert' (
-      hermesHostServices.Windows == "hermes-gateway"
-    ) "Windows hermes-agent service must be hermes-gateway")
+      hermesHostTypes.Windows == "windows-user-autostart"
+    ) "Windows hermes-agent must use per-user autostart")
+    (assert' (
+      hermesHostServices.Windows == "nucleus-hermes-gateway"
+    ) "Windows hermes-agent service must be nucleus-hermes-gateway")
+    (assert' (hermesHosts.Windows.scope == "user") "Windows hermes-agent must be user-scoped")
 
     # --- Redis invariants ---
     (assert' (redis.network.default.host == "127.0.0.1") "redis must bind loopback")

@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-  Provision hermes-agent directory, environment, and SCM service on Windows.
+  Provision the hermes-agent directory and environment on Windows, with a
+  per-user gateway autostart value and no SCM registration.
 
 .DESCRIPTION
   Windows equivalent of the POSIX activation entries in hermes-agent.nix.
@@ -79,6 +80,47 @@ function Get-HermesGatewayTask {
   return Get-ScheduledTask -TaskName 'HermesGateway' -ErrorAction SilentlyContinue
 }
 
+function Remove-HermesGatewayService {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
+
+  # WHY: the SCM registration predates the user-scoped Run key. Deleting it
+  # converges hosts that were managed by an earlier apply.
+  $existing = Get-HermesGatewayService
+  if ($null -eq $existing) { return }
+  if (-not $PSCmdlet.ShouldProcess('hermes-gateway', 'Remove SCM service')) { return }
+  if ($existing.Status -ne 'Stopped') {
+    Stop-Service -Name 'hermes-gateway' -Force
+  }
+  & sc.exe delete 'hermes-gateway' > $null
+}
+
+function Set-HermesGatewayRunValue {
+  [CmdletBinding(SupportsShouldProcess)]
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string]$Command
+  )
+
+  $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  if (-not $PSCmdlet.ShouldProcess($runKey, "Set $Name")) { return }
+  if (-not (Test-Path -LiteralPath $runKey)) {
+    New-Item -Path $runKey -Force > $null
+  }
+  New-ItemProperty -Path $runKey -Name $Name -Value $Command -PropertyType String -Force > $null
+}
+
+function Remove-HermesGatewayRunValue {
+  [CmdletBinding(SupportsShouldProcess)]
+  param([Parameter(Mandatory)][string]$Name)
+
+  $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  if (-not (Test-Path -LiteralPath $runKey)) { return }
+  if (-not $PSCmdlet.ShouldProcess($runKey, "Remove $Name")) { return }
+  # WHY: absence is the converged state, so a missing value is not an error.
+  Remove-ItemProperty -Path $runKey -Name $Name -ErrorAction SilentlyContinue # check-suppress:suppression_doc: Remove-ItemProperty errors when the nucleus-hermes-gateway Run value is absent on first provision; Test-Path above still guards the Run key, and a missing value is the converged state
+}
+
 function Get-HermesCliPath {
   <#
   .SYNOPSIS
@@ -148,6 +190,8 @@ function Sync-HermesConfig {
       Remove-Item -LiteralPath $pluginLink -Force
       Write-NucleusNotice "[$label] removed $pluginLink"
     }
+    Remove-HermesGatewayService
+    Remove-HermesGatewayRunValue -Name 'nucleus-hermes-gateway'
     Write-NucleusNotice "[$label] disabled — skipping"
     return
   }
@@ -198,7 +242,7 @@ function Sync-HermesConfig {
   $env:HERMES_HOME = $defaultHermesHome
 
   # WHY: a Scheduled Task from an earlier `hermes gateway install` conflicts with
-  # the SCM service installed below. Cleanup, not migration.
+  # the user Run key installed below. Cleanup, not migration.
   # check-suppress:suppression_doc: task may not exist; probe is best-effort
   $existingTask = Get-HermesGatewayTask
   if ($null -ne $existingTask) {
@@ -214,26 +258,17 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] removed outdated startup item: $($f.Name)"
   }
 
-  # WHY: SCM gives quadratic-backoff auto-restart on crash (PR #50200), matching
-  # launchd KeepAlive and systemd Restart=always. Needs admin rights.
+  # WHY: the gateway owns per-user secrets and profile state, so logon-owned
+  # HKCU Run is the carrier. The old SCM service has to go away in the same
+  # convergence pass or two gateways would compete for the same state.
+  Remove-HermesGatewayService
   # check-suppress:suppression_doc: hermes may not be installed; probe is best-effort
   $hermesBin = Get-HermesCliPath
   if ($null -ne $hermesBin) {
-    # check-suppress:suppression_doc: service may not exist; probe is best-effort
-    $existingSvc = Get-HermesGatewayService
-    if ($null -eq $existingSvc) {
-      Write-NucleusNotice "[$label] installing hermes-agent SCM Windows Service..."
-      & $hermesBin gateway install --service-type service
-      Write-NucleusNotice "[$label] hermes-agent SCM service installed"
-    }
+    Set-HermesGatewayRunValue -Name 'nucleus-hermes-gateway' -Command 'hermes --profile gateway gateway run --replace'
+    Write-NucleusNotice "[$label] ensured HKCU Run value nucleus-hermes-gateway"
   } else {
-    Write-NucleusWarning "[$label] hermes binary not found — cannot install SCM service"
-  }
-
-  # check-suppress:suppression_doc: service may not exist; probe is best-effort
-  $svc = Get-HermesGatewayService
-  if ($null -eq $svc) {
-    Write-NucleusWarning "[$label] hermes-gateway SCM service not found after install"
+    Write-NucleusWarning "[$label] hermes binary not found — cannot set gateway autostart"
   }
 
   $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright'

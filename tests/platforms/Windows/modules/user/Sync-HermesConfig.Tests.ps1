@@ -21,6 +21,22 @@
     required on macOS/Linux where the tests also run.
 #>
 
+# WHY: fixture cleanup must not depend on the interactive profile's safe-delete
+# wrapper; these paths are all built from this suite's temp roots.
+function Clear-HermesTestPath {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.LinkType -eq 'SymbolicLink') {
+        [System.IO.File]::Delete($Path)
+    } elseif ($item.PSIsContainer) {
+        [System.IO.Directory]::Delete($Path, $true)
+    } else {
+        [System.IO.File]::Delete($Path)
+    }
+}
+
 Describe 'Sync-HermesConfig harness-bridge plugin link' {
     BeforeAll {
         Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
@@ -46,6 +62,18 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $null = New-Item -ItemType Directory -Path $script:homeRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path $script:localAppData -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $script:pluginLink = Join-Path $script:localAppData 'hermes\plugins\harness-bridge'
+
+        # A stand-in hermes CLI lets the autostart case reach the plugin gate
+        # without leaving the test host; an enabled plugin needs no further
+        # calls. The real CLI contract is verified separately on a real host.
+        $script:standInHermes = Join-Path $script:homeRoot 'stand-in-hermes'
+        if ($IsWindows) {
+            $script:standInHermes = "$($script:standInHermes).cmd"
+            Set-Content -Path $script:standInHermes -Value @('@echo Status: enabled', 'exit /b 0')  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        } else {
+            Set-Content -Path $script:standInHermes -Value @('#!/bin/sh', 'echo "Status: enabled"', 'exit 0')  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+            $null = & chmod 755 $script:standInHermes  # check-suppress:suppression_doc: chmod returns nothing; the exit status is not the subject of this setup
+        }
 
         $script:originalHome = $HOME
         $script:originalLocalAppData = $env:LOCALAPPDATA
@@ -96,6 +124,26 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         Mock Get-HermesBunPath { return $null }
         Mock Get-HermesGatewayService { return $null }
         Mock Get-HermesGatewayTask { return $null }
+
+        # WHY: SCM changes and HKCU writes or removals cannot run on the test
+        # host. Mocking the module's boundary commands to these recorders
+        # captures the arguments without touching the machine. The Invoke- verbs
+        # keep the local recorders out of PSSA's state-changing-function rule.
+        $script:scmRemovals = 0
+        $script:runValues = @{}
+        $script:runValueRemovals = @()
+        function Invoke-HermesGatewayServiceRemoval { $script:scmRemovals++ }
+        function Invoke-HermesGatewayRunValueWrite {
+            param([string]$Name, [string]$Command)
+            $script:runValues[$Name] = $Command
+        }
+        function Invoke-HermesGatewayRunValueRemoval {
+            param([string]$Name)
+            $script:runValueRemovals += $Name
+        }
+        Mock Remove-HermesGatewayService { Invoke-HermesGatewayServiceRemoval }
+        Mock Set-HermesGatewayRunValue { Invoke-HermesGatewayRunValueWrite -Name $Name -Command $Command }
+        Mock Remove-HermesGatewayRunValue { Invoke-HermesGatewayRunValueRemoval -Name $Name }
     }
 
     AfterAll {
@@ -103,18 +151,23 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $env:LOCALAPPDATA = $script:originalLocalAppData
         $env:APPDATA = $script:originalAppData
         foreach ($path in @($script:repoRoot, $script:homeRoot, $script:localAppData, $script:appData)) {
-            if ($path -and (Test-Path -LiteralPath $path)) {
-                # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
-                Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
-            }
+            if ($path) { Clear-HermesTestPath -Path $path }
         }
     }
 
     BeforeEach {
-        if (Test-Path -LiteralPath $script:pluginLink) {
-            # check-suppress:suppression_doc: test reset -- failure is acceptable
-            Remove-Item -LiteralPath $script:pluginLink -Recurse -Force -ErrorAction SilentlyContinue
-        }
+        $script:scmRemovals = 0
+        $script:runValues = @{}
+        $script:runValueRemovals = @()
+        Clear-HermesTestPath -Path $script:pluginLink
+    }
+
+    It 'replaces the SCM service with a per-user gateway Run value' {
+        Mock Get-HermesCliPath { return $script:standInHermes }
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $script:scmRemovals | Should -Be 1
+        $script:runValues['nucleus-hermes-gateway'] | Should -Be 'hermes --profile gateway gateway run --replace'
     }
 
     It 'links the plugin into HERMES_HOME on an enabled run' {
@@ -171,6 +224,13 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         Sync-HermesConfig -Enabled:$false -User 'testuser' -RepoRoot $script:repoRoot > $null
 
         Test-Path -LiteralPath $script:pluginLink | Should -Be $false
+    }
+
+    It 'removes the gateway Run value exactly once when disabled' {
+        Sync-HermesConfig -Enabled:$false -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $script:runValueRemovals.Count | Should -Be 1
+        $script:runValueRemovals[0] | Should -Be 'nucleus-hermes-gateway'
     }
 
     It 'installs the pinned Playwright Chromium with bun and leaves the env var alone when none appears' {

@@ -84,6 +84,7 @@ BeforeAll {
   # Windows-only cmdlets. Each Mock below overrides its stub.
   function Get-NucleusLogDir { throw 'stub: Get-NucleusLogDir' }
   function Get-NucleusSystemLogDir { throw 'stub: Get-NucleusSystemLogDir' }
+  function Get-UserAutostartCommand { throw 'stub: Get-UserAutostartCommand' }
   # PSSA: these stubs intentionally shadow built-in cmdlets (Pester v5 cannot
   # Mock nonexistent commands) and are immediately replaced by Mock definitions;
   # the inline suppressions are scoped to each stub only.
@@ -568,6 +569,26 @@ Describe 'Get-ServiceStatus' {
     }
   }
 
+  Context 'user-autostart type' {
+    It 'reports the per-user logon carrier instead of an unknown service' {
+      Mock Get-UserAutostartCommand { return 'hermes --profile gateway gateway run --replace' }
+
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-user-autostart'; service = 'nucleus-hermes-gateway' }
+      $status.status | Should -Be 'user-autostart'
+      $status.enabled | Should -Be $true
+      $status.running | Should -Be $false
+      $status.error | Should -BeNullOrEmpty
+    }
+
+    It 'reports not-found when the logon carrier is absent' {
+      Mock Get-UserAutostartCommand { return '' }
+
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-user-autostart'; service = 'nucleus-hermes-gateway' }
+      $status.status | Should -Be 'not-found'
+      $status.enabled | Should -Be $false
+    }
+  }
+
   Context 'unknown type' {
     It 'returns unknown status' {
       $status = Get-ServiceStatus -HostEntry @{ type = 'unsupported' }
@@ -967,6 +988,23 @@ Describe 'Dispatch' {
       Invoke-Dispatch -Action verify -ServiceName @('cloud-drive')
 
       Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'no instances found' }
+    }
+  }
+
+  Context 'user-autostart verify' {
+    It 'passes verify for an enabled HKCU Run carrier without claiming a running daemon' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'hermes-agent' -DisplayName 'Hermes Agent' -InstanceId 'hermes-agent' -Class 'live' -HostEntry @{ type = 'windows-user-autostart'; service = 'nucleus-hermes-gateway' })
+      }
+      Mock Get-UserAutostartCommand { return 'hermes --profile gateway gateway run --replace' }
+      Mock Write-NucleusInfo { }
+      Mock Write-NucleusWarning { }
+
+      { Invoke-Dispatch -Action verify -ServiceName @('hermes-agent') } | Should -Not -Throw
+
+      Should -Invoke Write-NucleusInfo -Exactly 1 -ParameterFilter { $Message -match 'verify hermes-agent — user-autostart' }
+      Should -Invoke Write-NucleusInfo -Exactly 0 -ParameterFilter { $Message -match 'verify hermes-agent — active' }
+      Should -Invoke Write-NucleusWarning -Exactly 0
     }
   }
 

@@ -403,7 +403,7 @@
     "firing": "daemon"
   },
   "hermes-agent": {
-    "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
+    "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, ntfy) and cron jobs",
     "displayName": "Hermes Agent",
     "logging": {
       "capture": "all",
@@ -433,11 +433,11 @@
         "unitPath": "~/.config/systemd/user/hermes-agent.service"
       },
       "Windows": {
-        "service": "hermes-gateway",
-        "type": "windows-native",
+        "service": "nucleus-hermes-gateway",
+        "type": "windows-user-autostart",
         "platform": "Windows",
-        "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME.",
-        "scope": "system"
+        "justification": "User-scoped gateway with per-user secrets and profile state.",
+        "scope": "user"
       }
     }
   },

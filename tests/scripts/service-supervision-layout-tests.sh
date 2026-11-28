@@ -11,6 +11,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly REPO_ROOT
 
+# shellcheck source=../../src/scripts/lib/service-targets.sh
+. "$REPO_ROOT/src/scripts/lib/service-targets.sh"
+
 init_test_state
 require_command jq "services.json and matrix checks read structured data"
 require_command python3 "token and matrix checks parse policy/script content"
@@ -93,10 +96,21 @@ PY
   assert_pass "policy matrix covers registry services and existing script paths"
 }
 
+test_windows_user_autostart_is_accepted() {
+  if service_type_supported windows-user-autostart &&
+    ! service_type_supported not-a-service-type; then
+    assert_pass "windows-user-autostart is an accepted service type"
+  else
+    assert_fail "windows-user-autostart is an accepted service type" \
+      "the registry type gate did not separate the accepted type from an unknown one"
+  fi
+}
+
 section 1 "service supervision layout"
 echo ""
 
 test_restart_tokens_require_why
 test_policy_matrix_covers_registry_services
+test_windows_user_autostart_is_accepted
 
 finish_tests

@@ -85,7 +85,7 @@ run_service_registry() {
     # Validate each host entry has valid type, platform ref, and required fields
     while IFS=$'\t' read -r _name _host _type _platform _has_required; do
       case "$_type" in
-      macos-launchctl | nixos-systemctl | windows-native | windows-schtask | omitted) ;;
+      macos-launchctl | nixos-systemctl | windows-native | windows-schtask | windows-user-autostart | omitted) ;;
       *)
         error "services.json: '$_name' host '$_host' has invalid type '$_type'"
         _svc_errors=$((_svc_errors + 1))
@@ -116,6 +116,7 @@ run_service_registry() {
           elif .value.type == "nixos-systemctl" then (.value.service | type == "string" and length > 0)
           elif .value.type == "windows-native" then (.value.service | type == "string" and length > 0)
           elif .value.type == "windows-schtask" then (.value.taskPath | type == "string" and length > 0)
+          elif .value.type == "windows-user-autostart" then (.value.service | type == "string" and length > 0)
           elif .value.type == "omitted" then (.value.justification | type == "string" and length > 0)
           else false
           end | tostring
@@ -132,7 +133,7 @@ run_service_registry() {
           _svc_errors=$((_svc_errors + 1))
         fi
         ;;
-      macos-launchctl | nixos-systemctl | windows-native | windows-schtask)
+      macos-launchctl | nixos-systemctl | windows-native | windows-schtask | windows-user-autostart)
         case "$_scope" in
         user | system) ;;
         *)

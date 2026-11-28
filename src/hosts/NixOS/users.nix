@@ -3,9 +3,11 @@
   users.users.${username} = {
     # networkmanager: allows the user to manage Wi-Fi/VPN without sudo.
     # wheel: grants sudo access.
+    # docker: the NixOS daemon module grants this group access to the socket.
     # Source: NixOS users.users option and group membership semantics.
     # https://mynixos.com/nixpkgs/option/users.users
     extraGroups = [
+      "docker"
       "networkmanager"
       "wheel"
     ];

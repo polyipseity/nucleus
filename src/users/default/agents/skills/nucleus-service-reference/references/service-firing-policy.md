@@ -87,7 +87,7 @@ Native supervisors own crash recovery. The watchdog owns liveness probes, repair
 | `ds-store-gc` | launchd agent oneshot (`StartCalendarInterval`, no `KeepAlive`) | omitted | omitted | not a persistent daemon | periodic cleanup script run by timer | timer/oneshot |
 | `gc-weekly` | omitted in managed service set | omitted | omitted | n/a | periodic job (platform-defined) | timer/oneshot |
 | `gui-env` | launchd agent login oneshot (`RunAtLoad`, no `KeepAlive`) | omitted | omitted | not a persistent daemon | activation/login env propagation scripts | oneshot |
-| `hermes-agent` | launchd agent, `RunAtLoad`+`KeepAlive` | systemd user, `Restart=always` | SCM/native service | supervised | no audited restart loop | native=crash recovery |
+| `hermes-agent` | launchd agent, `RunAtLoad`+`KeepAlive` | systemd user, `Restart=always` | HKCU Run value `nucleus-hermes-gateway` (per-user logon carrier, no SCM service) | not supervised; watchdog skips it (no SCM/schtask supervisor kind) | no audited restart loop | native=crash recovery on macOS/NixOS; Windows=logon carrier, no daemon |
 | `icloud-exclusions` | launchd agent periodic oneshot (`StartInterval`, no `KeepAlive`) | omitted | omitted | not a persistent daemon | periodic script | timer/oneshot |
 | `jellyfin` | launchd daemon `org.nixos.jellyfin`, `RunAtLoad`+`KeepAlive` | systemd `jellyfin.service`, `Restart=always` | SCM `JellyfinServer` | supervised | no audited restart loop | native=crash recovery |
 | `linux-builder` | launchd daemon `org.nixos.linux-builder`, `RunAtLoad`+`KeepAlive` | omitted (native builds) | omitted | supervised on macOS | no audited restart loop; operator/audit helpers outside audited service-script scope may kickstart explicitly (separate concern) | native=crash recovery |

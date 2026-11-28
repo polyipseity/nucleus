@@ -170,6 +170,7 @@ function Enable-ManagedServiceSet {
 
   .DESCRIPTION
     Native services get StartupType Automatic and scheduled tasks are enabled.
+    User autostart rows have no enable gate and are returned without a change.
     No target is started here. The returned ids are the targets this pass
     cleared, for the repair pass to consider after convergence.
 
@@ -212,6 +213,10 @@ function Enable-ManagedServiceSet {
       'windows-schtask' {
         $parts = Split-SupervisorTarget -Target $hostEntry.taskPath
         Enable-ScheduledTask -TaskPath $parts.Path -TaskName $parts.Name -ErrorAction Stop
+      }
+      'windows-user-autostart' {
+        # WHY: the HKCU Run value has no SCM or scheduler enable gate. The user
+        # activation step owns this carrier, so there is nothing to clear here.
       }
       default {
         throw "Enable-ManagedServiceSet: unsupported type '$($hostEntry.type)' for $($row.instanceId)"
@@ -394,6 +399,10 @@ function Repair-ManagedServiceSet {
         $task = Get-NucleusScheduledTask -TaskPath $parts.Path -TaskName $parts.Name
         if ($null -ne $task -and $task.Settings.Enabled) { continue }
         Enable-ScheduledTask -TaskPath $parts.Path -TaskName $parts.Name -ErrorAction Stop
+      }
+      'windows-user-autostart' {
+        # WHY: the HKCU Run value is written before logon, so it has no loaded
+        # state for the post-apply repair pass to probe or restart.
       }
       default {
         throw "Repair-ManagedServiceSet: unsupported type '$($hostEntry.type)' for $target"

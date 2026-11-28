@@ -74,3 +74,35 @@ custom_providers:
       default-free:
         maxInputTokens: 256000
         maxOutputTokens: 16000
+
+# WHY: Telegram and Discord pair unknown users instead of trusting ambient
+# identity. The allowlists stay empty here and are filled in a user overlay.
+gateway:
+  unauthorized_dm_behavior: pair
+
+platforms:
+  telegram:
+    enabled: true
+    allow_from: []
+    group_allow_from: []
+    group_allowed_chats: []
+    extra:
+      unauthorized_dm_behavior: pair
+  discord:
+    enabled: true
+    extra:
+      allow_from: []
+      allowed_roles: []
+      allowed_channels: []
+      require_mention: true
+      # WHY: exec approval buttons stay admin-only; with no admins configured
+      # they fail closed until a user overlay names them.
+      require_admin_for_exec_approval: true
+      allow_admin_from: []
+  # WHY: ntfy has no native user identity. A private topic plus its read token
+  # is the trust boundary, so neither value is stored in the repo.
+  ntfy:
+    enabled: true
+    allow_from: []
+    extra:
+      markdown: true

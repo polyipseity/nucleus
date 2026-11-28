@@ -48,6 +48,10 @@
   # per-user link cannot guarantee.
   environment.etc."asound.conf".source = ../../modules/configs/asound/asound.conf;
 
+  # WHY: the gateway's Docker terminal backend needs a local daemon. The CLI is
+  # supplied by the managed docker package; this option owns the daemon.
+  virtualisation.docker.enable = true;
+
   # Journald retention: cap total journal size so disk-bound systemd services
   # (all managed nucleus services on NixOS) don't grow unbounded.
   services.journald.settings.Journal = {

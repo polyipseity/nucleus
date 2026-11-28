@@ -2,10 +2,23 @@
 # Live service targets from the registry. Defines functions and constants only.
 # Each host entry is either a registry key or one concrete prefix-match instance.
 
-# WHY: host filtering and omitted exclusion stay here so svc and apply cannot
-# disagree about which registry rows exist for a host.
+# WHY: svc and apply need one list of registry types they understand. HKCU Run
+# is a real carrier, but user activation owns it, not a supervisor probe.
+service_type_supported() {
+  case "$1" in
+  macos-launchctl | nixos-systemctl | windows-native | windows-schtask | windows-user-autostart)
+    return 0
+    ;;
+  *)
+    return 1
+    ;;
+  esac
+}
+
+# WHY: host filtering, omitted exclusion, and type validation stay here so svc
+# and apply cannot disagree about which registry rows exist for a host.
 service_registry_for_host() {
-  local registry="$1" host="$2"
+  local registry="$1" host="$2" filtered svc_type
 
   if [ ! -f "$registry" ]; then
     printf 'services registry not found at %s\n' "$registry" >&2
@@ -16,14 +29,23 @@ service_registry_for_host() {
     return 1
   fi
 
-  jq -c --arg host "$host" '
+  filtered="$(jq -c --arg host "$host" '
     to_entries | map(
       select(.value | type == "object")
       | select(.value.hosts | has($host))
       | select(.value.hosts[$host].type != "omitted")
       | {key: .key, value: {displayName: .value.displayName, description: .value.description, network: .value.network, hostEntry: .value.hosts[$host]}}
     ) | from_entries
-  ' "$registry"
+  ' "$registry")" || return 1
+
+  while IFS= read -r svc_type; do
+    if ! service_type_supported "$svc_type"; then
+      printf 'unsupported service type %s in %s\n' "$svc_type" "$registry" >&2
+      return 1
+    fi
+  done < <(printf '%s\n' "$filtered" | jq -r 'to_entries[].value.hostEntry.type')
+
+  printf '%s\n' "$filtered"
 }
 
 # Loads the prefix-match helpers only when a prefix row is expanded, so callers

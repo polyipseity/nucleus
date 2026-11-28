@@ -49,7 +49,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Platfo
           $svcErrors++
         }
         $type = $hEntry.type
-        if ($type -notin @('macos-launchctl', 'nixos-systemctl', 'windows-native', 'windows-schtask', 'omitted')) {
+        if ($type -notin @('macos-launchctl', 'nixos-systemctl', 'windows-native', 'windows-schtask', 'windows-user-autostart', 'omitted')) {
           Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid type '$type'"
           $svcErrors++
         }
@@ -62,6 +62,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Platfo
           'nixos-systemctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
           'windows-native' { -not [string]::IsNullOrEmpty($hEntry.service) }
           'windows-schtask' { -not [string]::IsNullOrEmpty($hEntry.taskPath) }
+          'windows-user-autostart' { $hEntry.ContainsKey('service') -and -not [string]::IsNullOrEmpty($hEntry.service) }
           'omitted' { -not [string]::IsNullOrEmpty($hEntry.justification) }
           default { $false }
         }
@@ -75,7 +76,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Platfo
             Write-ErrorMessage "services.json: '$svcName' host '$hostName' is omitted but has scope '$scope'"
             $svcErrors++
           }
-        } elseif ($type -in @('macos-launchctl', 'nixos-systemctl', 'windows-native', 'windows-schtask')) {
+        } elseif ($type -in @('macos-launchctl', 'nixos-systemctl', 'windows-native', 'windows-schtask', 'windows-user-autostart')) {
           if ($scope -notin @('user', 'system')) {
             Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid or missing scope '$scope'"
             $svcErrors++

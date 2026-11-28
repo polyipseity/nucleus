@@ -143,6 +143,15 @@ properties:
     - resource: Microsoft.WinGet.Client/Package
       directives:
         description: >-
+          Docker Desktop supplies the daemon and CLI the Hermes gateway uses on
+          Windows; macOS keeps OrbStack and NixOS runs the system daemon.
+      settings:
+        id: Docker.DockerDesktop
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
           Eclipse Temurin JDK 25 (latest LTS) — cross-platform parity with macOS
           (Homebrew cask openjdk@25) and NixOS (nixpkgs jdk floating LTS alias).
           Enabled by default via the single-source overlap enable flag.

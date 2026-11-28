@@ -28,7 +28,7 @@ let
   declarations = [
     "services.hermes-agent.settings.terminal.backend = \"local\""
     "services.hermes-agent.settings.approvals.mode = \"smart\""
-    "services.hermes-agent.gateway.enable = hostName == \"MacBook\" || hostName == \"NixOS\" || hostName == \"Windows\""
+    "services.hermes-agent.gateway.enable =\n    hostName == \"MacBook\" || hostName == \"NixOS\" || hostName == \"Windows\""
   ];
 
   tests = builtins.filter (x: x != null) (

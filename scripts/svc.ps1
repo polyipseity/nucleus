@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Unified service management and log inspection for Windows (windows-native, windows-schtask).
+  Unified service management and log inspection for Windows (windows-native, windows-schtask, windows-user-autostart).
 
 .DESCRIPTION
   Services come from src/modules/services.json, addressed by registry key. Entries flagged
@@ -504,6 +504,22 @@ function Test-ServiceIsSystemScope {
   return $plat.scope -eq 'system'
 }
 
+function Get-UserAutostartCommand {
+  <#
+  .SYNOPSIS
+    Reads the HKCU Run value a per-user service uses as its logon carrier.
+  #>
+  param(
+    [string]$Name
+  )
+
+  $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+  # check-suppress:suppression_doc: probe -- a user may not have this value; the null result is handled below.
+  $values = Get-ItemProperty -LiteralPath $runKey -ErrorAction SilentlyContinue
+  if ($null -eq $values) { return $null }
+  return [string]$values.$Name
+}
+
 function Get-ServiceStatus {
   param(
     [hashtable]$HostEntry
@@ -568,6 +584,18 @@ function Get-ServiceStatus {
           return @{ status = 'not-found'; running = $false; enabled = $false }
         }
         return @{ status = 'unknown'; running = $false; enabled = $null }
+      }
+    }
+    'windows-user-autostart' {
+      # WHY: this carrier is an HKCU Run value rather than an SCM service or a
+      # scheduled task, so SCM and scheduler probes would report something that
+      # was never meant to exist. The command exists only after logon.
+      $command = Get-UserAutostartCommand -Name $HostEntry.service
+      $enabled = -not [string]::IsNullOrWhiteSpace([string]$command)
+      return @{
+        status  = if ($enabled) { 'user-autostart' } else { 'not-found' }
+        running = $false
+        enabled = $enabled
       }
     }
     default {
@@ -1076,6 +1104,10 @@ switch ($Action) {
       if ($status.running) {
         $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
         Write-NucleusInfo -CommandName 'svc' "verify $($entry.instanceId) — active$pidStr"
+      } elseif ($status.status -eq 'user-autostart' -and $status.enabled) {
+        # WHY: an HKCU Run value is a logon carrier, not a daemon. Its enabled
+        # command is what verify can check; no process has to be running yet.
+        Write-NucleusInfo -CommandName 'svc' "verify $($entry.instanceId) — user-autostart (enabled, not running)"
       } else {
         $diag = if ($status.status) { " ($($status.status))" } else { '' }
         Write-NucleusWarning "$($entry.instanceId) — inactive$diag"

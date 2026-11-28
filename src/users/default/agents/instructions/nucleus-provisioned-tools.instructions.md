@@ -143,6 +143,7 @@ Each tool below is installed on this machine. Links go to official documentation
 - [`alsa-utils`](https://www.alsa-project.org/wiki/Main_Page): ALSA utilities.
 - [`caddy`](https://caddyserver.com/docs/): web server and reverse proxy.
 - [`camilladsp`](https://henquist.github.io/): audio DSP engine.
+- [`docker`](https://docs.docker.com/reference/cli/): container CLI.
 - [`jellyfin`](https://jellyfin.org/docs/): media server.
 - [`litellm`](https://docs.litellm.ai/): LLM proxy and gateway.
 - [`ollama`](https://github.com/ollama/ollama/tree/main/docs): local model runtime.

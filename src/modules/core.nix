@@ -237,6 +237,14 @@ let
       nixpkgs = "discord-canary";
       winget = "Discord.Discord.Canary";
     };
+    docker = {
+      category = "cli";
+      # WHY: the gateway needs a Docker CLI on every host. macOS keeps OrbStack
+      # as the daemon, so there is no Homebrew cask here; Windows uses the
+      # WinGet desktop app and NixOS runs the system daemon.
+      nixpkgs = "docker";
+      winget = "Docker.DockerDesktop";
+    };
     dos2unix = {
       category = "cli";
       homebrew = {

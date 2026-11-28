@@ -365,6 +365,29 @@
       ],
       "type": "object"
     },
+    "windowsUserAutostartEntry": {
+      "properties": {
+        "justification": {
+          "description": "Why this service is user-scoped.",
+          "type": "string"
+        },
+        "logging": {
+          "$ref": "#/definitions/loggingEntry"
+        },
+        "service": {
+          "description": "HKCU Run value name for the per-user logon carrier.",
+          "type": "string"
+        },
+        "type": {
+          "const": "windows-user-autostart"
+        }
+      },
+      "required": [
+        "type",
+        "service"
+      ],
+      "type": "object"
+    },
     "endpoint": {
       "description": "A single network endpoint with host, port, and protocol.",
       "properties": {
@@ -450,6 +473,9 @@
         },
         {
           "$ref": "#/definitions/windowsNativeEntry"
+        },
+        {
+          "$ref": "#/definitions/windowsUserAutostartEntry"
         },
         {
           "$ref": "#/definitions/windowsSchtaskEntry"
