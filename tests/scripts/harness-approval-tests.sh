@@ -307,7 +307,7 @@ test_approval_disabled_asks_without_request() {
   fi
 }
 
-test_missing_arguments_asks() {
+test_missing_arguments_deny_resolver_error() {
   local _rc=0
   local _out=""
   _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
@@ -381,7 +381,7 @@ test_unwritable_state_answers_resolver_error
 test_unreadable_config_answers_resolver_error
 test_disabled_bridge_asks_without_request
 test_approval_disabled_asks_without_request
-test_missing_arguments_asks
+test_missing_arguments_deny_resolver_error
 test_request_is_announced
 test_request_file_carries_the_action
 test_audit_log_records_the_decision

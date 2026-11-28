@@ -39,10 +39,10 @@ const runFile = promisify(execFile);
 
 const NOTIFY_COMMAND = "nucleus-utils";
 const APPROVAL_COMMAND = "nucleus-utils";
-// The approval sources wait until answered by default, so this is the ceiling for
-// the whole wait rather than a limit under the gate: 3600 s matches the hook
-// budget the shared hook files declare, and the harness falls back to its own
-// prompt when it expires.
+// The approval sources race with finite bounds by default (300 s for hermes,
+// 600 s for prompt), so this is the ceiling for the whole wait rather than a
+// limit under the gate: 3600 s matches the hook budget the shared hook files
+// declare, and the harness falls back to its own prompt when it expires.
 const APPROVAL_TIMEOUT_MS = 3_600_000;
 
 /**

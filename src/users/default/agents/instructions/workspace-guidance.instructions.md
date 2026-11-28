@@ -15,6 +15,7 @@ Keep `AGENTS.md` short and durable. Extract a section longer than about 30 lines
 | `.agents/instructions/*.instructions.md` | Narrow, file-type-scoped rules loaded automatically |
 | `.agents/prompts/*.prompt.md` | Reusable workflow prompts |
 | `.agents/skills/<skill>/` | Skill bundles (scripts plus instructions) |
+| `src/users/default/agents/skills/` | Nucleus user-scope skills (scripts plus instructions) |
 
 | Tool | Project entry point | User entry point |
 | --- | --- | --- |

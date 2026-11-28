@@ -131,7 +131,7 @@ in
       "the hook files must run the filter runner via nucleus-utils at least once, or the approval budget below is vacuous"
     )
     (assert' (all (entry: entry.timeout == hookCeiling) filterEntries)
-      "a filter entry's timeout must be the hook ceiling (${toString hookCeiling} s); the approval sources wait until answered by default, so a shorter hook timeout turns a human's answer into a harness denial"
+      "a filter entry's timeout must be the hook ceiling (${toString hookCeiling} s); approval sources race under finite 300/600 s bounds, so a shorter hook timeout can stop the bridge before either source answers"
     )
 
     # --- Claude carries the same budget ---

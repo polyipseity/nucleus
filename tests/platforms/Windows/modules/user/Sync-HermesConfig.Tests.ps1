@@ -3,12 +3,13 @@
     Pester coverage for the harness-bridge plugin link in Sync-HermesConfig.ps1.
 
 .DESCRIPTION
-    Unit-tests the plugin deployment on temp paths.  The link has to land in the
-    root the pinned CLI reads (HERMES_HOME, which resolves to
-    %LOCALAPPDATA%\hermes on Windows), so the suite asserts the target built from
-    that root: an enabled run links the overlay-resolved source, a second run is
-    idempotent, a link pointing elsewhere is recreated, a real directory is
-    refused without being deleted, and a disabled run removes the managed link.
+    Unit-tests the plugin deployment on temp paths. HERMES_HOME is the
+    authoritative resolver for the CLI's config and user-data home, including
+    profiles, so the suite asserts that nucleus pins it to the managed
+    ~/.hermes root and links the plugin there: an enabled run links the
+    overlay-resolved source, a second run is idempotent, a link pointing
+    elsewhere is recreated, a real directory is refused without being deleted,
+    and a disabled run removes the managed link.
 
     The hermes CLI is absent throughout, so the enable half stops at its
     documented warning; the CLI contract is probed separately against the real
@@ -45,10 +46,64 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
 
         # Fixture tree: the per-user overlay falls back to src/users/default/.
         $script:repoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermescfg-" + [guid]::NewGuid().ToString('N'))
+        $script:homeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermeshome-" + [guid]::NewGuid().ToString('N'))
         $pluginSourceDir = Join-Path $script:repoRoot 'src\users\default\hermes\plugins\harness-bridge'
         $null = New-Item -ItemType Directory -Path $pluginSourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = Set-Content -Path (Join-Path $pluginSourceDir 'plugin.yaml') -Value 'name: harness-bridge' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
         $script:pluginSource = $pluginSourceDir
+
+        # The same first-level overlay entries POSIX seeds before gateway start.
+        # The catalog is read from the real default domain, then extended with
+        # entries that must not reach either .env file.
+        $script:hermesSkillNames = @(
+            'nucleus-citation-reference', 'nucleus-harness-reference',
+            'nucleus-platform-reference', 'nucleus-policy-reference',
+            'nucleus-service-reference', 'nucleus-vm-reference'
+        )
+        $hermesOverlay = Join-Path $script:repoRoot 'src\users\default\hermes'
+        foreach ($relative in @('config.yaml', 'SOUL.md', 'profiles\gateway\config.yaml')) {
+            $path = Join-Path $hermesOverlay $relative
+            $null = New-Item -ItemType Directory -Path (Split-Path -Path $path -Parent) -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+            $null = Set-Content -Path $path -Value ("fixture: $relative") -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        }
+        $script:hermesSkillsOverlay = Join-Path $hermesOverlay 'skills'
+        $null = New-Item -ItemType Directory -Path $script:hermesSkillsOverlay -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $script:hermesGatewaySkillSources = @{}
+        $gatewaySkillsHome = Join-Path (Join-Path (Join-Path $script:homeRoot '.hermes') 'profiles\gateway') 'skills'
+        foreach ($name in $script:hermesSkillNames) {
+            $source = Join-Path $script:repoRoot "src\users\default\agents\skills\$name"
+            $null = New-Item -ItemType Directory -Path $source -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+            $script:hermesGatewaySkillSources[(Join-Path $gatewaySkillsHome $name)] = $source
+        }
+
+        $defaultCatalogPath = Join-Path $PSScriptRoot '..\..\..\..\..\src\users\default\env-secrets.json'
+        $script:hermesCatalogSecrets = @(
+            (Get-Content -Raw -LiteralPath $defaultCatalogPath | ConvertFrom-Json).secrets |
+                Where-Object { @($_.consumers) -contains 'hermes-agent' -and $_.sopsSource -eq 'user' }
+        )
+        $fixtureCatalogSecrets = @($script:hermesCatalogSecrets) + @(
+            [pscustomobject]@{ name = 'env_hermes_system_probe'; envVar = 'SYSTEM_PROBE'; sopsSource = 'system'; consumers = @('hermes-agent') }
+            [pscustomobject]@{ name = 'env_unrelated_probe'; envVar = 'UNRELATED_PROBE'; sopsSource = 'user'; consumers = @('other') }
+        )
+        $null = Set-Content -Path (Join-Path $script:repoRoot 'src\users\default\env-secrets.json') -Value ([pscustomobject]@{ secrets = $fixtureCatalogSecrets } | ConvertTo-Json -Depth 5) -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+
+        # Stand in for SOPS decryption: values are derived from the catalog, so
+        # the assertion proves the catalog selects the rendered lines.
+        $script:hermesDecryptedSecrets = @{}
+        foreach ($entry in $fixtureCatalogSecrets) {
+            $script:hermesDecryptedSecrets[$entry.name] = "fixture:$($entry.name)"
+        }
+        $script:hermesExpectedEnvLines = @($script:hermesCatalogSecrets | ForEach-Object { "$($_.envVar)=fixture:$($_.name)" })
+        $script:hermesDecryptCalls = @()
+        function Get-HermesDecryptedUserSecret {
+            [CmdletBinding()]
+            param(
+                [Parameter(Mandatory)][string]$RepoRoot,
+                [Parameter(Mandatory)][string]$User
+            )
+            $script:hermesDecryptCalls += "$RepoRoot|$User"
+            return [PSCustomObject]$script:hermesDecryptedSecrets
+        }
 
         # The install branch reads its playwright pin from the lockfile, the same
         # path Sync-HermesConfig uses on a real host.
@@ -57,11 +112,37 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $lockfile = [ordered]@{ bun = [ordered]@{ playwright = '1.63.0' } }
         Set-Content -Path (Join-Path $lockfileDir 'lockfile.json') -Value ($lockfile | ConvertTo-Json -Depth 4)  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
-        $script:homeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermeshome-" + [guid]::NewGuid().ToString('N'))
         $script:localAppData = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermeslad-" + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:homeRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path $script:localAppData -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        $script:pluginLink = Join-Path $script:localAppData 'hermes\plugins\harness-bridge'
+        $script:managedHermesHome = Join-Path $script:homeRoot '.hermes'
+        $script:pluginLink = Join-Path (Join-Path $script:managedHermesHome 'plugins') 'harness-bridge'
+
+        # Paths whose existence and content are snapshotted when the Run value
+        # is requested. The home symlink is created by Sync-HermesConfig itself.
+        $hermesHome = $script:managedHermesHome
+        $gatewayHome = Join-Path $hermesHome 'profiles\gateway'
+        $script:hermesCliSkillsPath = Join-Path $hermesHome 'skills'
+        $script:hermesRepoLink = Join-Path $hermesHome 'repo'
+        $script:hermesManagedFileLinks = @(
+            (Join-Path $hermesHome 'config.yaml'),
+            (Join-Path $hermesHome 'SOUL.md'),
+            (Join-Path $gatewayHome 'config.yaml'),
+            (Join-Path $gatewayHome 'SOUL.md')
+        )
+        $script:hermesEnvPaths = @(
+            (Join-Path $hermesHome '.env'),
+            (Join-Path $gatewayHome '.env')
+        )
+        $script:hermesLinkPaths = @(
+            (Join-Path $hermesHome 'config.yaml'),
+            (Join-Path $hermesHome 'SOUL.md'),
+            $script:hermesCliSkillsPath,
+            $script:hermesRepoLink,
+            (Join-Path $gatewayHome 'config.yaml'),
+            (Join-Path $gatewayHome 'SOUL.md'),
+            (Join-Path $gatewayHome 'skills')
+        ) + @($script:hermesGatewaySkillSources.Keys)
 
         # A stand-in hermes CLI lets the autostart case reach the plugin gate
         # without leaving the test host; an enabled plugin needs no further
@@ -78,6 +159,7 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $script:originalHome = $HOME
         $script:originalLocalAppData = $env:LOCALAPPDATA
         $script:originalAppData = $env:APPDATA
+        $script:originalHermesHome = $env:HERMES_HOME
         Set-Variable -Name HOME -Value $script:homeRoot -Force
         # WHY here: Sync-HermesConfig reads $HOME for the Playwright cache, and with
         #   no chromium-* present the real installer runs, which downloads from npm
@@ -113,11 +195,20 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         # hermes CLI lookup, and the delete-protection helpers are all stubbed so
         # nothing touches the real machine.  Get-Command itself is left alone:
         # Pester resolves mocked commands through it.
+        $script:hermesEnvWrites = @{}
+        $script:hermesProtection = @{}
+        $script:hermesProtectionEvents = @()
         Mock Test-HermesSymlinkPrivilege { return $true }
         Mock Get-HermesUserEnvVar { return $null }
-        Mock Write-HermesUserEnvVar { }
-        Mock Set-ManagedSymlinkDeleteProtection { }
-        Mock Remove-ManagedSymlinkDeleteProtection { }
+        Mock Write-HermesUserEnvVar { $script:hermesEnvWrites[$Name] = $Value }
+        Mock Set-ManagedSymlinkDeleteProtection {
+            $script:hermesProtection[$Path] = $true
+            $script:hermesProtectionEvents += "set:$Path"
+        }
+        Mock Remove-ManagedSymlinkDeleteProtection {
+            $script:hermesProtection[$Path] = $false
+            $script:hermesProtectionEvents += "remove:$Path"
+        }
 
         # hermes is not installed in this sandbox: the enable half warns and stops.
         Mock Get-HermesCliPath { return $null }
@@ -136,6 +227,22 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         function Invoke-HermesGatewayRunValueWrite {
             param([string]$Name, [string]$Command)
             $script:runValues[$Name] = $Command
+            # WHY snapshot here: the profile has to exist before autostart is
+            # written, so the Run mock is the observation point for call order.
+            if ($Name -eq 'nucleus-hermes-gateway') {
+                $links = @{}
+                foreach ($path in $script:hermesLinkPaths) {
+                    $item = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+                    if ($null -ne $item) { $links[$path] = $item }
+                }
+                $envFiles = @{}
+                foreach ($path in $script:hermesEnvPaths) {
+                    if (Test-Path -LiteralPath $path -PathType Leaf) {
+                        $envFiles[$path] = Get-Content -LiteralPath $path -Raw
+                    }
+                }
+                $script:runTimeHermesLayout = @{ Links = $links; EnvFiles = $envFiles }
+            }
         }
         function Invoke-HermesGatewayRunValueRemoval {
             param([string]$Name)
@@ -150,6 +257,7 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         Set-Variable -Name HOME -Value $script:originalHome -Force
         $env:LOCALAPPDATA = $script:originalLocalAppData
         $env:APPDATA = $script:originalAppData
+        $env:HERMES_HOME = $script:originalHermesHome
         foreach ($path in @($script:repoRoot, $script:homeRoot, $script:localAppData, $script:appData)) {
             if ($path) { Clear-HermesTestPath -Path $path }
         }
@@ -158,7 +266,12 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
     BeforeEach {
         $script:scmRemovals = 0
         $script:runValues = @{}
+        $script:hermesEnvWrites = @{}
+        $script:hermesProtection = @{}
+        $script:hermesProtectionEvents = @()
         $script:runValueRemovals = @()
+        $script:runTimeHermesLayout = $null
+        $script:hermesDecryptCalls = @()
         Clear-HermesTestPath -Path $script:pluginLink
     }
 
@@ -168,6 +281,15 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
 
         $script:scmRemovals | Should -Be 1
         $script:runValues['nucleus-hermes-gateway'] | Should -Be 'hermes --profile gateway gateway run --replace'
+    }
+
+    It 'pins HERMES_HOME to the managed ~/.hermes root' {
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $script:hermesEnvWrites['HERMES_HOME'] | Should -Be $script:managedHermesHome
+        $env:HERMES_HOME | Should -Be $script:managedHermesHome
+        (Get-Item -LiteralPath $script:pluginLink -Force).Target | Should -Be $script:pluginSource
+        Test-Path -LiteralPath (Join-Path $script:localAppData 'hermes\plugins\harness-bridge') | Should -Be $false
     }
 
     It 'links the plugin into HERMES_HOME on an enabled run' {
@@ -231,6 +353,101 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
 
         $script:runValueRemovals.Count | Should -Be 1
         $script:runValueRemovals[0] | Should -Be 'nucleus-hermes-gateway'
+    }
+
+    It 'clears delete protection before redeploying managed file links on a second activation' {
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+        $firstEventCount = $script:hermesProtectionEvents.Count
+        foreach ($path in $script:hermesManagedFileLinks) {
+            $script:hermesProtection[$path] | Should -BeTrue -Because "$path is protected after the first activation"
+        }
+
+        { Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null } | Should -Not -Throw
+        $secondEvents = @()
+        for ($i = $firstEventCount; $i -lt $script:hermesProtectionEvents.Count; $i++) {
+            $secondEvents += $script:hermesProtectionEvents[$i]
+        }
+        # WHY: protection is restored right after Deploy-UserWritableSymlink,
+        # so that event marks redeployment for each link.
+        foreach ($path in $script:hermesManagedFileLinks) {
+            $removeAt = [array]::IndexOf($secondEvents, "remove:$path")
+            $setAt = [array]::IndexOf($secondEvents, "set:$path")
+            $removeAt | Should -BeGreaterThan -1 -Because "$path must be unprotected on the second activation"
+            $setAt | Should -BeGreaterThan $removeAt -Because "$path must be unprotected before it is redeployed"
+            (Get-Item -LiteralPath $path -Force).LinkType | Should -Be 'SymbolicLink'
+        }
+    }
+
+    It 'removes stale gateway autostart when symlink privilege is denied' {
+        Mock Test-HermesSymlinkPrivilege { return $false }
+        # WHY: the global mock reports no hermes CLI, so the no-Run assertion
+        # would pass even with the privilege guard removed.
+        Mock Get-HermesCliPath { return $script:standInHermes }
+
+        # WHY: a fresh HOME proves the guard runs before the ~/.hermes symlink
+        # is attempted; an earlier case can leave that symlink behind.
+        $deniedHome = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermesdenied-" + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $deniedHome -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $previousHome = $HOME
+        Set-Variable -Name HOME -Value $deniedHome -Force
+        $warnings = @()
+        $deniedHomeSymlinkCreated = $false
+        try {
+            Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot -WarningVariable warnings > $null
+            $deniedHomeSymlinkCreated = Test-Path -LiteralPath (Join-Path $deniedHome '.hermes')
+        } finally {
+            Set-Variable -Name HOME -Value $previousHome -Force
+            Clear-HermesTestPath -Path $deniedHome
+        }
+
+        ($warnings -join ' ') | Should -Match 'cannot create the Hermes profile links'
+        $script:scmRemovals | Should -Be 1
+        $script:runValueRemovals.Count | Should -Be 1
+        $script:runValueRemovals[0] | Should -Be 'nucleus-hermes-gateway'
+        $script:runValues.Count | Should -Be 0
+        $deniedHomeSymlinkCreated | Should -BeFalse
+    }
+
+    It 'deploys the overlay-owned Hermes files and skill links before writing the gateway Run value' {
+        Mock Get-HermesCliPath { return $script:standInHermes }
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $layout = $script:runTimeHermesLayout
+        $layout | Should -Not -BeNullOrEmpty
+        foreach ($path in $script:hermesLinkPaths) {
+            $layout.Links.ContainsKey($path) | Should -BeTrue -Because "expected a link at $path when the Run value was written"
+        }
+        $layout.Links[$script:hermesCliSkillsPath].LinkType | Should -Be 'SymbolicLink'
+        $layout.Links[$script:hermesCliSkillsPath].Target | Should -Be $script:hermesSkillsOverlay
+        foreach ($linkPath in $script:hermesGatewaySkillSources.Keys) {
+            $layout.Links[$linkPath].Target | Should -Be $script:hermesGatewaySkillSources[$linkPath]
+        }
+    }
+
+    It 'links the live repository through HERMES_HOME before writing the gateway Run value' {
+        Mock Get-HermesCliPath { return $script:standInHermes }
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $layout = $script:runTimeHermesLayout
+        $layout | Should -Not -BeNullOrEmpty
+        $layout.Links.ContainsKey($script:hermesRepoLink) | Should -BeTrue -Because 'the gateway resolves the live checkout through HERMES_HOME/repo'
+        $layout.Links[$script:hermesRepoLink].LinkType | Should -Be 'SymbolicLink'
+        $layout.Links[$script:hermesRepoLink].Target | Should -Be $script:repoRoot
+    }
+
+    It 'renders both Hermes .env files from the user secret catalog before the gateway Run value' {
+        Mock Get-HermesCliPath { return $script:standInHermes }
+        Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot > $null
+
+        $layout = $script:runTimeHermesLayout
+        $layout | Should -Not -BeNullOrEmpty
+        $script:hermesDecryptCalls | Should -Be "$script:repoRoot|testuser"
+        $expected = ($script:hermesExpectedEnvLines -join '|')
+        foreach ($path in $script:hermesEnvPaths) {
+            $layout.EnvFiles.ContainsKey($path) | Should -BeTrue -Because "expected $path when the Run value was written"
+            (($layout.EnvFiles[$path] -split "`n") -join '|') | Should -Be $expected
+            $layout.EnvFiles[$path] | Should -Not -Match 'SYSTEM_PROBE|UNRELATED_PROBE'
+        }
     }
 
     It 'installs the pinned Playwright Chromium with bun and leaves the env var alone when none appears' {

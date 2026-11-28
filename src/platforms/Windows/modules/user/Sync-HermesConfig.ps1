@@ -163,6 +163,167 @@ function Get-HermesBunPath {
   return $bun.Source
 }
 
+function Get-HermesEnvSecretSpec {
+  <#
+  .SYNOPSIS
+    Selects the user-scoped Hermes entries from the env-secrets catalog.
+  #>
+  [CmdletBinding()]
+  [OutputType([object[]])]
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$User
+  )
+
+  # The user domain replaces the default wholesale (users-registry.nix),
+  # so only one catalog file is read.
+  $userCatalog = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\env-secrets.json"
+  $defaultCatalog = Join-Path -Path $RepoRoot -ChildPath 'src\users\default\env-secrets.json'
+  $catalogPath = if (Test-Path -LiteralPath $userCatalog -PathType Leaf) { $userCatalog } else { $defaultCatalog }
+  if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
+    throw "hermes-config: env-secrets catalog not found at $catalogPath"
+  }
+
+  $catalog = Get-Content -LiteralPath $catalogPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  if ($null -eq $catalog.secrets) {
+    throw "hermes-config: env-secrets catalog has no 'secrets' array: $catalogPath"
+  }
+
+  $specs = @()
+  foreach ($entry in @($catalog.secrets)) {
+    # POSIX renders the two .env files from hermesUserSecrets: consumer
+    # hermes-agent and sopsSource user. System secrets stay with litellm.
+    if (@($entry.consumers) -contains 'hermes-agent' -and $entry.sopsSource -eq 'user') {
+      $specs += [PSCustomObject]@{ name = $entry.name; envVar = $entry.envVar }
+    }
+  }
+  return $specs
+}
+
+function Get-HermesDecryptedUserSecret {
+  <#
+  .SYNOPSIS
+    Decrypts the user SOPS file that backs the Hermes .env files.
+  #>
+  [CmdletBinding()]
+  [OutputType([object])]
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$User
+  )
+
+  $secretFile = Join-Path -Path $RepoRoot -ChildPath "src\secrets\users\$User.yml"
+  if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
+    throw "hermes-config: user SOPS file not found at $secretFile"
+  }
+
+  # Same candidate order as apply.ps1: WinGet first, then PATH.
+  # check-suppress:suppression_doc: probe -- the WinGet package directory is absent on some hosts; PATH is the fallback.
+  $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*') -Directory -ErrorAction SilentlyContinue |
+    Sort-Object -Property Name -Descending | Select-Object -First 1
+  $sopsCandidates = @()
+  if ($null -ne $sopsPackageDir) {
+    $sopsCandidates += Join-Path -Path $sopsPackageDir.FullName -ChildPath 'sops.exe'
+  }
+  # check-suppress:suppression_doc: probe -- sops may not be on PATH; Resolve-Executable reports the missing tool.
+  $sopsFromPath = Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  if (-not [string]::IsNullOrWhiteSpace($sopsFromPath)) {
+    $sopsCandidates += $sopsFromPath
+  }
+  $gpgCandidates = @(
+    (Join-Path -Path $env:ProgramFiles -ChildPath 'GnuPG\bin\gpg.exe'),
+    (Join-Path -Path "${env:ProgramFiles(x86)}" -ChildPath 'GnuPG\bin\gpg.exe'),
+    # check-suppress:suppression_doc: probe -- gpg may not be on PATH; Resolve-Executable reports the missing tool.
+    (Get-Command -Name 'gpg.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  $secretParams = @{
+    FilePath    = $secretFile
+    GpgExe      = Resolve-Executable -Name 'gpg' -CandidatePaths $gpgCandidates
+    HostKeyPath = Join-Path -Path $env:ProgramData -ChildPath 'ssh\ssh_host_ed25519_key'
+    RepoRoot    = $RepoRoot
+    SopsExe     = Resolve-Executable -Name 'sops' -CandidatePaths $sopsCandidates
+  }
+  return Get-Secret @secretParams
+}
+
+function Deploy-HermesDirectoryLink {
+  <#
+  .SYNOPSIS
+    Links an overlay-owned skill directory into the Hermes profile tree.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string]$SourcePath,
+    [Parameter(Mandatory)][string]$LinkPath
+  )
+
+  if (-not (Test-Path -LiteralPath $SourcePath -PathType Container)) {
+    throw "[$Name] overlay source not found: $SourcePath"
+  }
+  $parent = Split-Path -Path $LinkPath -Parent
+  if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+    New-Item -ItemType Directory -Path $parent -Force > $null
+  }
+
+  # WHY Get-Item, not Test-Path: a broken symlink has to be replaced, and
+  # Test-Path would report it as absent while New-Item still sees the path.
+  # check-suppress:suppression_doc: probe -- a missing link is the expected first-provision case.
+  $existing = Get-Item -LiteralPath $LinkPath -Force -ErrorAction SilentlyContinue
+  if ($null -ne $existing) {
+    if ($existing.LinkType -ne 'SymbolicLink') {
+      throw "[$Name] refusing to replace the real directory $LinkPath"
+    }
+    if ([string]::Equals($existing.Target, $SourcePath, [System.StringComparison]::OrdinalIgnoreCase)) {
+      return
+    }
+    Remove-ManagedSymlinkDeleteProtection -Context $Name -Path $LinkPath
+    Remove-Item -LiteralPath $LinkPath -Force
+  }
+  New-Item -ItemType SymbolicLink -Path $LinkPath -Target $SourcePath > $null
+  Set-ManagedSymlinkDeleteProtection -Context $Name -Path $LinkPath
+}
+
+function Write-HermesEnvFile {
+  <#
+  .SYNOPSIS
+    Renders one dotenv document to the CLI and gateway profile targets.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string[]]$TargetPaths,
+    [Parameter(Mandatory)][object[]]$SecretSpecs,
+    [Parameter(Mandatory)][object]$DecryptedSecrets
+  )
+
+  $lines = @()
+  foreach ($spec in $SecretSpecs) {
+    $property = $DecryptedSecrets.PSObject.Properties[$spec.name]
+    if ($null -eq $property) {
+      throw "hermes-config: SOPS user secrets are missing $($spec.name)"
+    }
+    $lines += "$($spec.envVar)=$( [string]$property.Value )"
+  }
+  $content = $lines -join "`n"
+
+  foreach ($target in $TargetPaths) {
+    $parent = Split-Path -Path $target -Parent
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) {
+      New-Item -ItemType Directory -Path $parent -Force > $null
+    }
+    [System.IO.File]::WriteAllText($target, $content, [System.Text.UTF8Encoding]::new($false))
+    if ($IsWindows) {
+      # sops-nix writes mode 0600 on POSIX; the user key is the only grant here.
+      $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+      & icacls.exe $target /inheritance:r /grant:r "${identity}:(F)" > $null
+      if ($LASTEXITCODE -ne 0) {
+        throw "hermes-config: could not restrict ACL on $target (icacls exit $LASTEXITCODE)"
+      }
+    }
+  }
+}
+
 function Sync-HermesConfig {
   [CmdletBinding()]
   param(
@@ -177,12 +338,23 @@ function Sync-HermesConfig {
   )
 
   $label = 'hermes-config'
-  # WHY: the CLI reads its root from HERMES_HOME (context override → env var →
-  # platform default), so nucleus pins it to %LOCALAPPDATA%\hermes and the
-  # plugin link lands in that root.
-  $defaultHermesHome = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'hermes'
+  # WHY: HERMES_HOME is the authoritative resolver for the CLI's config and
+  # user-data home, including profiles. Nucleus points it at the managed
+  # ~/.hermes root so the config, profile, and plugin paths share one home.
+  $hermesSymlinkTarget = Join-Path -Path $HOME -ChildPath '.hermes'
+  $managedHermesHome = $hermesSymlinkTarget
   $hermesPluginRelPath = 'plugins\harness-bridge'
-  $pluginLink = Join-Path -Path (Join-Path -Path $defaultHermesHome -ChildPath 'plugins') -ChildPath 'harness-bridge'
+  # WHY mirrored from hermes-agent.nix: the gateway profile carries the same six
+  # user-scope bundles as the CLI, so the overlay paths are resolved per host.
+  $hermesSkillNames = @(
+    'nucleus-citation-reference'
+    'nucleus-harness-reference'
+    'nucleus-platform-reference'
+    'nucleus-policy-reference'
+    'nucleus-service-reference'
+    'nucleus-vm-reference'
+  )
+  $pluginLink = Join-Path -Path (Join-Path -Path $managedHermesHome -ChildPath 'plugins') -ChildPath 'harness-bridge'
 
   if (-not $Enabled) {
     if (Test-Path -LiteralPath $pluginLink) {
@@ -198,11 +370,21 @@ function Sync-HermesConfig {
 
   $dataDir = Join-Path -Path $HOME -ChildPath 'data'
   $hermesDataDir = Join-Path -Path $dataDir -ChildPath 'hermes-agent'
-  $hermesSymlinkTarget = Join-Path -Path $HOME -ChildPath '.hermes'
 
   if (-not (Test-Path -Path $hermesDataDir)) {
     New-Item -ItemType Directory -Path $hermesDataDir -Force > $null
     Write-NucleusNotice "[$label] created directory: data/hermes-agent"
+  }
+
+  # WHY: the guard and stale autostart cleanup precede the ~/.hermes symlink
+  # attempt so a host without the privilege gets the warning, not a .NET error.
+  # WHY: the Run value starts the gateway with this profile, so a run that cannot
+  # create links must still clear a stale autostart carrier.
+  Remove-HermesGatewayService
+  Remove-HermesGatewayRunValue -Name 'nucleus-hermes-gateway'
+  if (-not (Test-HermesSymlinkPrivilege)) {
+    Write-NucleusWarning "[$label] cannot create the Hermes profile links without elevation or Developer Mode"
+    return
   }
 
   # WHY no -PathType: pwsh 7 dropped that enumerator, so LinkType decides, and a
@@ -231,15 +413,15 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] created symlink: $hermesSymlinkTarget -> $hermesDataDir"
   }
 
-  # WHY: uv tool install does not set HERMES_HOME and the upstream installer is
-  # not used, so nucleus writes the same value plus the process copy, since
-  # hermes writes runtime state under that root too.
+  # WHY: the CLI resolves its config and user-data home from HERMES_HOME, so
+  # the User-scope value and this process's copy both point at the managed
+  # ~/.hermes root that carries the profile tree.
   $currentHermesHome = Get-HermesUserEnvVar -Name 'HERMES_HOME'
-  if ($null -eq $currentHermesHome -or $currentHermesHome -ne $defaultHermesHome) {
-    Write-HermesUserEnvVar -Name 'HERMES_HOME' -Value $defaultHermesHome
-    Write-NucleusNotice "[$label] set HERMES_HOME to $defaultHermesHome"
+  if ($null -eq $currentHermesHome -or $currentHermesHome -ne $managedHermesHome) {
+    Write-HermesUserEnvVar -Name 'HERMES_HOME' -Value $managedHermesHome
+    Write-NucleusNotice "[$label] set HERMES_HOME to $managedHermesHome"
   }
-  $env:HERMES_HOME = $defaultHermesHome
+  $env:HERMES_HOME = $managedHermesHome
 
   # WHY: a Scheduled Task from an earlier `hermes gateway install` conflicts with
   # the user Run key installed below. Cleanup, not migration.
@@ -258,10 +440,58 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] removed outdated startup item: $($f.Name)"
   }
 
+  # WHY: --profile gateway is on the Run command line, so the profile and its
+  # secrets have to be materialized before the value is written. A host that
+  # cannot create the links must not advertise a gateway that cannot start.
+  $gatewayProfileDir = Join-Path -Path (Join-Path -Path $hermesSymlinkTarget -ChildPath 'profiles') -ChildPath 'gateway'
+  if (-not (Test-Path -LiteralPath $gatewayProfileDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $gatewayProfileDir -Force > $null
+  }
+  $hermesFileLinks = @(
+    @{ Name = 'hermes-cli-config'; RelativePath = 'config.yaml'; TargetPath = (Join-Path -Path $hermesSymlinkTarget -ChildPath 'config.yaml') }
+    @{ Name = 'hermes-cli-soul'; RelativePath = 'SOUL.md'; TargetPath = (Join-Path -Path $hermesSymlinkTarget -ChildPath 'SOUL.md') }
+    @{ Name = 'hermes-gateway-config'; RelativePath = 'profiles/gateway/config.yaml'; TargetPath = (Join-Path -Path $gatewayProfileDir -ChildPath 'config.yaml') }
+    @{ Name = 'hermes-gateway-soul'; RelativePath = 'SOUL.md'; TargetPath = (Join-Path -Path $gatewayProfileDir -ChildPath 'SOUL.md') }
+  )
+  foreach ($link in $hermesFileLinks) {
+    # WHY: Deploy-WritableSymlink removes the current target before linking, and
+    # the delete-protection ACL has to be cleared first on a second activation.
+    # check-suppress:suppression_doc: probe -- a missing link is the expected first-provision case.
+    $existingLink = Get-Item -LiteralPath $link.TargetPath -Force -ErrorAction SilentlyContinue
+    if ($null -ne $existingLink) {
+      Remove-ManagedSymlinkDeleteProtection -Context $label -Path $link.TargetPath
+    }
+    $deployment = Deploy-UserWritableSymlink -Name $link.Name -User $User -ConfigName 'hermes' -RelativePath $link.RelativePath -RepoRoot $RepoRoot -TargetPath $link.TargetPath
+    Set-ManagedSymlinkDeleteProtection -Context $label -Path $link.TargetPath
+    Write-NucleusNotice "[$label] $($deployment.Message)"
+  }
+
+  $cliSkillsSource = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'hermes' -EntryName 'skills' -RepoRoot $RepoRoot
+  Deploy-HermesDirectoryLink -Name 'hermes-cli-skills' -SourcePath $cliSkillsSource -LinkPath (Join-Path -Path $hermesSymlinkTarget -ChildPath 'skills')
+  # WHY: POSIX exposes the live checkout through $HERMES_HOME/repo for the
+  # gateway; the same managed-link pattern keeps it replaceable on re-apply.
+  Deploy-HermesDirectoryLink -Name 'hermes-repo' -SourcePath $RepoRoot -LinkPath (Join-Path -Path $managedHermesHome -ChildPath 'repo')
+  $gatewaySkillsDir = Join-Path -Path $gatewayProfileDir -ChildPath 'skills'
+  if (-not (Test-Path -LiteralPath $gatewaySkillsDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $gatewaySkillsDir -Force > $null
+  }
+  foreach ($name in $hermesSkillNames) {
+    $skillSource = Resolve-UserConfigFile -User $User -ConfigName 'agents' -RelativePath "skills/$name" -RepoRoot $RepoRoot
+    Deploy-HermesDirectoryLink -Name "hermes-gateway-$name" -SourcePath $skillSource -LinkPath (Join-Path -Path $gatewaySkillsDir -ChildPath $name)
+  }
+
+  $envSpecs = Get-HermesEnvSecretSpec -RepoRoot $RepoRoot -User $User
+  if ($envSpecs.Count -gt 0) {
+    $decryptedSecrets = Get-HermesDecryptedUserSecret -RepoRoot $RepoRoot -User $User
+    Write-HermesEnvFile -TargetPaths @(
+      (Join-Path -Path $hermesSymlinkTarget -ChildPath '.env'),
+      (Join-Path -Path $gatewayProfileDir -ChildPath '.env')
+    ) -SecretSpecs $envSpecs -DecryptedSecrets $decryptedSecrets
+  }
+
   # WHY: the gateway owns per-user secrets and profile state, so logon-owned
-  # HKCU Run is the carrier. The old SCM service has to go away in the same
-  # convergence pass or two gateways would compete for the same state.
-  Remove-HermesGatewayService
+  # HKCU Run is the carrier. The SCM service and stale Run value were cleared
+  # before this point, so only the current autostart value remains.
   # check-suppress:suppression_doc: hermes may not be installed; probe is best-effort
   $hermesBin = Get-HermesCliPath
   if ($null -ne $hermesBin) {

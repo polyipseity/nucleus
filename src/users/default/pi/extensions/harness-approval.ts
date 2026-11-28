@@ -26,10 +26,10 @@ import { join } from "node:path";
 
 const APPROVAL_COMMAND = "nucleus-utils";
 const CONFIG_PATH = join(homedir(), ".local", "state", "nucleus", "config.json");
-// The sources wait until answered by default (harness-approval.timeout-seconds
-// is 0), so this is the ceiling for the whole wait rather than a limit under the
-// gate: 3600 s matches the hook budget the shared hook files declare, and pi
-// falls back to its own confirm when it expires.
+// The sources race with finite bounds by default (300 s for hermes, 600 s for
+// prompt), so this is the ceiling for the whole wait rather than a limit under
+// the gate: 3600 s matches the hook budget the shared hook files declare, and
+// pi falls back to its own confirm when it expires.
 const EXEC_TIMEOUT_MS = 3_600_000;
 const SUMMARY_LIMIT = 200;
 
@@ -93,7 +93,7 @@ const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 /**
  * `harness-notify.enable` is the master kill switch: with it off, this gate must
  * not add prompts pi would not otherwise show. The gate itself
- * (`harness-approval.sources`, `["prompt"]` by default) is read by the
+ * (`harness-approval.sources`, `["prompt","hermes"]` by default) is read by the
  * `nucleus-utils harness request-approval` command this extension calls, so
  * an empty list leaves pi's own confirm.
  */
