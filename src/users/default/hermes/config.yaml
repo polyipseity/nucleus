@@ -1,0 +1,71 @@
+$schema: ./config.schema.json
+# Default Nucleus Hermes CLI profile.
+# Direct keys are listed in priority order. Hermes auto-detection skips any
+# key whose .env value is empty, so an unconfigured provider never wins.
+direct_provider_pool:
+  - env: AI_GATEWAY_API_KEY
+    skip_when_empty: true
+  - env: ANTHROPIC_API_KEY
+    skip_when_empty: true
+  - env: OPENAI_API_KEY
+    skip_when_empty: true
+  - env: OPENAI_BASE_URL
+    skip_when_empty: true
+  - env: NOUS_API_KEY
+    skip_when_empty: true
+  - env: HF_TOKEN
+    skip_when_empty: true
+  - env: GITHUB_TOKEN
+    skip_when_empty: true
+  - env: OPENROUTER_API_KEY
+    skip_when_empty: true
+
+model:
+  provider: auto
+
+# Policy areas: web, terminal/files, browser, media, orchestration, memory,
+# automation, MCP, and plugins. Hermes names several of these differently.
+# MCP and plugin tools register themselves once their servers/plugins load.
+toolsets:
+  - web
+  - terminal
+  - file
+  - browser
+  - vision
+  - image_gen
+  - tts
+  - delegation
+  - kanban
+  - memory
+  - cronjob
+  - skills
+
+terminal:
+  backend: local
+
+approvals:
+  mode: smart
+
+plugins:
+  enabled:
+    - harness-bridge
+
+# The free alias goes first. A request that exhausts it falls through to the
+# paid alias on the same LiteLLM endpoint.
+fallback_providers:
+  - provider: custom:litellm
+    model: default-free
+  - provider: custom:litellm
+    model: default
+
+custom_providers:
+  - name: litellm
+    api_key: sk-nucleus-dummy-litellm
+    base_url: http://127.0.0.1:4000/v1
+    models:
+      default:
+        maxInputTokens: 256000
+        maxOutputTokens: 16000
+      default-free:
+        maxInputTokens: 256000
+        maxOutputTokens: 16000

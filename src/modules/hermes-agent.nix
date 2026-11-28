@@ -104,12 +104,23 @@ let
       userKeys = hermesUserSopsKeys;
     }).all;
 
-  # WHY a template: upstream concatenates `environmentFiles` verbatim, so each
-  # entry must be dotenv (`KEY=value`). The catalog stores bare values, and
-  # python-dotenv drops a bare line, leaving the gateway unauthenticated with no
-  # error. The template renders envVar names onto the decrypted values.
-  hermesEnvTemplate = "hermes-env";
-  hermesEnvTemplatePath = config.sops.templates.${hermesEnvTemplate}.path;
+  # WHY two templates: both profiles read their own `.env`, and upstream's
+  # `environmentFiles` rewrites the CLI `.env` on every activation. Rendering
+  # each template straight to its profile keeps the two files independent.
+  hermesCliEnvTemplate = "hermes-env";
+  hermesGatewayEnvTemplate = "hermes-gateway-env";
+  hermesCliEnvPath = "${config.home.homeDirectory}/.hermes/.env";
+  hermesGatewayEnvPath = "${config.home.homeDirectory}/.hermes/profiles/gateway/.env";
+  hermesEnvContent = hermesSecretUtils.renderHermesEnv config.sops.placeholder hermesUserSecrets;
+
+  hermesSkillNames = [
+    "nucleus-citation-reference"
+    "nucleus-harness-reference"
+    "nucleus-platform-reference"
+    "nucleus-policy-reference"
+    "nucleus-service-reference"
+    "nucleus-vm-reference"
+  ];
 in
 {
 
@@ -153,19 +164,24 @@ in
   home.activation.waitForHermesSecrets = lib.mkIf (hermesSecrets != [ ]) (
     lib.hm.dag.entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
-        ${lib.escapeShellArg hermesEnvTemplatePath}
+        ${lib.escapeShellArg hermesCliEnvPath} \
+        ${lib.escapeShellArg hermesGatewayEnvPath}
     ''
   );
 
   # sops-nix defines `config.sops.placeholder` only while templates are
-  # non-empty, so the template is also what makes the map exist. Skipped
+  # non-empty, so these templates also make the placeholder map exist. Skipped
   # wholesale when no secret is declared, since an empty template is fatal.
   sops.templates = lib.optionalAttrs (hermesSecrets != [ ]) {
-    ${hermesEnvTemplate} = {
-      mode = "0400";
-      content = lib.concatMapStringsSep "\n" (
-        entry: "${entry.envVar}=${config.sops.placeholder.${entry.name}}"
-      ) hermesSecrets;
+    ${hermesCliEnvTemplate} = {
+      path = hermesCliEnvPath;
+      mode = "0600";
+      content = hermesEnvContent;
+    };
+    ${hermesGatewayEnvTemplate} = {
+      path = hermesGatewayEnvPath;
+      mode = "0600";
+      content = hermesEnvContent;
     };
   };
 
@@ -175,14 +191,21 @@ in
 
   services.hermes-agent = {
     enable = lib.mkDefault true;
-    gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
-    # An empty secret value is legitimate and renders as `KEY=`, which hermes
-    # reads as unconfigured.
-    environmentFiles = lib.mkIf (hermesSecrets != [ ]) [ hermesEnvTemplatePath ];
 
     # Hermes gates user plugins on `plugins.enabled`, and `settings` is written to
     # config.yaml, independent of whether the gateway runs here.
     settings.plugins.enabled = [ "harness-bridge" ];
+
+    # Upstream builds `hermes gateway` and appends extraArgs
+    # (nix/moduleCommon.nix gatewayArgv). `--profile` is consumed before argparse
+    # wherever it appears in argv (hermes_cli/_parser.py, main.py), so this argv
+    # runs `gateway run --replace` against profiles/gateway.
+    extraArgs = [
+      "--profile"
+      "gateway"
+      "run"
+      "--replace"
+    ];
 
     # WHY drop `voice`: its ML closure builds from source for 30-80 min each on
     # aarch64-darwin with no binary cache, and upstream's overlay is a pure alias
@@ -190,6 +213,55 @@ in
     # tracks upstream's integrations instead of freezing a copy here.
     extraDependencyGroups = lib.remove "voice" upstreamFullDependencyGroups;
   };
+
+  services.hermes-agent.settings.terminal.backend = "local";
+  services.hermes-agent.settings.approvals.mode = "smart";
+  services.hermes-agent.gateway.enable =
+    hostName == "MacBook" || hostName == "NixOS" || hostName == "Windows";
+
+  # SOPS renders both .env templates directly, so their parent directories must
+  # exist before the sops-nix activation entry. Only create parents here: the
+  # seed links ~/.hermes/skills and the gateway skills path itself, and a
+  # pre-created directory there would block those links.
+  home.activation.prepareHermesProfileDirs = lib.mkIf config.programs.hermes-agent.enable (
+    lib.hm.dag.entryBefore [ "sops-nix" ] ''
+      mkdir -p "${config.home.homeDirectory}/.hermes" \
+        "${config.home.homeDirectory}/.hermes/profiles/gateway"
+    ''
+  );
+
+  # Writable symlinks into the live repo tree. entryBetween lists runs-before
+  # names first: the seed runs before hermesAgentSetup, which merges Nix
+  # settings into config.yaml, and after the parent directories are prepared
+  # and linkGeneration has run.
+  home.activation.seedHermesUserConfig = lib.mkIf config.programs.hermes-agent.enable (
+    lib.hm.dag.entryBetween [ "hermesAgentSetup" ] [ "prepareHermesProfileDirs" "linkGeneration" ] ''
+      _seed="${activationBundle}/src/scripts/configs/seed-writable-symlink.sh"
+      "$_seed" "$HOME/.hermes/config.yaml" \
+        "${overlay.toRepoRelPath (overlay.selectFile "hermes" "config.yaml")}" "${hostName}"
+      "$_seed" "$HOME/.hermes/SOUL.md" \
+        "${overlay.toRepoRelPath (overlay.selectFile "hermes" "SOUL.md")}" "${hostName}"
+      "$_seed" "$HOME/.hermes/skills" \
+        "${overlay.toRepoRelPath (overlay.selectFirstLevelEntry "hermes" "skills")}" "${hostName}"
+      "$_seed" "$HOME/.hermes/profiles/gateway/config.yaml" \
+        "${overlay.toRepoRelPath (overlay.selectFile "hermes" "profiles/gateway/config.yaml")}" "${hostName}"
+      "$_seed" "$HOME/.hermes/profiles/gateway/SOUL.md" \
+        "${overlay.toRepoRelPath (overlay.selectFile "hermes" "SOUL.md")}" "${hostName}"
+      ${lib.concatMapStringsSep "\n" (name: ''
+        _skill_source="${overlay.toRepoRelPath (overlay.selectFile "agents" "skills/${name}")}"
+        # The seeded skills directory already carries relative links for the CLI.
+        if [ ! -e "$HOME/.hermes/skills/${name}" ] && [ ! -L "$HOME/.hermes/skills/${name}" ]; then
+          "$_seed" "$HOME/.hermes/skills/${name}" "$_skill_source" "${hostName}"
+        fi
+        "$_seed" "$HOME/.hermes/profiles/gateway/skills/${name}" "$_skill_source" "${hostName}"
+      '') hermesSkillNames}
+
+      # The gateway mounts the live checkout through $HERMES_HOME/repo.
+      . "${activationBundle}/src/scripts/lib/lib.sh"
+      _hermes_live_root="$(derive_repo_root)" || exit 1
+      ln -sfn "$_hermes_live_root" "$HOME/.hermes/repo"
+    ''
+  );
 
   # Writable symlink into the live repo tree, so the plugin edits without a rebuild.
   home.activation.seedHermesHarnessBridgePlugin = lib.mkIf config.programs.hermes-agent.enable (

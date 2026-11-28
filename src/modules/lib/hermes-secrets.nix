@@ -30,6 +30,14 @@ in
       user = builtins.filter (s: s.sopsSource == "user") all;
     };
 
+  # Dotenv lines for one profile's .env. Both the CLI and the gateway profile
+  # consume the same user-secret catalog; the placeholders come from sops-nix.
+  renderHermesEnv =
+    placeholders: entries:
+    builtins.concatStringsSep "\n" (
+      map (entry: "${entry.envVar}=${placeholders.${entry.name}}") entries
+    );
+
   # Declared keys the referenced SOPS file does not carry.
   #
   # `systemKeys` and `userKeys` are the parsed key names of that file, `[ ]`

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Nucleus Hermes CLI and gateway profile config.yaml files.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "approvals": {
+      "description": "Policy approval settings.",
+      "properties": {
+        "mode": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "custom_providers": {
+      "description": "Custom provider definitions merged into Hermes.",
+      "items": {
+        "properties": {
+          "api_key": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "models": {
+            "additionalProperties": {
+              "properties": {
+                "maxInputTokens": {
+                  "type": "integer"
+                },
+                "maxOutputTokens": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "direct_provider_pool": {
+      "description": "Ordered provider environment keys Hermes auto-detects.",
+      "items": {
+        "properties": {
+          "env": {
+            "type": "string"
+          },
+          "skip_when_empty": {
+            "type": "boolean"
+          }
+        },
+        "required": ["env"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "fallback_providers": {
+      "items": {
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "required": ["model", "provider"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "model": {
+      "properties": {
+        "provider": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "plugins": {
+      "properties": {
+        "enabled": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "terminal": {
+      "description": "CLI uses local; the gateway profile runs commands in Docker.",
+      "properties": {
+        "backend": {
+          "type": "string"
+        },
+        "docker_forward_env": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "docker_run_as_host_user": {
+          "type": "boolean"
+        },
+        "docker_volumes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "toolsets": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

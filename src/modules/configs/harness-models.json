@@ -71,6 +71,18 @@
       "payload": "src/users/default/hermes/litellm-config.yaml"
     },
     {
+      "harness": "hermes-gateway",
+      "path": "~/.hermes/profiles/gateway/config.yaml",
+      "format": "yaml",
+      "slot": {
+        "kind": "yaml-named-item",
+        "listKey": "custom_providers",
+        "itemKey": "name",
+        "itemName": "litellm"
+      },
+      "payload": "src/users/default/hermes/litellm-config.yaml"
+    },
+    {
       "harness": "codex",
       "path": "~/.codex/config.toml",
       "format": "toml",
