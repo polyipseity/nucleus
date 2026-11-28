@@ -1867,13 +1867,7 @@
             },
             {
               "name": "request-approval",
-              "flags": [
-                {
-                  "long": "--plain",
-                  "takesValue": false,
-                  "description": "Print the decision word alone"
-                }
-              ],
+              "flags": [],
               "positionals": [
                 {
                   "name": "harness",

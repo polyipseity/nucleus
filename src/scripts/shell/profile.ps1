@@ -929,7 +929,6 @@ $nucleusUtilsFlags = @(
   '--home',
   '--hook',
   '--host',
-  '--plain',
   '--preset',
   '--registry',
   '--repo-root',

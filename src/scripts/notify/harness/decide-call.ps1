@@ -11,7 +11,7 @@
     cursor           {"permission":"allow"|"ask"|"deny"}
     claude, copilot  {"hookSpecificOutput":{...,"permissionDecision":"..."}}
     pi, opencode,
-    codex, others    plain allow | deny | ask
+    codex, others    the typed decision document itself
 
   The registry is `src\modules\configs\harness-filters.json` under
   $env:NUCLEUS_REPO_ROOT, which this file reads from the live checkout: the
@@ -37,9 +37,9 @@
   decision here" and is then put to the configured approval sources, which
   answer allow or deny for a call no filter decides: the runner never allows by
   omission, because that would remove prompting the harness would otherwise do.
-  The sources are consulted through the sibling request-approval.ps1 with
-  -Plain, so this runner renders the document and the resolver only states the
-  decision.
+  The sources are consulted through the sibling request-approval.ps1, which
+  prints one typed decision document. This runner validates it and renders it in
+  the calling harness's vocabulary.
 
   Every path prints a document and exits 0, because several harnesses read a
   failed hook as a denial, which would turn a broken registry into a blocked
@@ -82,22 +82,107 @@ $script:auditDigest = ''
 $script:filterId = ''
 $script:filterRule = ''
 
-function ConvertTo-HarnessFilterDocument {
+function Format-HarnessDecisionDocument {
   <#
   .SYNOPSIS
-    Renders a decision in the calling harness's own vocabulary.
+    Builds the typed decision document shared by every harness adapter.
   .DESCRIPTION
-    `ask` is valid in every shape, so the neutral answer is always expressible.
-    The two document shapes are the ones the harnesses parse today (Copilot
-    PreToolUse, Cursor beforeShellExecution); the plain word is what pi and
-    opencode read from the last stdout line, and what a harness without a
-    document shape ignores.
-  .PARAMETER Harness
-    Calling harness name.
+    Filter decisions have no approval source, so the source is `none` and no
+    source timed out. The timeout values are the contract bounds from the
+    decision schema, not caller-supplied waits.
   .PARAMETER Decision
     allow, ask, or deny.
   .PARAMETER Reason
-    Human-readable reason, carried by the document shapes that have a field for it.
+    Why the runner answered this way.
+  .PARAMETER Source
+    Approval source, or `none` when no source decided.
+  .PARAMETER TimedOutSources
+    Sources that gave up waiting.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [ValidateSet('allow', 'ask', 'deny')]
+    [string]$Decision,
+
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Reason,
+
+    [string]$Source = 'none',
+
+    [string[]]$TimedOutSources = @()
+  )
+
+  $document = [ordered]@{
+    version         = 1
+    decision        = $Decision
+    reason          = $Reason
+    source          = $Source
+    timeouts        = [ordered]@{ hermes = 300; prompt = 600 }
+    timedOutSources = @($TimedOutSources | Sort-Object -Unique)
+  }
+  return (ConvertTo-Json -InputObject $document -Compress -Depth 5)
+}
+
+function Read-HarnessDecisionDocument {
+  <#
+  .SYNOPSIS
+    Validates the resolver's typed document and returns its compact form.
+  .DESCRIPTION
+    An empty return means the text is not a decision the harness can act on.
+    Every field from decision-contract.schema.json is checked here; the runner
+    never falls back to a plain word or to a stderr detail.
+  .PARAMETER Text
+    Raw stdout captured from the approval resolver.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Text
+  )
+
+  $parsed = $null
+  try { $parsed = ConvertFrom-Json -InputObject $Text -AsHashtable -ErrorAction Stop }
+  catch { return '' }
+  if ($parsed -isnot [hashtable]) { return '' }
+  # decision-contract.schema.json sets additionalProperties: false at the top
+  # level, so an extra field makes the whole document unusable.
+  $contractKeys = @('version', 'decision', 'reason', 'source', 'timeouts', 'timedOutSources')
+  if (@($parsed.Keys).Count -ne $contractKeys.Count) { return '' }
+  foreach ($key in $contractKeys) {
+    if ($parsed.Keys -cnotcontains $key) { return '' }
+  }
+  if ($parsed['version'] -ne 1) { return '' }
+  if ($parsed['decision'] -cnotin @('allow', 'ask', 'deny')) { return '' }
+  if ($parsed['reason'] -isnot [string]) { return '' }
+  if ($parsed['source'] -cnotin @('prompt', 'hermes', 'all-timeouts', 'resolver-error', 'none')) { return '' }
+  $timeouts = $parsed['timeouts']
+  if ($timeouts -isnot [hashtable] -or $timeouts['hermes'] -ne 300 -or $timeouts['prompt'] -ne 600) { return '' }
+  $timedOut = $parsed['timedOutSources']
+  if ($timedOut -isnot [array]) { return '' }
+  foreach ($name in $timedOut) {
+    if ($name -cnotin @('hermes', 'prompt')) { return '' }
+  }
+  return (ConvertTo-Json -InputObject $parsed -Compress -Depth 5)
+}
+
+function ConvertTo-HarnessFilterDocument {
+  <#
+  .SYNOPSIS
+    Renders a typed decision in the calling harness's own vocabulary.
+  .DESCRIPTION
+    `ask` is valid in every shape, so the neutral answer is always expressible.
+    The two document shapes are the ones the harnesses parse today (Copilot
+    PreToolUse, Cursor beforeShellExecution); every other harness reads the typed
+    document itself, reason included.
+  .PARAMETER Harness
+    Calling harness name.
+  .PARAMETER Document
+    Typed decision document.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -106,28 +191,27 @@ function ConvertTo-HarnessFilterDocument {
     [string]$Harness,
 
     [Parameter(Mandatory)]
-    [ValidateSet('allow', 'ask', 'deny')]
-    [string]$Decision,
-
-    [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$Reason
+    [string]$Document
   )
 
+  $parsed = ConvertFrom-Json -InputObject $Document -AsHashtable
+  $decision = [string]$parsed['decision']
+  $reason = [string]$parsed['reason']
   switch ($Harness) {
     'cursor' {
-      return (ConvertTo-Json -InputObject ([ordered]@{ permission = $Decision }) -Compress -Depth 5)
+      return (ConvertTo-Json -InputObject ([ordered]@{ permission = $decision }) -Compress -Depth 5)
     }
     { $_ -in @('claude', 'copilot') } {
       return (ConvertTo-Json -InputObject ([ordered]@{
             hookSpecificOutput = [ordered]@{
               hookEventName             = 'PreToolUse'
-              permissionDecision        = $Decision
-              permissionDecisionReason  = $Reason
+              permissionDecision        = $decision
+              permissionDecisionReason  = $reason
             }
           }) -Compress -Depth 5)
     }
-    default { return $Decision }
+    default { return $Document }
   }
 }
 
@@ -405,10 +489,9 @@ function Complete-HarnessFilter {
   .SYNOPSIS
     Prints the aggregated decision in the caller's vocabulary and exits 0.
   .DESCRIPTION
-    An undecided call is put to the configured approval sources, asked for the
-    decision word alone because this runner renders the document. A source that
-    answers allow or deny becomes the runner's answer; anything else keeps the
-    runner's own reason so the harness's prompt explains what happened.
+    An undecided call is put to the configured approval sources. A valid typed
+    document becomes the runner's answer; anything else keeps the runner's own
+    ask so the harness's prompt explains what happened.
   .PARAMETER Harness
     Calling harness name.
   .PARAMETER Decision
@@ -449,29 +532,44 @@ function Complete-HarnessFilter {
 
   Write-HarnessFilterAudit -Harness $Harness -Decision $Decision -Rule $Rule -Summary $Summary
 
+  $document = Format-HarnessDecisionDocument -Decision $Decision -Reason $Reason
   if ($Decision -cin @('allow', 'deny')) {
-    Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $Decision -Reason $Reason)
+    Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Document $document)
     exit 0
   }
 
+  # No filter decided, so the configured approval sources answer. Their document
+  # carries the reason, which is what the harness prompt has to show.
   $resolverPath = Join-Path -Path $PSScriptRoot -ChildPath 'request-approval.ps1'
   if (-not (Test-Path -LiteralPath $resolverPath -PathType Leaf)) {
     Write-HarnessBridgeWarning -CommandName 'decide-call' -Message "no approval resolver at ${resolverPath}: asking locally"
   }
   else {
     $pwshPath = [Environment]::ProcessPath
-    $lines = @(& $pwshPath -NoProfile -File $resolverPath -Plain -Harness $Harness -Tool $Tool -Summary $Summary |
+    $lines = @(& $pwshPath -NoProfile -File $resolverPath -Harness $Harness -Tool $Tool -Summary $Summary |
         ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
     if ($LASTEXITCODE -ne 0) {
       Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'the approval resolver failed: asking locally'
     }
-    elseif ($lines.Count -ge 1 -and $lines[$lines.Count - 1] -cin @('allow', 'deny')) {
-      Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $lines[$lines.Count - 1] -Reason 'harness-approval (source)')
-      exit 0
+    else {
+      $resolved = Read-HarnessDecisionDocument -Text ($lines -join "`n")
+      if ($resolved -eq '') {
+        Write-HarnessBridgeWarning -CommandName 'decide-call' -Message 'the approval resolver printed no valid decision document: asking locally'
+      }
+      else {
+        $resolvedDocument = ConvertFrom-Json -InputObject $resolved -AsHashtable
+        # A source decided, so its reason is the one the harness prompt shows.
+        # An ask means no source answered; the runner's own reason then explains
+        # why it is prompting (filter-error, no-filter, or not-a-command).
+        if ($resolvedDocument['decision'] -cne 'ask') {
+          Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Document $resolved)
+          exit 0
+        }
+      }
     }
   }
 
-  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason $Reason)
+  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Document $document)
   exit 0
 }
 
@@ -548,7 +646,8 @@ catch {
   # WHY its own call: a crash is exactly the outcome a review looks for, so the
   # fail-open document is audited rather than only printed.
   Write-HarnessFilterAudit -Harness $Harness -Decision 'ask' -Rule 'runner-error'
-  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason 'nucleus-utils harness decide-call (runner-error): the runner failed, so the harness prompts')
+  $document = Format-HarnessDecisionDocument -Decision 'ask' -Reason 'nucleus-utils harness decide-call (runner-error): the runner failed, so the harness prompts'
+  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Document $document)
 }
 
 exit 0

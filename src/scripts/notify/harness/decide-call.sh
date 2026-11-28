@@ -8,7 +8,7 @@
 #         cursor           -> {"permission":"allow"|"ask"|"deny"}
 #         claude, copilot  -> {"hookSpecificOutput":{...,"permissionDecision":"…"}}
 #         pi, opencode,
-#         codex, others    -> plain allow | deny | ask
+#         codex, others    -> the typed decision document itself
 #
 # The registry is `src/modules/configs/harness-filters.json`, read from the live
 # checkout through derive_repo_root (method 4: runtime direct read) because the
@@ -86,16 +86,47 @@ case "$_hf_payload" in
   ;;
 esac
 
-# Renders the decision in the calling harness's own vocabulary. `ask` is a valid
-# value in every shape, so the neutral answer is always expressible. The two
-# document shapes are the ones the harnesses parse today (Copilot PreToolUse,
-# Cursor beforeShellExecution); the plain word is what pi and opencode read from
-# the last stdout line, and what a harness without a document shape ignores.
-_hf_render() { # <decision> <reason>
+# The one wire contract shared by the resolver and every consumer. Filter
+# decisions have no approval source, so they use `none` and no timed-out sources.
+_hf_document() { # <decision> <reason> [source] [timed-out-sources-json]
+  jq -cnM --arg d "$1" --arg r "$2" --arg s "${3:-none}" --argjson t "${4:-[]}" \
+    '{version: 1, decision: $d, reason: $r, source: $s,
+      timeouts: {hermes: 300, prompt: 600}, timedOutSources: $t}'
+}
+
+# jq both validates the resolver's document and normalizes it to one line. A
+# document that fails any field of decision-contract.schema.json is not a
+# decision: the runner keeps the caller's own ask instead. The top-level key set
+# is checked exactly, matching additionalProperties: false in the schema.
+_hf_validate_document() { # <document>
+  if ! jq -ceM '
+    type == "object" and
+    (keys == (["version", "decision", "reason", "source", "timeouts", "timedOutSources"] | sort)) and
+    .version == 1 and
+    (.decision | IN("allow", "deny", "ask")) and
+    (.reason | type == "string") and
+    (.source | IN("prompt", "hermes", "all-timeouts", "resolver-error", "none")) and
+    (.timeouts.hermes == 300) and (.timeouts.prompt == 600) and
+    (.timedOutSources | type == "array" and all(.[]; IN("hermes", "prompt")))
+  ' <<<"$1" >/dev/null; then
+    return 1
+  fi
+  jq -cM . <<<"$1"
+}
+
+# Renders the typed decision in the calling harness's own vocabulary. `ask` is a
+# valid decision in every shape, so the neutral answer is always expressible.
+# The two document shapes are the ones the harnesses parse today (Copilot
+# PreToolUse, Cursor beforeShellExecution); every other harness reads the typed
+# document itself, reason included.
+_hf_render() { # <typed document>
+  local _hf_decision _hf_reason
+  _hf_decision="$(jq -r '.decision' <<<"$1")"
+  _hf_reason="$(jq -r '.reason' <<<"$1")"
   case "$_hf_harness" in
-  cursor) jq -cn --arg d "$1" '{permission: $d}' ;;
+  cursor) jq -cn --arg d "$_hf_decision" '{permission: $d}' ;;
   claude | copilot)
-    jq -cn --arg d "$1" --arg r "$2" \
+    jq -cn --arg d "$_hf_decision" --arg r "$_hf_reason" \
       '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: $d, permissionDecisionReason: $r}}'
     ;;
   *) printf '%s\n' "$1" ;;
@@ -107,6 +138,7 @@ _hf_finish() { # <decision> <reason> [runner-rule]
   # WHY a third argument: a runner-level outcome has no filter to name, and the
   # rule token is what tells a registry failure apart from a clean `no-filter`.
   _hf_finish_rule="${3-}"
+  _hf_document_text="$(_hf_document "$1" "$2")"
   if [ -z "$_hf_finish_rule" ]; then
     _hf_finish_rule="${_hf_best_rule-}"
   fi
@@ -129,23 +161,28 @@ _hf_finish() { # <decision> <reason> [runner-rule]
   fi
   case "${1-}" in
   allow | deny)
-    _hf_render "$1" "${2-}"
+    _hf_render "$_hf_document_text"
     exit 0
     ;;
   esac
-  # No filter decided, so the configured approval sources answer instead: the
-  # same gate every harness hook passes through, asked for the decision word
-  # alone because the reason below is this runner's to render.
+  # No filter decided, so the configured approval sources answer instead. The
+  # resolver owns the reason this time: its typed document is validated and then
+  # rendered, so a source that timed out explains itself in the harness prompt.
   _hf_resolver="$SCRIPT_DIR/request-approval.sh"
   if [ ! -f "$_hf_resolver" ]; then
     warn "no approval resolver at $_hf_resolver: asking locally"
-  elif ! _hf_option="$("$_hf_resolver" --plain "$_hf_harness" "$_hf_tool" "$_hf_description")"; then
+  elif ! _hf_response="$("$_hf_resolver" "$_hf_harness" "$_hf_tool" "$_hf_description")"; then
     warn "the approval resolver failed: asking locally"
-  elif [ "$_hf_option" = "allow" ] || [ "$_hf_option" = "deny" ]; then
-    _hf_render "$_hf_option" "harness-approval (source)"
+  elif ! _hf_resolved="$(_hf_validate_document "$_hf_response")"; then
+    warn "the approval resolver printed no valid decision document: asking locally"
+  elif [ "$(jq -r '.decision' <<<"$_hf_resolved")" != ask ]; then
+    # A source decided, so its reason is the one the harness prompt shows. An
+    # `ask` says no source answered; the runner's own reason then explains why
+    # it is prompting (filter-error, no-filter, or not-a-command).
+    _hf_render "$_hf_resolved"
     exit 0
   fi
-  _hf_render ask "${2-}"
+  _hf_render "$_hf_document_text"
   exit 0
 }
 

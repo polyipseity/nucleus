@@ -49,6 +49,10 @@ REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
 SCHEMA="$REPO_ROOT/src/modules/configs/harness-filters.schema.json"
 readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR REGISTRY SCHEMA
 
+TYPED_REASON='all approval sources timed out (hermes 300s, prompt 600s)'
+TYPED_DENY='{"version":1,"decision":"deny","reason":"all approval sources timed out (hermes 300s, prompt 600s)","source":"all-timeouts","timeouts":{"hermes":300,"prompt":600},"timedOutSources":["hermes","prompt"]}'
+readonly TYPED_REASON TYPED_DENY
+
 require_command jq "the runner and the filter registry both need jq"
 require_command check-jsonschema "the shipped registry is validated against its schema"
 require_command python3 "the schema file is parsed with python3"
@@ -108,6 +112,18 @@ run_runner() { # <tree> <harness> <payload>
   local _harness="$2"
   local _payload="$3"
   NUCLEUS_REPO_ROOT="$_root" "$_root/src/scripts/notify/harness/decide-call.sh" "$_harness" <<<"$_payload"
+}
+
+# The resolver stand-in prints the exact typed document and a decoy on stderr: a
+# runner that reads the last line or the stderr detail cannot pass the cases below.
+write_typed_resolver() { # <tree> <document>
+  local _path="$1/src/scripts/notify/harness/request-approval.sh"
+  cat >"$_path" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' 'stderr detail must not become the verdict' >&2
+printf '%s\n' '$2'
+EOF
+  chmod +x "$_path"
 }
 
 run_filter() { # <settings> <command>
@@ -315,29 +331,17 @@ _claude_deny="$(run_runner "$TREE" claude '{"command":"/bin/rm -rf x"}')"
 assert_document "claude: native path is denied" "$_claude_deny" \
   '.hookSpecificOutput.permissionDecision == "deny"'
 
-if [ "$(run_runner "$TREE" pi '{"command":"/bin/rm x"}')" = "deny" ]; then
-  assert_pass "pi: plain deny word"
-else
-  assert_fail "pi: plain deny word" "the plain-word render is what pi reads from its last stdout line"
-fi
+assert_document "pi: typed deny document" "$(run_runner "$TREE" pi '{"command":"/bin/rm x"}')" \
+  '.version == 1 and .decision == "deny" and .source == "none" and .timeouts.hermes == 300 and .timeouts.prompt == 600 and (.reason | contains("safe-delete (native-path)"))'
 
-if [ "$(run_runner "$TREE" codex '{"command":"/bin/rm x"}')" = "deny" ]; then
-  assert_pass "codex: plain deny word"
-else
-  assert_fail "codex: plain deny word" "codex has no document shape, so the plain word is its render"
-fi
+assert_document "codex: typed deny document" "$(run_runner "$TREE" codex '{"command":"/bin/rm x"}')" \
+  '.version == 1 and .decision == "deny" and (.reason | contains("safe-delete (native-path)"))'
 
-if [ "$(run_runner "$TREE" opencode '{"command":"ls -la"}')" = "allow" ]; then
-  assert_pass "opencode: an ungated command is allowed"
-else
-  assert_fail "opencode: an ungated command is allowed" "a command no filter matches must not become a prompt"
-fi
+assert_document "opencode: an ungated command is allowed" "$(run_runner "$TREE" opencode '{"command":"ls -la"}')" \
+  '.version == 1 and .decision == "allow" and (.timedOutSources | length) == 0'
 
-if [ "$(run_runner "$TREE" unknown-harness '{"command":"/bin/rm x"}')" = "deny" ]; then
-  assert_pass "fallback: an unknown harness gets the plain word"
-else
-  assert_fail "fallback: an unknown harness gets the plain word" "the fallback render is the plain decision"
-fi
+assert_document "fallback: an unknown harness gets the typed document" "$(run_runner "$TREE" unknown-harness '{"command":"/bin/rm x"}')" \
+  '.version == 1 and .decision == "deny"'
 
 # One document per call: a second line would be a second decision for a harness
 # that reads either the whole stdout or its last line.
@@ -539,11 +543,13 @@ fi
 
 _no_bun_status=0
 _no_bun_line="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" pi <<<'{"command":"/bin/rm x"}' 2>"$NO_BUN_STDERR")" || _no_bun_status=$?
-if [ "$_no_bun_line" = "ask" ] && [ "$_no_bun_status" -eq 0 ]; then
-  assert_pass "a missing bun answers ask and exits 0"
+if [ "$_no_bun_status" -eq 0 ]; then
+  assert_pass "a missing bun exits 0"
 else
-  assert_fail "a missing bun answers ask and exits 0" "got '$_no_bun_line' with exit $_no_bun_status"
+  assert_fail "a missing bun exits 0" "the runner exited $_no_bun_status"
 fi
+assert_document "a missing bun answers a typed ask" "$_no_bun_line" \
+  '.version == 1 and .decision == "ask" and (.reason | contains("filter-error"))'
 
 _no_bun_document="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" copilot <<<'{"command":"/bin/rm x"}' 2>/dev/null)"
 assert_document "a missing bun is recorded as filter-error" "$_no_bun_document" \
@@ -554,5 +560,45 @@ if grep -q 'bun is not on PATH' "$NO_BUN_STDERR"; then
 else
   assert_fail "a missing bun warns on stderr, where a human looks" "stderr carried no bun warning: $(cat "$NO_BUN_STDERR")"
 fi
+
+section 7 "typed resolver rendering"
+
+# No filter speaks here, so the runner must take the resolver's typed document,
+# render it in the native shapes, and pass it through unchanged to the harnesses
+# without a document shape. The stub writes a decoy word to stderr as well.
+TYPED_TREE="$(make_tree typed-resolver)"
+set_registry "$TYPED_TREE" '{"filters":[{"enabled":false,"id":"safe-delete","settings":{}}]}'
+write_typed_resolver "$TYPED_TREE" "$TYPED_DENY"
+
+_typed_copilot="$(run_runner "$TYPED_TREE" copilot '{"command":"anything"}')"
+assert_document "copilot: the resolver reason is the permission decision reason" "$_typed_copilot" \
+  ".hookSpecificOutput.permissionDecision == \"deny\" and .hookSpecificOutput.permissionDecisionReason == \"$TYPED_REASON\""
+assert_document "claude: the resolver reason is the permission decision reason" "$(run_runner "$TYPED_TREE" claude '{"command":"anything"}')" \
+  ".hookSpecificOutput.permissionDecision == \"deny\" and .hookSpecificOutput.permissionDecisionReason == \"$TYPED_REASON\""
+
+_typed_cursor="$(run_runner "$TYPED_TREE" cursor '{"command":"anything"}')"
+if [ "$_typed_cursor" = '{"permission":"deny"}' ]; then
+  assert_pass "cursor: a typed deny renders the permission document"
+else
+  assert_fail "cursor: a typed deny renders the permission document" "got '$_typed_cursor'"
+fi
+
+for _typed_harness in pi opencode codex unknown-harness; do
+  _typed_line="$(run_runner "$TYPED_TREE" "$_typed_harness" '{"command":"anything"}')"
+  if [ "$_typed_line" = "$TYPED_DENY" ]; then
+    assert_pass "$_typed_harness: the typed document reaches the harness unchanged"
+  else
+    assert_fail "$_typed_harness: the typed document reaches the harness unchanged" "got '$_typed_line'"
+  fi
+done
+
+# The contract pins the top-level key set. An otherwise valid deny with one
+# extra field is not a decision, so the runner keeps its own ask instead of
+# rendering a deny the resolver never stated under the contract.
+EXTRA_KEY_DENY="$(printf '%s' "$TYPED_DENY" | jq -c '. + {"extra": "unexpected"}')"
+write_typed_resolver "$TYPED_TREE" "$EXTRA_KEY_DENY"
+assert_document "pi: a typed resolver document with an extra top-level key is not acted on" \
+  "$(run_runner "$TYPED_TREE" pi '{"command":"anything"}')" \
+  '.version == 1 and .decision == "ask" and (.reason | contains("no-filter")) and (.reason | contains("all approval sources timed out") | not)'
 
 finish_tests

@@ -129,6 +129,47 @@ function notify(event, text) {
   child.unref();
 }
 
+const DECISION_CONTRACT_DECISIONS = new Set(["allow", "deny", "ask"]);
+const DECISION_CONTRACT_SOURCES = new Set([
+  "prompt",
+  "hermes",
+  "all-timeouts",
+  "resolver-error",
+  "none",
+]);
+const DECISION_CONTRACT_TIMED_OUT_SOURCES = new Set(["hermes", "prompt"]);
+const DECISION_CONTRACT_KEYS = [
+  "version",
+  "decision",
+  "reason",
+  "source",
+  "timeouts",
+  "timedOutSources",
+];
+
+/** The typed decision document, or null when stdout carries no usable decision. */
+function parseDecisionDocument(stdout) {
+  try {
+    const doc = JSON.parse(stdout.trim().split("\n").pop()?.trim() ?? "");
+    if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return null;
+    // The schema sets additionalProperties: false, so an extra top-level field
+    // makes the whole document unusable.
+    if (Object.keys(doc).length !== DECISION_CONTRACT_KEYS.length) return null;
+    if (DECISION_CONTRACT_KEYS.some((key) => !Object.prototype.hasOwnProperty.call(doc, key))) return null;
+    if (doc.version !== 1) return null;
+    if (!DECISION_CONTRACT_DECISIONS.has(doc.decision)) return null;
+    if (typeof doc.reason !== "string") return null;
+    if (!DECISION_CONTRACT_SOURCES.has(doc.source)) return null;
+    if (typeof doc.timeouts !== "object" || doc.timeouts === null || Array.isArray(doc.timeouts)) return null;
+    if (doc.timeouts.hermes !== 300 || doc.timeouts.prompt !== 600) return null;
+    if (!Array.isArray(doc.timedOutSources)) return null;
+    if (!doc.timedOutSources.every((name) => DECISION_CONTRACT_TIMED_OUT_SOURCES.has(name))) return null;
+    return { decision: doc.decision, reason: doc.reason };
+  } catch {
+    return null;
+  }
+}
+
 /** Event payload ids are optional in every field OpenCode has exposed so far. */
 function asId(value) {
   return typeof value === "string" && value !== "" ? value : null;
@@ -137,20 +178,20 @@ function asId(value) {
 /**
  * Ask the bridge for a decision on one permission request. Only allow and deny
  * are applied; `ask` means "nobody answered", which must leave OpenCode's own
- * local prompt in place.
+ * local prompt in place. A deny carries the resolver's reason so the approval
+ * notification can state why the call was rejected.
  */
 async function decideRemotely(tool, summary) {
   try {
     const { stdout } = await runFile(APPROVAL_COMMAND, ["harness", "request-approval", "opencode", tool, summary], {
       timeout: APPROVAL_TIMEOUT_MS,
     });
-    const lines = stdout.trim().split("\n");
-    const decision = lines[lines.length - 1]?.trim();
-    return decision === "allow" || decision === "deny" ? decision : "ask";
+    const parsed = parseDecisionDocument(stdout);
+    if (parsed !== null && parsed.decision !== "ask") return parsed;
   } catch {
     // Broker missing, wedged or killed: the local prompt decides.
-    return "ask";
   }
+  return { decision: "ask", reason: "" };
 }
 
 /**
@@ -238,15 +279,18 @@ async function handleEvent(event, context, project) {
         return;
       }
       const tool = asId(data.action) ?? "permission";
-      const decision = await decideRemotely(tool, `${project}${detail}`);
-      if (decision === "ask") {
+      const answer = await decideRemotely(tool, `${project}${detail}`);
+      if (answer.decision === "ask") {
         notify(
           "approval",
           `${project} — permission requested${detail} (no remote answer)`,
         );
         return;
       }
-      await replyToPermission(context, sessionID, requestID, decision);
+      if (answer.decision === "deny") {
+        notify("approval", `${project} — permission denied: ${answer.reason}`);
+      }
+      await replyToPermission(context, sessionID, requestID, answer.decision);
       return;
     }
 

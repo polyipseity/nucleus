@@ -325,13 +325,20 @@ Describe 'nucleus-utils harness nesting (PowerShell)' {
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }
 
-  It 'forwards --plain to request-approval' {
+  It 'forwards request-approval and returns its typed document' {
     $testHome = New-UtilsTestHome
     try {
       Set-UtilsTestConfig -HomePath $testHome
-      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'request-approval', '--plain', 'cursor', 'shelltool', 'forwarding summary')
+      $result = Invoke-UtilsScript -HomePath $testHome -Arguments @('harness', 'request-approval', 'cursor', 'shelltool', 'forwarding summary')
       $result.ExitCode | Should -Be 0
-      $result.Stdout.Trim() | Should -Be 'ask'
+      $doc = $result.Stdout.Trim() | ConvertFrom-Json -AsHashtable
+      $doc['version'] | Should -Be 1
+      $doc['decision'] | Should -Be 'ask'
+      $doc['reason'] | Should -Be 'no approval sources enabled'
+      $doc['source'] | Should -Be 'none'
+      $doc['timeouts']['hermes'] | Should -Be 300
+      $doc['timeouts']['prompt'] | Should -Be 600
+      @($doc['timedOutSources']).Count | Should -Be 0
       $result.Stderr | Should -Not -Match 'usage:'
     } finally { Remove-UtilsTestHome -HomePath $testHome }
   }

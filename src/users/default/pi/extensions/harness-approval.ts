@@ -10,7 +10,7 @@
  *
  * Three outcomes, all decided remotely first:
  *   allow: the call runs untouched (no local prompt)
- *   deny:  the call is blocked without asking locally
+ *   deny:  the call is blocked with the resolver's own reason, without asking
  *   ask:   no remote decision arrived (broker disabled, unreachable, or nobody
  *           answered in time), so the local confirm prompt decides
  *
@@ -34,6 +34,52 @@ const EXEC_TIMEOUT_MS = 3_600_000;
 const SUMMARY_LIMIT = 200;
 
 const DELETION_WORD_RE = /\b(?:rm|del|rd|rmdir|erase|ri|unlink|shred|remove-item)\b/i;
+type Decision = "allow" | "ask" | "deny";
+const DECISIONS: readonly string[] = ["allow", "ask", "deny"];
+const SOURCES: readonly string[] = [
+  "prompt",
+  "hermes",
+  "all-timeouts",
+  "resolver-error",
+  "none",
+];
+const TIMED_OUT_SOURCES: readonly string[] = ["hermes", "prompt"];
+const CONTRACT_KEYS: readonly string[] = [
+  "version",
+  "decision",
+  "reason",
+  "source",
+  "timeouts",
+  "timedOutSources",
+];
+
+/** The typed decision document, or null when stdout carries no usable decision. */
+function parseDecision(stdout: string): { decision: Decision; reason: string } | null {
+  try {
+    const doc = JSON.parse(stdout.trim().split("\n").pop()?.trim() ?? "") as Record<
+      string,
+      unknown
+    >;
+    if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return null;
+    // The schema sets additionalProperties: false, so an extra top-level field
+    // makes the whole document unusable.
+    if (Object.keys(doc).length !== CONTRACT_KEYS.length) return null;
+    if (CONTRACT_KEYS.some((key) => !Object.prototype.hasOwnProperty.call(doc, key))) return null;
+    if (doc["version"] !== 1) return null;
+    if (!DECISIONS.includes(doc["decision"] as string)) return null;
+    if (typeof doc["reason"] !== "string") return null;
+    if (!SOURCES.includes(doc["source"] as string)) return null;
+    const timeouts = doc["timeouts"];
+    if (typeof timeouts !== "object" || timeouts === null || Array.isArray(timeouts)) return null;
+    const bounds = timeouts as Record<string, unknown>;
+    if (bounds["hermes"] !== 300 || bounds["prompt"] !== 600) return null;
+    if (!Array.isArray(doc["timedOutSources"])) return null;
+    if (!doc["timedOutSources"].every((name) => TIMED_OUT_SOURCES.includes(name as string))) return null;
+    return { decision: doc["decision"] as Decision, reason: doc["reason"] as string };
+  } catch {
+    return null;
+  }
+}
 
 const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bsudo\b/, "privileged command"],
@@ -106,7 +152,8 @@ export default function (pi: ExtensionAPI) {
 
     const summary = `${event.toolName} (${reason}): ${summarize(event.input)}`;
 
-    let decision = "ask";
+    let decision: Decision = "ask";
+    let decisionReason = "no approval source answered";
     try {
       const result = await pi.exec(
         APPROVAL_COMMAND,
@@ -114,8 +161,11 @@ export default function (pi: ExtensionAPI) {
         { timeout: EXEC_TIMEOUT_MS },
       );
       if (result.code === 0) {
-        const lines = result.stdout.trim().split("\n");
-        decision = lines[lines.length - 1]?.trim() ?? "ask";
+        const parsed = parseDecision(result.stdout);
+        if (parsed !== null) {
+          decision = parsed.decision;
+          decisionReason = parsed.reason;
+        }
       }
     } catch {
       // Broker unreachable: fall through to the local prompt rather than
@@ -125,7 +175,7 @@ export default function (pi: ExtensionAPI) {
 
     if (decision === "allow") return;
     if (decision === "deny") {
-      return { block: true, reason: "Denied remotely (/harness deny)" };
+      return { block: true, reason: decisionReason };
     }
 
     const approved = await ctx.ui.confirm(

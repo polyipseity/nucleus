@@ -45,8 +45,28 @@ export interface RunnerOptions {
 export interface Verdict {
 	readonly decision: "allow" | "ask" | "deny";
 	readonly raw: string;
+	readonly reason: string;
 	readonly stderr: string;
 }
+
+type Decision = Verdict["decision"];
+const DECISIONS: readonly string[] = ["allow", "ask", "deny"];
+const SOURCES: readonly string[] = [
+	"prompt",
+	"hermes",
+	"all-timeouts",
+	"resolver-error",
+	"none",
+];
+const TIMED_OUT_SOURCES: readonly string[] = ["hermes", "prompt"];
+const CONTRACT_KEYS: readonly string[] = [
+	"version",
+	"decision",
+	"reason",
+	"source",
+	"timeouts",
+	"timedOutSources",
+];
 
 function collectStream(stream: NodeJS.ReadableStream | null): Promise<string> {
 	if (stream === null) {
@@ -110,12 +130,31 @@ export const spawnHarnessFilter: SpawnFn = async (command, args, stdin, timeoutM
 	});
 };
 
-function parseVerdict(stdout: string): "allow" | "ask" | "deny" | null {
-	const line = stdout.trim().split("\n").pop()?.trim() ?? "";
-	if (line === "allow" || line === "ask" || line === "deny") {
-		return line;
+function parseVerdict(stdout: string): { decision: Decision; reason: string } | null {
+	try {
+		const doc = JSON.parse(stdout.trim().split("\n").pop()?.trim() ?? "") as Record<
+			string,
+			unknown
+		>;
+		if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return null;
+		// The schema sets additionalProperties: false, so an extra top-level field
+		// makes the whole document unusable.
+		if (Object.keys(doc).length !== CONTRACT_KEYS.length) return null;
+		if (CONTRACT_KEYS.some((key) => !Object.prototype.hasOwnProperty.call(doc, key))) return null;
+		if (doc["version"] !== 1) return null;
+		if (!DECISIONS.includes(doc["decision"] as string)) return null;
+		if (typeof doc["reason"] !== "string") return null;
+		if (!SOURCES.includes(doc["source"] as string)) return null;
+		const timeouts = doc["timeouts"];
+		if (typeof timeouts !== "object" || timeouts === null || Array.isArray(timeouts)) return null;
+		const bounds = timeouts as Record<string, unknown>;
+		if (bounds["hermes"] !== 300 || bounds["prompt"] !== 600) return null;
+		if (!Array.isArray(doc["timedOutSources"])) return null;
+		if (!doc["timedOutSources"].every((name) => TIMED_OUT_SOURCES.includes(name as string))) return null;
+		return { decision: doc["decision"] as Decision, reason: doc["reason"] as string };
+	} catch {
+		return null;
 	}
-	return null;
 }
 
 export function hasDeletionWord(command: string): boolean {
@@ -136,9 +175,14 @@ export async function runHarnessFilter(
 	const spawnFn = options.spawnFn ?? spawnHarnessFilter;
 	const result = await spawnFn(runnerCommand, runnerArgs, buildPayload(command), timeoutMs);
 
-	const decision = parseVerdict(result.stdout);
-	if (decision !== null) {
-		return { decision, raw: result.stdout.trim(), stderr: result.stderr.trim() };
+	const parsed = parseVerdict(result.stdout);
+	if (parsed !== null) {
+		return {
+			decision: parsed.decision,
+			raw: result.stdout.trim(),
+			reason: parsed.reason,
+			stderr: result.stderr.trim(),
+		};
 	}
 
 	const details = [
@@ -153,7 +197,8 @@ export async function runHarnessFilter(
 	const suffix = details.length > 0 ? ` (${details})` : "";
 	return {
 		decision: "ask",
-		raw: stderr.length > 0 ? stderr : `no verdict${suffix}`,
+		raw: `no decision document${suffix}`,
+		reason: `no decision document${suffix}`,
 		stderr,
 	};
 }
@@ -173,21 +218,7 @@ function setStatus(ui: SafeDeleteUi, value: string | undefined): void {
 
 
 function verdictDetail(verdict: Verdict): string {
-	const parts = verdict.raw.split("\t");
-	if (parts.length >= 3) {
-		const detail = parts.slice(2).join("\t").trim();
-		if (detail.length > 0) {
-			return `${parts[1]}: ${detail}`;
-		}
-	}
-	const stderr = verdict.stderr.trim();
-	if (stderr.length > 0) {
-		return stderr;
-	}
-	if (parts.length >= 2 && parts[1]?.trim().length > 0) {
-		return parts[1]!.trim();
-	}
-	return "";
+	return verdict.reason.trim();
 }
 
 function block(reason: string): { block: true; reason: string } {

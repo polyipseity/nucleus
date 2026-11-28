@@ -27,6 +27,22 @@ import createSafeDeleteExtension, {
 const REPO_ROOT = process.cwd();
 const RUNNER_PATH = join(REPO_ROOT, "src/scripts/notify/harness/decide-call.sh");
 const ESC = String.fromCharCode(27);
+const DENY_REASON = "all approval sources timed out (hermes 300s, prompt 600s)";
+
+function typedDocument(decision: "allow" | "ask" | "deny", reason: string): string {
+	return JSON.stringify({
+		version: 1,
+		decision,
+		reason,
+		source: decision === "deny" ? "all-timeouts" : "none",
+		timeouts: { hermes: 300, prompt: 600 },
+		timedOutSources: decision === "deny" ? ["hermes", "prompt"] : [],
+	});
+}
+
+const DENY_DOCUMENT = typedDocument("deny", DENY_REASON);
+const ASK_DOCUMENT = typedDocument("ask", "no approval sources enabled");
+const ALLOW_DOCUMENT = typedDocument("allow", "prompt allowed");
 
 const originalNoColor = process.env.NO_COLOR;
 const originalTerm = process.env.TERM;
@@ -99,13 +115,13 @@ function loadExtension(options: RunnerOptions = {}): ToolCallHandler {
 	return handler;
 }
 
-function fakeSpawn(verdict: "allow" | "ask" | "deny", calls?: SpawnCall[]): SpawnFn {
+function fakeSpawn(document: string, calls?: SpawnCall[]): SpawnFn {
 	return async (command, args, stdin, timeoutMs): Promise<SpawnResult> => {
 		calls?.push({ command, args, stdin, timeoutMs });
 		return {
 			code: 0,
 			signal: null,
-			stdout: `${verdict}\n`,
+			stdout: `${document}\n`,
 			stderr: "",
 			timedOut: false,
 		};
@@ -216,7 +232,7 @@ describe("safe-delete pre-filter and payload", () => {
 
 	test("pre-filter short-circuits non-bash tools and commands without deletion words", async () => {
 		const calls: SpawnCall[] = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("deny", calls) });
+		const handler = loadExtension({ spawnFn: fakeSpawn(DENY_DOCUMENT, calls) });
 
 		await expect(
 			handler({ toolName: "read", input: { command: "rm -rf /" } }, { hasUI: false, ui: { hasUI: false } }),
@@ -230,9 +246,43 @@ describe("safe-delete pre-filter and payload", () => {
 });
 
 describe("safe-delete verdict mapping", () => {
+	test("a typed deny exposes the resolver reason to the caller", async () => {
+		const verdict = await runHarnessFilter("rm x", {
+			spawnFn: fakeSpawn(DENY_DOCUMENT),
+		});
+
+		expect(verdict.decision).toBe("deny");
+		expect((verdict as unknown as { reason: string }).reason).toBe(DENY_REASON);
+	});
+
+	test("a typed deny with an extra top-level key stays an ask", async () => {
+		const extraKeyDocument = `${DENY_DOCUMENT.slice(0, -1)},"extra":"unexpected"}`;
+		const verdict = await runHarnessFilter("rm x", {
+			spawnFn: fakeSpawn(extraKeyDocument),
+		});
+
+		expect(verdict.decision).toBe("ask");
+		expect((verdict as unknown as { reason: string }).reason).not.toContain(DENY_REASON);
+	});
+
+	test("a plain word with a stderr detail stays an ask without the detail", async () => {
+		const verdict = await runHarnessFilter("rm x", {
+			spawnFn: async () => ({
+				code: 0,
+				signal: null,
+				stdout: "deny\n",
+				stderr: DENY_REASON,
+				timedOut: false,
+			}),
+		});
+
+		expect(verdict.decision).toBe("ask");
+		expect((verdict as unknown as { reason: string }).reason).not.toContain(DENY_REASON);
+	});
+
 	test("deny blocks and reports status set then cleared", async () => {
 		const status: Array<[string, string | undefined]> = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("deny") });
+		const handler = loadExtension({ spawnFn: fakeSpawn(DENY_DOCUMENT) });
 		const ui: SafeDeleteUi = {
 			hasUI: false,
 			setStatus: (key, value) => status.push([key, value]),
@@ -245,7 +295,7 @@ describe("safe-delete verdict mapping", () => {
 
 		expect(result).toEqual({
 			block: true,
-			reason: "Blocked by the safe-delete filter (deny). Use safe-rm or rip2 instead.",
+			reason: `Blocked by the safe-delete filter (deny). ${DENY_REASON} Use safe-rm or rip2 instead.`,
 		});
 		expect(status).toEqual([
 			["safe-delete", "safe-delete: blocked"],
@@ -257,7 +307,7 @@ describe("safe-delete verdict mapping", () => {
 		const restore = allowColor();
 		try {
 			const status: Array<[string, string | undefined]> = [];
-			const handler = loadExtension({ spawnFn: fakeSpawn("deny") });
+			const handler = loadExtension({ spawnFn: fakeSpawn(DENY_DOCUMENT) });
 			const ui: SafeDeleteUi = {
 				hasUI: false,
 				setStatus: (key, value) => status.push([key, value]),
@@ -281,7 +331,7 @@ describe("safe-delete verdict mapping", () => {
 		const restore = allowColor();
 		try {
 			const status: Array<[string, string | undefined]> = [];
-			const handler = loadExtension({ spawnFn: fakeSpawn("ask") });
+			const handler = loadExtension({ spawnFn: fakeSpawn(ASK_DOCUMENT) });
 			const ui: SafeDeleteUi = {
 				hasUI: false,
 				setStatus: (key, value) => status.push([key, value]),
@@ -303,7 +353,7 @@ describe("safe-delete verdict mapping", () => {
 
 	test("ask blocks without UI, reports no confirmation was possible, and clears status", async () => {
 		const status: Array<[string, string | undefined]> = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("ask") });
+		const handler = loadExtension({ spawnFn: fakeSpawn(ASK_DOCUMENT) });
 		const ui: SafeDeleteUi = {
 			hasUI: false,
 			setStatus: (key, value) => status.push([key, value]),
@@ -317,7 +367,7 @@ describe("safe-delete verdict mapping", () => {
 		expect(result).toEqual({
 			block: true,
 			reason:
-				"Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use safe-rm or rip2 instead.",
+				`Blocked by the safe-delete filter (ask) and no confirmation UI is available. no approval sources enabled Use safe-rm or rip2 instead.`,
 		});
 		expect(status).toEqual([
 			["safe-delete", "safe-delete: confirmation required"],
@@ -328,7 +378,7 @@ describe("safe-delete verdict mapping", () => {
 	test("ask with UI confirm true allows and clears status on settle", async () => {
 		const status: Array<[string, string | undefined]> = [];
 		const confirms: Array<[string, string]> = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("ask") });
+		const handler = loadExtension({ spawnFn: fakeSpawn(ASK_DOCUMENT) });
 		const ui: SafeDeleteUi = {
 			hasUI: true,
 			confirm: async (title, message) => {
@@ -347,6 +397,7 @@ describe("safe-delete verdict mapping", () => {
 		expect(confirms).toHaveLength(1);
 		expect(confirms[0]?.[0]).toBe("Safe-delete filter requires confirmation");
 		expect(confirms[0]?.[1]).toContain("rm file.txt");
+		expect(confirms[0]?.[1]).toContain("no approval sources enabled");
 		expect(status).toEqual([
 			["safe-delete", "safe-delete: confirmation required"],
 			["safe-delete", undefined],
@@ -355,7 +406,7 @@ describe("safe-delete verdict mapping", () => {
 
 	test("ask with UI confirm false blocks and clears status on settle", async () => {
 		const status: Array<[string, string | undefined]> = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("ask") });
+		const handler = loadExtension({ spawnFn: fakeSpawn(ASK_DOCUMENT) });
 		const ui: SafeDeleteUi = {
 			hasUI: true,
 			confirm: async () => false,
@@ -376,7 +427,7 @@ describe("safe-delete verdict mapping", () => {
 
 	test("allow passes through without status changes", async () => {
 		const status: Array<[string, string | undefined]> = [];
-		const handler = loadExtension({ spawnFn: fakeSpawn("allow") });
+		const handler = loadExtension({ spawnFn: fakeSpawn(ALLOW_DOCUMENT) });
 		const ui: SafeDeleteUi = {
 			hasUI: false,
 			setStatus: (key, value) => status.push([key, value]),
@@ -397,7 +448,7 @@ describe("safe-delete verdict mapping", () => {
 			runnerCommand: "/custom/harness-filter",
 			runnerArgs: ["pi"],
 			timeoutMs: 4321,
-			spawnFn: fakeSpawn("allow", calls),
+			spawnFn: fakeSpawn(ALLOW_DOCUMENT, calls),
 		});
 
 		await handler(
